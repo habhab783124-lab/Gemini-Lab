@@ -1,0 +1,76 @@
+# 这份 .gitignore 文件应该放在 Unity 项目的根目录下
+# 来源参考: https://github.com/github/gitignore/blob/main/Unity.gitignore
+
+# 核心忽略文件夹 (缓存、临时文件、日志、本地用户设置等)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uilds/
+/[Bb]uild/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+# 内存抓取文件 (通常很大且可能包含敏感数据)
+/[Mm]emoryCaptures/
+
+# 录屏文件 (通常很大)
+/[Rr]ecordings/
+
+# 如果你想忽略 Asset Store Tools 插件，可以取消下面这行的注释
+# /[Aa]ssets/AssetStoreTools*
+
+# 自动生成的 JetBrains Rider 插件
+/[Aa]ssets/Plugins/Editor/JetBrains*
+
+# Visual Studio 缓存目录
+.vs/
+
+# Gradle 缓存目录
+.gradle/
+
+# 自动生成的 VS/MD/Consulo 解决方案和工程文件
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity3D 生成的无用 meta 文件
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Unity3D 崩溃报告生成的系统信息文件
+sysinfo.txt
+
+# 打包产物
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crashlytics 生成的文件
+crashlytics-build.properties
+
+# Packed dat 文件
+*.dat
+
+# 操作系统自动生成的文件 (macOS / Windows 缓存)
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
