@@ -23,6 +23,8 @@ namespace GeminiLab.Modules.Pet
 
         public string CurrentState => _context?.RuntimeData.CurrentState ?? "None";
 
+        public PetRuntimeData? RuntimeData => _context?.RuntimeData;
+
         private void Awake()
         {
             PetStateValueSO config = _config ?? ScriptableObject.CreateInstance<PetStateValueSO>();
@@ -101,7 +103,7 @@ namespace GeminiLab.Modules.Pet
         public static void PublishStateChanged(string from, string to)
         {
             Debug.Log($"[PetFSM] {from} -> {to}");
-            if (ServiceLocator.TryResolve(out EventBus? eventBus))
+            if (ServiceLocator.TryResolve(out EventBus? eventBus) && eventBus is not null)
             {
                 eventBus.Publish(new PetStateChangedEvent(from, to));
             }
@@ -116,24 +118,66 @@ namespace GeminiLab.Modules.Pet
 
             while (context.CommandLinkService.TryDequeue(out PetCommand command))
             {
-                context.RuntimeData.LastTraceId = command.TraceId;
-                if (context.IsSleeping && command.ForceWake)
+                PetCommandRequest request = command.Request;
+                context.RuntimeData.LastTraceId = request.TraceId;
+                if (context.IsSleeping && request.ForceWake && request.CommandType == PetCommandType.WorkRequest)
                 {
                     float moodPenalty = context.Config.ForceWakeMoodPenalty;
                     context.RuntimeData.Mood = Mathf.Clamp(context.RuntimeData.Mood - moodPenalty, 0f, 100f);
                     context.RuntimeData.PreventSleepBeforeTime = context.RuntimeData.RuntimeTimeSeconds + 3f;
                     stateMachine.ForceChangeState<IdleState>();
-                    context.EventBus?.Publish(new PetWakePenaltyAppliedEvent(command.TraceId, -moodPenalty));
+                    context.EventBus?.Publish(new PetWakePenaltyAppliedEvent(request.TraceId, -moodPenalty));
                 }
 
-                if (!context.IsSleeping || command.ForceWake)
+                switch (request.CommandType)
                 {
-                    context.RuntimeData.WorkRequested = true;
-                    context.EventBus?.Publish(new PetCommandAcceptedEvent(command.TraceId, command.ForceWake));
-                }
-                else
-                {
-                    context.EventBus?.Publish(new PetCommandRejectedEvent(command.TraceId, "Pet is sleeping and command is not force-wake."));
+                    case PetCommandType.WorkRequest:
+                        if (!context.IsSleeping || request.ForceWake)
+                        {
+                            if (request.TargetType == PetWorkTargetType.WorkDesk &&
+                                (context.FurnitureService is null ||
+                                 !context.FurnitureService.TryGetBestInteractionTarget(context.RuntimeData.Position, FurnitureInteractionQuery.WorkDeskOnly, out FurnitureInteractionTarget _)))
+                            {
+                                context.RuntimeData.WorkRequested = false;
+                                context.EventBus?.Publish(new PetWorkFailedEvent(request.TraceId, "No available WorkDesk target."));
+                                ResetWorkRuntime(context);
+                                break;
+                            }
+
+                            context.RuntimeData.WorkRequested = true;
+                            context.RuntimeData.ActiveWorkTraceId = request.TraceId;
+                            context.RuntimeData.ActiveWorkMessage = request.Message;
+                            context.RuntimeData.RequiredWorkTargetType = request.TargetType;
+                            context.RuntimeData.IsAtRequiredWorkTarget = false;
+                            context.RuntimeData.TargetFurnitureId = string.Empty;
+                            context.RuntimeData.TargetReached = false;
+                            context.RuntimeData.ActivePath.Clear();
+                            context.EventBus?.Publish(new PetCommandAcceptedEvent(request.TraceId, request.ForceWake, request.CommandType, request.Source));
+                        }
+                        else
+                        {
+                            context.EventBus?.Publish(new PetCommandRejectedEvent(request.TraceId, "Pet is sleeping and command is not force-wake."));
+                        }
+
+                        break;
+                    case PetCommandType.WorkCompleted:
+                        if (string.Equals(context.RuntimeData.ActiveWorkTraceId, request.TraceId, System.StringComparison.Ordinal))
+                        {
+                            context.RuntimeData.WorkRequested = false;
+                            context.EventBus?.Publish(new PetWorkCompletedEvent(request.TraceId, request.Message));
+                            ResetWorkRuntime(context);
+                        }
+
+                        break;
+                    case PetCommandType.WorkFailed:
+                        if (string.Equals(context.RuntimeData.ActiveWorkTraceId, request.TraceId, System.StringComparison.Ordinal))
+                        {
+                            context.RuntimeData.WorkRequested = false;
+                            context.EventBus?.Publish(new PetWorkFailedEvent(request.TraceId, request.Message));
+                            ResetWorkRuntime(context);
+                        }
+
+                        break;
                 }
             }
         }
@@ -175,6 +219,17 @@ namespace GeminiLab.Modules.Pet
             {
                 context.CommandLinkService = commandLinkService;
             }
+        }
+
+        private static void ResetWorkRuntime(PetContext context)
+        {
+            context.RuntimeData.ActiveWorkTraceId = string.Empty;
+            context.RuntimeData.ActiveWorkMessage = string.Empty;
+            context.RuntimeData.RequiredWorkTargetType = PetWorkTargetType.Any;
+            context.RuntimeData.IsAtRequiredWorkTarget = false;
+            context.RuntimeData.TargetFurnitureId = string.Empty;
+            context.RuntimeData.TargetReached = false;
+            context.RuntimeData.ActivePath.Clear();
         }
     }
 }

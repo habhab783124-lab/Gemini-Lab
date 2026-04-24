@@ -31,6 +31,7 @@ namespace GeminiLab.Modules.Furniture
                 FurnitureDefinitionSO fallback = ScriptableObject.CreateInstance<FurnitureDefinitionSO>();
                 fallback.ConfigureRuntime(
                     "Furniture.Fallback",
+                    FurnitureCategory.Decoration,
                     FurniturePlacementType.Floor,
                     Vector2Int.one,
                     default);

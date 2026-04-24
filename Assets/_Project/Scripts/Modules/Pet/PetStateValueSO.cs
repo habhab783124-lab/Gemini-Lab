@@ -25,5 +25,8 @@ namespace GeminiLab.Modules.Pet
 
         [Header("Command Penalty")]
         [Range(0f, 100f)] public float ForceWakeMoodPenalty = 30f;
+
+        [Header("Work")]
+        [Min(1f)] public float WorkStateTimeoutSeconds = 30f;
     }
 }

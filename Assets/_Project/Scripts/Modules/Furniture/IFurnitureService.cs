@@ -18,6 +18,8 @@ namespace GeminiLab.Modules.Furniture
 
         bool TryGetBestInteractionTarget(Vector2 origin, out FurnitureInteractionTarget target);
 
+        bool TryGetBestInteractionTarget(Vector2 origin, FurnitureInteractionQuery query, out FurnitureInteractionTarget target);
+
         bool TryConsumeInteractionBuff(string furnitureId, out EnvironmentalBuff buff);
 
         FurnitureLayoutSnapshot CaptureLayout();

@@ -15,14 +15,30 @@ namespace GeminiLab.Modules.Pet
         public void Enter(PetContext context)
         {
             context.EnterState(StateName);
+            if (!context.RuntimeData.IsAtRequiredWorkTarget)
+            {
+                context.RuntimeData.WorkRequested = false;
+                context.EventBus?.Publish(new PetWorkFailedEvent(context.RuntimeData.ActiveWorkTraceId, "Work target is not reached."));
+                ResetWorkContext(context);
+                return;
+            }
+
+            context.EventBus?.Publish(new PetWorkStartedEvent(context.RuntimeData.ActiveWorkTraceId, context.RuntimeData.TargetFurnitureId));
         }
 
         public void Tick(PetContext context, float deltaTime)
         {
             context.Advance(deltaTime);
-            if (context.RuntimeData.TimeInCurrentState >= 2f)
+            if (!context.RuntimeData.WorkRequested)
+            {
+                return;
+            }
+
+            if (context.RuntimeData.TimeInCurrentState >= context.Config.WorkStateTimeoutSeconds)
             {
                 context.RuntimeData.WorkRequested = false;
+                context.EventBus?.Publish(new PetWorkFailedEvent(context.RuntimeData.ActiveWorkTraceId, "Work timeout."));
+                ResetWorkContext(context);
             }
         }
 
@@ -32,6 +48,14 @@ namespace GeminiLab.Modules.Pet
 
         public void Exit(PetContext context)
         {
+        }
+
+        private static void ResetWorkContext(PetContext context)
+        {
+            context.RuntimeData.ActiveWorkTraceId = string.Empty;
+            context.RuntimeData.ActiveWorkMessage = string.Empty;
+            context.RuntimeData.RequiredWorkTargetType = PetWorkTargetType.Any;
+            context.RuntimeData.IsAtRequiredWorkTarget = false;
         }
     }
 }

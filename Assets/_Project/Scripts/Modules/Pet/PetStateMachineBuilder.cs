@@ -36,9 +36,29 @@ namespace GeminiLab.Modules.Pet
                     ctx.RuntimeData.Energy > ctx.Config.SleepEnterEnergyThreshold)
                 .AddTransition<InteractingState, IdleState>(ctx =>
                     ctx.RuntimeData.TimeInCurrentState >= 1.0f || ctx.RuntimeData.WorkRequested)
-                .AddTransition<IdleState, WorkingState>(ctx => ctx.RuntimeData.WorkRequested, priority: 10)
-                .AddTransition<MovingState, WorkingState>(ctx => ctx.RuntimeData.WorkRequested, priority: 10)
-                .AddTransition<InteractingState, WorkingState>(ctx => ctx.RuntimeData.WorkRequested, priority: 10)
+                .AddTransition<IdleState, MovingState>(ctx =>
+                    ctx.RuntimeData.WorkRequested &&
+                    !ctx.RuntimeData.IsAtRequiredWorkTarget &&
+                    ctx.FurnitureService is not null &&
+                    ctx.FurnitureService.HasPlacedFurniture,
+                    priority: 20)
+                .AddTransition<IdleState, WorkingState>(ctx =>
+                    ctx.RuntimeData.WorkRequested &&
+                    ctx.RuntimeData.IsAtRequiredWorkTarget,
+                    priority: 10)
+                .AddTransition<MovingState, WorkingState>(ctx =>
+                    ctx.RuntimeData.WorkRequested &&
+                    ctx.RuntimeData.TargetReached &&
+                    ctx.RuntimeData.IsAtRequiredWorkTarget,
+                    priority: 10)
+                .AddTransition<MovingState, IdleState>(ctx =>
+                    !ctx.RuntimeData.WorkRequested &&
+                    string.IsNullOrEmpty(ctx.RuntimeData.ActiveWorkTraceId),
+                    priority: 9)
+                .AddTransition<InteractingState, WorkingState>(ctx =>
+                    ctx.RuntimeData.WorkRequested &&
+                    ctx.RuntimeData.IsAtRequiredWorkTarget,
+                    priority: 10)
                 .AddTransition<WorkingState, IdleState>(ctx => !ctx.RuntimeData.WorkRequested);
 
             machine.SetInitialState<IdleState>();

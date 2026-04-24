@@ -43,5 +43,13 @@ namespace GeminiLab.Modules.Pet
         public float PreventSleepBeforeTime;
 
         public string LastTraceId = string.Empty;
+
+        public string ActiveWorkTraceId = string.Empty;
+
+        public string ActiveWorkMessage = string.Empty;
+
+        public PetWorkTargetType RequiredWorkTargetType = PetWorkTargetType.Any;
+
+        public bool IsAtRequiredWorkTarget;
     }
 }

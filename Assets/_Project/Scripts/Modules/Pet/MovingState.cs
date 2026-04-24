@@ -19,6 +19,7 @@ namespace GeminiLab.Modules.Pet
         {
             context.EnterState(StateName);
             context.RuntimeData.TargetReached = false;
+            context.RuntimeData.IsAtRequiredWorkTarget = false;
             AcquireTargetAndPath(context);
         }
 
@@ -62,14 +63,34 @@ namespace GeminiLab.Modules.Pet
 
         private static void AcquireTargetAndPath(PetContext context)
         {
-            if (context.FurnitureService is null || !context.FurnitureService.TryGetBestInteractionTarget(context.RuntimeData.Position, out FurnitureInteractionTarget target))
+            FurnitureInteractionQuery query = context.RuntimeData.WorkRequested && context.RuntimeData.RequiredWorkTargetType == PetWorkTargetType.WorkDesk
+                ? FurnitureInteractionQuery.WorkDeskOnly
+                : FurnitureInteractionQuery.Any;
+            if (context.FurnitureService is null || !context.FurnitureService.TryGetBestInteractionTarget(context.RuntimeData.Position, query, out FurnitureInteractionTarget target))
             {
                 context.RuntimeData.TargetReached = true;
+                if (context.RuntimeData.WorkRequested)
+                {
+                    context.RuntimeData.WorkRequested = false;
+                    if (!string.IsNullOrWhiteSpace(context.RuntimeData.ActiveWorkTraceId))
+                    {
+                        context.EventBus?.Publish(new PetWorkFailedEvent(context.RuntimeData.ActiveWorkTraceId, "No reachable work target."));
+                    }
+
+                    context.RuntimeData.ActiveWorkTraceId = string.Empty;
+                    context.RuntimeData.ActiveWorkMessage = string.Empty;
+                    context.RuntimeData.RequiredWorkTargetType = PetWorkTargetType.Any;
+                }
+
                 return;
             }
 
             context.RuntimeData.TargetFurnitureId = target.FurnitureId;
             context.RuntimeData.TargetPosition = target.InteractionPoint;
+            context.RuntimeData.IsAtRequiredWorkTarget =
+                !context.RuntimeData.WorkRequested ||
+                context.RuntimeData.RequiredWorkTargetType == PetWorkTargetType.Any ||
+                target.Category == FurnitureCategory.WorkDesk;
 
             if (context.NavigationService is null ||
                 !context.NavigationService.TryRequestPath(context.RuntimeData.Position, target.InteractionPoint, out NavigationPath path))

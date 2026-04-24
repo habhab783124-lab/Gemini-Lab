@@ -96,6 +96,11 @@ namespace GeminiLab.Modules.Furniture
 
         public bool TryGetBestInteractionTarget(Vector2 origin, out FurnitureInteractionTarget target)
         {
+            return TryGetBestInteractionTarget(origin, FurnitureInteractionQuery.Any, out target);
+        }
+
+        public bool TryGetBestInteractionTarget(Vector2 origin, FurnitureInteractionQuery query, out FurnitureInteractionTarget target)
+        {
             target = default;
             if (_placedFurniture.Count == 0)
             {
@@ -107,10 +112,26 @@ namespace GeminiLab.Modules.Furniture
             for (int i = 0; i < _placedFurniture.Count; i++)
             {
                 Furniture furniture = _placedFurniture[i];
+                if (!furniture.Anchor.IsAvailable)
+                {
+                    continue;
+                }
+
+                FurnitureCategory category = ResolveCategory(furniture.Definition);
+                if (query.HasRequiredCategory && category != query.RequiredCategory)
+                {
+                    continue;
+                }
+
                 Vector2 point = furniture.Anchor.WorldPosition;
                 float distance = Vector2.Distance(origin, point);
                 float preference = _habitService.GetPreferenceScore(furniture.InstanceId);
                 float score = preference + furniture.Definition.Buff.EnergyDelta + furniture.Definition.Buff.MoodDelta - distance * 0.2f;
+                if (category == FurnitureCategory.WorkDesk)
+                {
+                    score += 1f;
+                }
+
                 if (score > bestScore)
                 {
                     bestScore = score;
@@ -124,7 +145,13 @@ namespace GeminiLab.Modules.Furniture
             }
 
             Vector2 interactionPoint = bestFurniture.Anchor.WorldPosition;
-            target = new FurnitureInteractionTarget(bestFurniture.InstanceId, interactionPoint, bestScore);
+            FurnitureCategory bestCategory = ResolveCategory(bestFurniture.Definition);
+            target = new FurnitureInteractionTarget(
+                bestFurniture.InstanceId,
+                bestFurniture.Definition.Id,
+                bestCategory,
+                interactionPoint,
+                bestScore);
             return true;
         }
 
@@ -198,14 +225,14 @@ namespace GeminiLab.Modules.Furniture
                 return;
             }
 
-            AddFallbackDefinition("Furniture_Bed_Angel_001", FurniturePlacementType.Floor, new Vector2Int(2, 1), moodDelta: 2f, energyDelta: 6f);
-            AddFallbackDefinition("Furniture_Nightstand_Angel_001", FurniturePlacementType.Floor, new Vector2Int(1, 1), moodDelta: 1f, energyDelta: 1f);
-            AddFallbackDefinition("Furniture_Harp_Angel_001", FurniturePlacementType.Floor, new Vector2Int(1, 1), moodDelta: 5f, energyDelta: 0f);
-            AddFallbackDefinition("Furniture_WorkDesk_Angel_01", FurniturePlacementType.Floor, new Vector2Int(2, 1), moodDelta: 1f, energyDelta: 2f);
-            AddFallbackDefinition("Furniture_WorkDesk_Devil_01", FurniturePlacementType.Wall, new Vector2Int(1, 1), moodDelta: 3f, energyDelta: -1f);
+            AddFallbackDefinition("Furniture_Bed_Angel_001", FurnitureCategory.Bed, FurniturePlacementType.Floor, new Vector2Int(2, 1), moodDelta: 2f, energyDelta: 6f);
+            AddFallbackDefinition("Furniture_Nightstand_Angel_001", FurnitureCategory.Decoration, FurniturePlacementType.Floor, new Vector2Int(1, 1), moodDelta: 1f, energyDelta: 1f);
+            AddFallbackDefinition("Furniture_Harp_Angel_001", FurnitureCategory.Leisure, FurniturePlacementType.Floor, new Vector2Int(1, 1), moodDelta: 5f, energyDelta: 0f);
+            AddFallbackDefinition("Furniture_WorkDesk_Angel_01", FurnitureCategory.WorkDesk, FurniturePlacementType.Floor, new Vector2Int(2, 1), moodDelta: 1f, energyDelta: 2f);
+            AddFallbackDefinition("Furniture_WorkDesk_Devil_01", FurnitureCategory.WorkDesk, FurniturePlacementType.Wall, new Vector2Int(1, 1), moodDelta: 3f, energyDelta: -1f);
         }
 
-        private void AddFallbackDefinition(string id, FurniturePlacementType placementType, Vector2Int occupiedCells, float moodDelta, float energyDelta)
+        private void AddFallbackDefinition(string id, FurnitureCategory category, FurniturePlacementType placementType, Vector2Int occupiedCells, float moodDelta, float energyDelta)
         {
             if (_definitions.ContainsKey(id))
             {
@@ -215,6 +242,7 @@ namespace GeminiLab.Modules.Furniture
             FurnitureDefinitionSO definition = ScriptableObject.CreateInstance<FurnitureDefinitionSO>();
             definition.ConfigureRuntime(
                 id,
+                category,
                 placementType,
                 occupiedCells,
                 new EnvironmentalBuff
@@ -280,6 +308,39 @@ namespace GeminiLab.Modules.Furniture
             Furniture runtimeFurniture = go.AddComponent<Furniture>();
             runtimeFurniture.Initialize(instanceId, definition);
             return runtimeFurniture;
+        }
+
+        private static FurnitureCategory ResolveCategory(FurnitureDefinitionSO definition)
+        {
+            if (definition.Category != FurnitureCategory.Unknown)
+            {
+                return definition.Category;
+            }
+
+            string id = definition.Id;
+            if (id.IndexOf("WorkDesk", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return FurnitureCategory.WorkDesk;
+            }
+
+            if (id.IndexOf("Bed", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return FurnitureCategory.Bed;
+            }
+
+            if (id.IndexOf("Leisure", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                id.IndexOf("Harp", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return FurnitureCategory.Leisure;
+            }
+
+            if (id.IndexOf("Decoration", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                id.IndexOf("Nightstand", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return FurnitureCategory.Decoration;
+            }
+
+            return FurnitureCategory.Unknown;
         }
     }
 }

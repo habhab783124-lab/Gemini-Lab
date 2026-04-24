@@ -11,6 +11,7 @@ namespace GeminiLab.Core.Events
     public sealed class EventBus
     {
         private readonly Dictionary<Type, Delegate> _handlers = new();
+        private readonly object _syncRoot = new();
 
         /// <summary>
         /// Subscribes to an event payload type.
@@ -23,13 +24,16 @@ namespace GeminiLab.Core.Events
             }
 
             Type key = typeof(TEvent);
-            if (_handlers.TryGetValue(key, out Delegate? existing))
+            lock (_syncRoot)
             {
-                _handlers[key] = Delegate.Combine(existing, callback);
-            }
-            else
-            {
-                _handlers.Add(key, callback);
+                if (_handlers.TryGetValue(key, out Delegate? existing))
+                {
+                    _handlers[key] = Delegate.Combine(existing, callback);
+                }
+                else
+                {
+                    _handlers.Add(key, callback);
+                }
             }
 
             return new Subscription(() => Unsubscribe(callback));
@@ -46,19 +50,22 @@ namespace GeminiLab.Core.Events
             }
 
             Type key = typeof(TEvent);
-            if (!_handlers.TryGetValue(key, out Delegate? existing))
+            lock (_syncRoot)
             {
-                return;
-            }
+                if (!_handlers.TryGetValue(key, out Delegate? existing))
+                {
+                    return;
+                }
 
-            Delegate? updated = Delegate.Remove(existing, callback);
-            if (updated is null)
-            {
-                _handlers.Remove(key);
-            }
-            else
-            {
-                _handlers[key] = updated;
+                Delegate? updated = Delegate.Remove(existing, callback);
+                if (updated is null)
+                {
+                    _handlers.Remove(key);
+                }
+                else
+                {
+                    _handlers[key] = updated;
+                }
             }
         }
 
@@ -68,9 +75,13 @@ namespace GeminiLab.Core.Events
         public void Publish<TEvent>(TEvent payload)
         {
             Type key = typeof(TEvent);
-            if (!_handlers.TryGetValue(key, out Delegate? existing))
+            Delegate? existing;
+            lock (_syncRoot)
             {
-                return;
+                if (!_handlers.TryGetValue(key, out existing))
+                {
+                    return;
+                }
             }
 
             if (existing is Action<TEvent> callback)
@@ -95,7 +106,10 @@ namespace GeminiLab.Core.Events
         /// </summary>
         public void Clear()
         {
-            _handlers.Clear();
+            lock (_syncRoot)
+            {
+                _handlers.Clear();
+            }
         }
 
         private sealed class Subscription : IDisposable
