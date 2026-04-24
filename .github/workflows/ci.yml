@@ -27,6 +27,11 @@ jobs:
           test -f Assets/_Project/Scripts/Modules/Persistence/SaveSystem.cs
           test -f Assets/_Project/Tests/EditMode/GeminiLab.Tests.EditMode.asmdef
           test -f Assets/_Project/Scenes/Boot.unity
+          test -f Assets/_Project/Scripts/Modules/UI/GeminiLab.Modules.UI.asmdef
+          test -f Assets/_Project/Scripts/Modules/DesktopOverlay/DesktopOverlayManager.cs
+          test -f Assets/_Project/Scripts/Modules/Travel/TravelService.cs
+          test -f Assets/_Project/Scenes/Desktop/Desktop_Overlay.unity
+          test -f Assets/_Project/Docs/ReleaseChecklist_Phase4.md
 
   unity-editmode-tests:
     runs-on: ubuntu-latest
@@ -56,7 +61,9 @@ jobs:
 
   unity-empty-build:
     runs-on: ubuntu-latest
-    needs: unity-editmode-tests
+    needs:
+      - unity-editmode-tests
+      - unity-playmode-smoke
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,3 +80,29 @@ jobs:
           unityVersion: 2022.3.62f3
           targetPlatform: StandaloneWindows64
           buildName: GeminiLab
+
+  unity-playmode-smoke:
+    runs-on: ubuntu-latest
+    needs: unity-editmode-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Run PlayMode smoke tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 2022.3.62f3
+          testMode: PlayMode
+          artifactsPath: playmode-test-results
+
+      - name: Upload playmode artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: playmode-test-results
+          path: playmode-test-results
