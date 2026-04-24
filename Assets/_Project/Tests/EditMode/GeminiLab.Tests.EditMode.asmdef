@@ -1,0 +1,25 @@
+{
+  "name": "GeminiLab.Tests.EditMode",
+  "rootNamespace": "GeminiLab.Tests.EditMode",
+  "references": [
+    "GeminiLab.Core",
+    "GeminiLab.Modules.Pet",
+    "GeminiLab.Modules.Persistence",
+    "GeminiLab.Modules.Navigation.Abstractions",
+    "GeminiLab.Modules.Furniture"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
