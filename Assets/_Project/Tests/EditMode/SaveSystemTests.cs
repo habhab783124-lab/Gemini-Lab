@@ -10,6 +10,7 @@ namespace GeminiLab.Tests.EditMode
     {
         private string _tempRoot = string.Empty;
 
+        [System.Serializable]
         private sealed class TestSnapshot
         {
             public string Name = string.Empty;

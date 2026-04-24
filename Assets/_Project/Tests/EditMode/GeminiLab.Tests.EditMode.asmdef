@@ -6,7 +6,8 @@
     "GeminiLab.Modules.Pet",
     "GeminiLab.Modules.Persistence",
     "GeminiLab.Modules.Navigation.Abstractions",
-    "GeminiLab.Modules.Furniture"
+    "GeminiLab.Modules.Furniture",
+    "GeminiLab.Modules.Gateway"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

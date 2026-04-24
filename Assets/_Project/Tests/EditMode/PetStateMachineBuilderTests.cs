@@ -47,6 +47,7 @@ namespace GeminiLab.Tests.EditMode
         {
             PetContext context = CreateContext(energy: 80f);
             context.RuntimeData.WorkRequested = true;
+            context.RuntimeData.IsAtRequiredWorkTarget = true;
             context.RuntimeData.TimeInCurrentState = 2f; // Also satisfies Idle -> Moving.
             StateMachine<PetContext> machine = PetStateMachineBuilder.Build(context);
 
@@ -92,8 +93,9 @@ namespace GeminiLab.Tests.EditMode
             PetController.PublishStateChanged("Idle", "Moving");
 
             Assert.IsTrue(received.HasValue);
-            Assert.AreEqual("Idle", received.Value.FromState);
-            Assert.AreEqual("Moving", received.Value.ToState);
+            PetStateChangedEvent payload = received.GetValueOrDefault();
+            Assert.AreEqual("Idle", payload.FromState);
+            Assert.AreEqual("Moving", payload.ToState);
         }
     }
 }
