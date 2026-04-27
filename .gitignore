@@ -25,6 +25,19 @@
 # Visual Studio 缓存目录
 .vs/
 
+# JetBrains Rider / IntelliJ 本机配置
+.idea/
+*.sln.docstates
+*.userosscache
+*.rsuser
+*.DotSettings.user
+
+# VS Code 本机调试与个人设置
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/extensions.json
+
 # Gradle 缓存目录
 .gradle/
 
