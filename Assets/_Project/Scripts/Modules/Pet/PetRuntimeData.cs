@@ -64,5 +64,9 @@ namespace GeminiLab.Modules.Pet
         public float TravelEndAtSeconds;
 
         public int TravelCompletedCount;
+
+        public string LastInteractionFurnitureId = string.Empty;
+
+        public string LastInteractionSummary = string.Empty;
     }
 }

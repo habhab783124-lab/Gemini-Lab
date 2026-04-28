@@ -98,6 +98,10 @@ namespace GeminiLab.Modules.Pet
                     out target)
                     || context.FurnitureService.TryGetBestInteractionTarget(
                         context.RuntimeData.Position,
+                        new FurnitureInteractionQuery(FurnitureCategory.Decoration, hasRequiredCategory: true),
+                        out target)
+                    || context.FurnitureService.TryGetBestInteractionTarget(
+                        context.RuntimeData.Position,
                         FurnitureInteractionQuery.BedOnly,
                         out target);
             }

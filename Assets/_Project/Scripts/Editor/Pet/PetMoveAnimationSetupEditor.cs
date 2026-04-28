@@ -81,6 +81,15 @@ namespace GeminiLab.EditorTools.Pet
                     animator = pet.gameObject.AddComponent<Animator>();
                 }
 
+                SerializedObject petSerialized = new(pet);
+                SerializedProperty? controllerProperty = petSerialized.FindProperty("_movementController");
+                if (controllerProperty is not null && controllerProperty.objectReferenceValue != controller)
+                {
+                    controllerProperty.objectReferenceValue = controller;
+                    petSerialized.ApplyModifiedPropertiesWithoutUndo();
+                    EditorUtility.SetDirty(pet);
+                }
+
                 if (animator.runtimeAnimatorController != controller)
                 {
                     animator.runtimeAnimatorController = controller;

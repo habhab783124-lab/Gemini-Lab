@@ -1,5 +1,6 @@
 #nullable enable
 using GeminiLab.Core.FSM;
+using GeminiLab.Modules.Furniture;
 
 namespace GeminiLab.Modules.Pet
 {
@@ -17,6 +18,7 @@ namespace GeminiLab.Modules.Pet
             context.EnterState(StateName);
             context.RuntimeData.TargetReached = false;
             context.RuntimeData.TargetFurnitureId = string.Empty;
+            context.RuntimeData.TargetFurnitureCategory = FurnitureCategory.Unknown;
             context.RuntimeData.ActivePath.Clear();
             context.RuntimeData.PathIndex = 0;
         }

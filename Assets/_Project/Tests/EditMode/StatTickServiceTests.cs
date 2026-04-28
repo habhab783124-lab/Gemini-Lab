@@ -51,5 +51,22 @@ namespace GeminiLab.Tests.EditMode
 
             Assert.AreEqual(52f, data.Energy, 0.01f);
         }
+
+        [Test]
+        public void ApplyEnvironmentalBuff_ClampsAndAppliesDelta()
+        {
+            PetRuntimeData data = new()
+            {
+                Mood = 97f,
+                Energy = 95f,
+                Satiety = 50f
+            };
+
+            StatTickService.ApplyEnvironmentalBuff(data, moodDelta: 10f, energyDelta: 12f);
+
+            Assert.AreEqual(100f, data.Mood, 0.01f);
+            Assert.AreEqual(100f, data.Energy, 0.01f);
+            Assert.AreEqual(50f, data.Satiety, 0.01f);
+        }
     }
 }

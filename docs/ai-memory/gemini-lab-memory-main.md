@@ -1,6 +1,6 @@
 # Gemini-Lab Memory Main
 
-Updated: 2026-04-27
+Updated: 2026-04-28
 
 ## 定位
 这份文档是 Gemini-Lab 的长期项目记忆总览。
@@ -34,6 +34,8 @@ Updated: 2026-04-27
 - 当前仓库已经从“文档与工程骨架先行”推进到“文档 + 原型实现并行”阶段。
 - `AGENTS.md`、`docs/` 与 `docs/ai-memory/` 于 2026-04-21 建立；2026-04-27 完成 fork 主线同步并补齐 Git 工作流文档。
 - `Assets/_Project/` 下已经存在真实运行时代码、场景、asmdef、测试程序集、示例美术资源与动画资源。
+- `2026-04-28` 已开始推进任务 1：现有场景家具接入 `FurnitureService`，并让 Apartment 场景里的状态/库存/概览面板显示真实运行时数据。
+- `2026-04-28` 已完成任务 2 的首轮范围确认，并把现有 `Move` 动画 controller 显式绑定到 `Apartment_Main.unity` 中的 `Pet_Angel`。
 - `Assets/_Project/Prefabs/` 目前仍没有真实 `.prefab` 资产；`Assets/_Project/ScriptableObjects/` 目前仍没有真实 `.asset` 配置资产。
 - README 系列文档描述的目标状态仍然大于当前实现范围，阅读时必须显式区分“已实现事实”和“规划目标”。
 - 项目本地 skill 目录当前仍保持 `.agents/skills/` 与 `.cursor/skills/` 镜像关系，当前统计为 `72` 项。
@@ -59,6 +61,8 @@ Updated: 2026-04-27
 6. 当前最明显的资源层缺口仍是：
    - 缺少真实 Prefab 资产
    - 缺少真实 ScriptableObject 配置资产
+   - 真实人格雷达、美术更完整的交互动画与更正式的 UI 资源仍未补齐
+   - 宠物动画当前只有 `Move_Front / Move_Back / Move_Side`；`Pet_Angel` 现已绑定 move controller，但 `Idle / Interact / Emotion` 仍缺少正式资源与状态链路
 7. 当前工作树不是干净状态，执行任何修改前都要先看 `git status`，避免覆盖用户现有改动。
 8. 当前版本控制协作基线已经固定为 `fork + upstream + feature branch + PR` 工作流。
 

@@ -20,8 +20,10 @@ namespace GeminiLab.Modules.Pet
             if (context.FurnitureService is not null &&
                 context.FurnitureService.TryConsumeInteractionBuff(context.RuntimeData.TargetFurnitureId, out EnvironmentalBuff buff))
             {
-                context.RuntimeData.Mood = Mathf.Clamp(context.RuntimeData.Mood + buff.MoodDelta, 0f, 100f);
-                context.RuntimeData.Energy = Mathf.Clamp(context.RuntimeData.Energy + buff.EnergyDelta, 0f, 100f);
+                StatTickService.ApplyEnvironmentalBuff(context.RuntimeData, buff.MoodDelta, buff.EnergyDelta);
+                context.RuntimeData.LastInteractionFurnitureId = context.RuntimeData.TargetFurnitureId;
+                context.RuntimeData.LastInteractionSummary =
+                    $"{context.RuntimeData.TargetFurnitureCategory} (Mood {FormatSigned(buff.MoodDelta)}, Energy {FormatSigned(buff.EnergyDelta)})";
             }
         }
 
@@ -36,6 +38,11 @@ namespace GeminiLab.Modules.Pet
 
         public void Exit(PetContext context)
         {
+        }
+
+        private static string FormatSigned(float value)
+        {
+            return value >= 0f ? $"+{value:0.#}" : value.ToString("0.#");
         }
     }
 }

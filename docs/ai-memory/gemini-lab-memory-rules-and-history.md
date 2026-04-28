@@ -1,6 +1,6 @@
 # Gemini-Lab Memory Rules And History
 
-Updated: 2026-04-27
+Updated: 2026-04-28
 
 ## 长期规则
 1. 所有中文文档、中文注释、中文说明都必须保持 UTF-8 正常显示。
@@ -54,6 +54,35 @@ Updated: 2026-04-27
 - 重新浏览仓库后确认：`_Project/` 已经存在真实场景、运行时代码、asmdef、测试程序集、示例动画与美术资源。
 - 刷新主记忆、架构、文件指南、结构总览、skill 清单与索引，移除“没有场景 / 没有脚本 / 没有 asmdef / 没有导航包”的过期表述。
 - 重新确认项目本地 skill 两套目录目前仍保持镜像关系，当前统计为 `72` 项。
+
+### 2026-04-28
+- 开始推进任务 1“物件交互和状态显示”。
+- 在不新增缺失美术资源的前提下，优先接入已有内容：
+  - 让 Apartment 场景里的现成家具对象注册进 `FurnitureService`
+  - 让宠物运行时状态通过事件快照驱动现有 UI 面板
+  - 让状态面板、家具库存面板、右下角概览面板显示真实运行时数据
+- 新增或更新的关键代码点包括：
+  - `Assets/_Project/Scripts/Modules/Furniture/FurnitureService.cs`
+  - `Assets/_Project/Scripts/Modules/Pet/PetRuntimeSnapshotChangedEvent.cs`
+  - `Assets/_Project/Scripts/Modules/UI/StatusPanelController.cs`
+  - `Assets/_Project/Scripts/Modules/UI/FurnitureInventoryPanelController.cs`
+  - `Assets/_Project/Scripts/Modules/UI/PersonalityRadarView.cs`
+- 当前仍未验证：
+  - Unity Editor 内的真实运行效果
+  - EditMode / PlayMode 测试执行结果
+- 开始推进任务 2“桌宠基础动画资源”的范围确认，而不是直接补图。
+- 当前确认到的动画现状：
+  - `Assets/_Project/Art/Sprites/Pet/Frames/Move/` 已有 `Front / Back / Side` 三组序列帧
+  - `Idle/`、`Interact/`、`Emotion/` 目录当前为空
+  - `Assets/_Project/Animations/Pet/` 已有 3 个移动 `.anim` 和 1 个 `Pet_Angel.controller`
+  - 当前 controller 只覆盖 `Move_Front / Move_Back / Move_Side`
+- 因此，任务 2 现阶段可直接进入制作的范围是：
+  - 移动动画 clip / controller / Animator 挂载链路补齐
+  - 不包括缺失美术前提下的正式 `Idle / Interact / Emotion` 资源交付
+- 已补的动画链路改动：
+  - `PetController` 新增显式 `RuntimeAnimatorController` 引用，并在缺少 `Animator` 时自动补组件并赋值
+  - `PetMoveAnimationSetupEditor` 现在会同时把 controller 回写到 `PetController`
+  - `Apartment_Main.unity` 中的 `Pet_Angel` 已绑定 `Pet_Angel.controller` 资源引用
 
 ## 已确认决策
 

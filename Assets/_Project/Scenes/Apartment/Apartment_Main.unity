@@ -730,6 +730,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _config: {fileID: 0}
   _personality: {fileID: 0}
+  _movementController: {fileID: 9100000, guid: ba46f117e79c2504888c585f53d1ecf8, type: 2}
 --- !u!212 &483894547
 SpriteRenderer:
   m_ObjectHideFlags: 0

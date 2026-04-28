@@ -1,6 +1,6 @@
 # Gemini-Lab 项目结构总览
 
-Updated: 2026-04-27
+Updated: 2026-04-28
 
 ## 这份文档怎么看
 这不是“理想中的最终目录图”，而是“当前仓库已经有什么，以及这些目录将来分别负责什么”的说明。
@@ -65,6 +65,7 @@ AI 协作工具链目录。
 - `Modules/` 已有 `Pet`、`Furniture`、`Navigation`、`Gateway`、`Travel`、`Persistence`、`UI`、`DesktopOverlay` 等真实代码
 - `Editor/` 已有编辑器脚本
 - `Scripts/UI/` 目前主要仍承载目录说明；真实 UI 运行时代码当前主要在 `Scripts/Modules/UI/`
+- `Pet` 与 `Furniture` 当前已经开始补“现有场景家具交互 + 运行时状态显示”链路
 
 ### `Assets/_Project/Scenes/`
 当前已存在真实场景文件：
@@ -75,6 +76,7 @@ AI 协作工具链目录。
 当前判断：
 - 这 3 个场景已经足以说明仓库不再是“没有场景”的状态
 - 但它们仍然更接近原型场景，而不是完整量产场景集
+- `Apartment_Main.unity` 当前已经承载宠物、现成家具与状态/库存/概览面板，是任务 1 的主验证场景
 
 ### `Assets/_Project/Tests/`
 当前已存在：

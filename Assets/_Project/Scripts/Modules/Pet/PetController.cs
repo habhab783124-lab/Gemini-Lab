@@ -22,6 +22,7 @@ namespace GeminiLab.Modules.Pet
 
         [SerializeField] private PetStateValueSO? _config;
         [SerializeField] private PersonalityMatrixSO? _personality;
+        [SerializeField] private RuntimeAnimatorController? _movementController;
         [SerializeField] private bool _sideFramesFaceLeft = true;
 
         private PetContext? _context;
@@ -32,6 +33,7 @@ namespace GeminiLab.Modules.Pet
         private SpriteRenderer? _spriteRenderer;
         private Vector2 _lastAnimationPosition;
         private Vector2 _lastMoveDirection = Vector2.down;
+        private PetRuntimeSnapshotChangedEvent? _lastPublishedSnapshot;
 
         public string CurrentState => _context?.RuntimeData.CurrentState ?? "None";
 
@@ -41,6 +43,7 @@ namespace GeminiLab.Modules.Pet
         {
             _animator = GetComponent<Animator>();
             _spriteRenderer = GetComponent<SpriteRenderer>();
+            EnsureAnimatorBinding();
             _lastAnimationPosition = transform.position;
 
             PetStateValueSO config = _config ?? ScriptableObject.CreateInstance<PetStateValueSO>();
@@ -102,6 +105,7 @@ namespace GeminiLab.Modules.Pet
             _stateMachine.Tick(Time.deltaTime);
             _context.ApplyPosition?.Invoke(_context.RuntimeData.Position);
             UpdateMovementAnimation();
+            PublishSnapshotIfChanged(_context);
         }
 
         private void FixedUpdate()
@@ -324,6 +328,62 @@ namespace GeminiLab.Modules.Pet
 
             bool movingRight = direction.x > 0f;
             _spriteRenderer.flipX = _sideFramesFaceLeft ? movingRight : !movingRight;
+        }
+
+        private void PublishSnapshotIfChanged(PetContext context)
+        {
+            if (context.EventBus is null)
+            {
+                return;
+            }
+
+            PetRuntimeData runtime = context.RuntimeData;
+            PetRuntimeSnapshotChangedEvent snapshot = new(
+                runtime.CurrentState,
+                runtime.Mood,
+                runtime.Energy,
+                runtime.Satiety,
+                runtime.WorkRequested,
+                runtime.TargetFurnitureId,
+                runtime.TargetFurnitureCategory,
+                runtime.IsTraveling,
+                runtime.LastInteractionFurnitureId,
+                runtime.LastInteractionSummary);
+
+            if (_lastPublishedSnapshot.HasValue && AreSnapshotsEquivalent(_lastPublishedSnapshot.Value, snapshot))
+            {
+                return;
+            }
+
+            _lastPublishedSnapshot = snapshot;
+            context.EventBus.Publish(snapshot);
+        }
+
+        private static bool AreSnapshotsEquivalent(PetRuntimeSnapshotChangedEvent previous, PetRuntimeSnapshotChangedEvent current)
+        {
+            return previous.CurrentState == current.CurrentState &&
+                   Mathf.Abs(previous.Mood - current.Mood) < 0.01f &&
+                   Mathf.Abs(previous.Energy - current.Energy) < 0.01f &&
+                   Mathf.Abs(previous.Satiety - current.Satiety) < 0.01f &&
+                   previous.WorkRequested == current.WorkRequested &&
+                   previous.TargetFurnitureId == current.TargetFurnitureId &&
+                   previous.TargetFurnitureCategory == current.TargetFurnitureCategory &&
+                   previous.IsTraveling == current.IsTraveling &&
+                   previous.LastInteractionFurnitureId == current.LastInteractionFurnitureId &&
+                   previous.LastInteractionSummary == current.LastInteractionSummary;
+        }
+
+        private void EnsureAnimatorBinding()
+        {
+            if (_animator is null)
+            {
+                _animator = gameObject.AddComponent<Animator>();
+            }
+
+            if (_movementController is not null && _animator.runtimeAnimatorController != _movementController)
+            {
+                _animator.runtimeAnimatorController = _movementController;
+            }
         }
     }
 }

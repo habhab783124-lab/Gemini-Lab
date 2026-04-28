@@ -5,6 +5,8 @@ using GeminiLab.Core;
 using GeminiLab.Core.Events;
 using GeminiLab.Modules.Navigation;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
 
 namespace GeminiLab.Modules.Furniture
 {
@@ -32,6 +34,16 @@ namespace GeminiLab.Modules.Furniture
 
         public bool HasPlacedFurniture => _placedFurniture.Count > 0;
 
+        private void OnEnable()
+        {
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        private void OnDisable()
+        {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+
         private void Awake()
         {
             for (int i = 0; i < _defaultDefinitions.Length; i++)
@@ -55,6 +67,8 @@ namespace GeminiLab.Modules.Furniture
             {
                 _eventBus = eventBus;
             }
+
+            RegisterSceneFurniture();
         }
 
         public bool TryPlaceFurniture(FurnitureDefinitionSO definition, Vector2 position, float rotationZ, out Furniture? furniture, out string failureReason)
@@ -66,6 +80,7 @@ namespace GeminiLab.Modules.Furniture
         public bool TryRemoveNearestFurniture(Vector2 position, float maxDistance, out string removedFurnitureId)
         {
             EnsureDependencies();
+            RemoveDestroyedFurnitureEntries();
             removedFurnitureId = string.Empty;
             int nearestIndex = -1;
             float nearestDistance = maxDistance;
@@ -101,6 +116,7 @@ namespace GeminiLab.Modules.Furniture
 
         public bool TryGetBestInteractionTarget(Vector2 origin, FurnitureInteractionQuery query, out FurnitureInteractionTarget target)
         {
+            RemoveDestroyedFurnitureEntries();
             target = default;
             if (_placedFurniture.Count == 0)
             {
@@ -178,6 +194,7 @@ namespace GeminiLab.Modules.Furniture
 
         public FurnitureLayoutSnapshot CaptureLayout()
         {
+            RemoveDestroyedFurnitureEntries();
             FurnitureLayoutEntry[] entries = new FurnitureLayoutEntry[_placedFurniture.Count];
             for (int i = 0; i < _placedFurniture.Count; i++)
             {
@@ -249,7 +266,8 @@ namespace GeminiLab.Modules.Furniture
                 {
                     MoodDelta = moodDelta,
                     EnergyDelta = energyDelta
-                });
+                },
+                sprite: null);
             _definitions[id] = definition;
             _buildPalette.Add(definition);
         }
@@ -289,11 +307,13 @@ namespace GeminiLab.Modules.Furniture
 
             SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = definition.Sprite;
-            renderer.sortingLayerName = "Furniture";
-            renderer.sortingOrder = -(int)(go.transform.position.y * 100f);
-            go.AddComponent<BoxCollider2D>();
+            BoxCollider2D collider = go.AddComponent<BoxCollider2D>();
+            collider.size = new Vector2(
+                Mathf.Max(0.5f, definition.OccupiedCells.x),
+                Mathf.Max(0.5f, definition.OccupiedCells.y));
 
             Furniture runtimeFurniture = CreateFurnitureRuntime(go, definition, instanceId);
+            ApplyFurniturePresentation(runtimeFurniture, renderer, definition);
             _placedFurniture.Add(runtimeFurniture);
             _definitions[definition.Id] = definition;
 
@@ -310,6 +330,178 @@ namespace GeminiLab.Modules.Furniture
             return runtimeFurniture;
         }
 
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            _ = scene;
+            _ = mode;
+            RegisterSceneFurniture();
+        }
+
+        private void RegisterSceneFurniture()
+        {
+            RemoveDestroyedFurnitureEntries();
+
+            Furniture[] sceneFurniture = FindObjectsByType<Furniture>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < sceneFurniture.Length; i++)
+            {
+                Furniture furniture = sceneFurniture[i];
+                if (furniture is null || _placedFurniture.Contains(furniture))
+                {
+                    continue;
+                }
+
+                FurnitureDefinitionSO resolvedDefinition = ResolveSceneFurnitureDefinition(furniture);
+                furniture.Initialize(furniture.InstanceId, resolvedDefinition);
+
+                if (furniture.TryGetComponent(out SpriteRenderer renderer) && renderer is not null)
+                {
+                    if (resolvedDefinition.Sprite is null)
+                    {
+                        resolvedDefinition.ConfigureRuntime(
+                            resolvedDefinition.Id,
+                            resolvedDefinition.Category,
+                            resolvedDefinition.PlacementType,
+                            resolvedDefinition.OccupiedCells,
+                            resolvedDefinition.Buff,
+                            renderer.sprite);
+                    }
+
+                    ApplyFurniturePresentation(furniture, renderer, resolvedDefinition);
+                }
+
+                _placedFurniture.Add(furniture);
+            }
+        }
+
+        private FurnitureDefinitionSO ResolveSceneFurnitureDefinition(Furniture furniture)
+        {
+            SpriteRenderer? renderer = furniture.GetComponent<SpriteRenderer>();
+            string spriteName = renderer?.sprite?.name ?? string.Empty;
+            string objectName = furniture.gameObject.name;
+
+            if (!string.IsNullOrWhiteSpace(spriteName) && _definitions.TryGetValue(spriteName, out FurnitureDefinitionSO? bySprite))
+            {
+                return bySprite;
+            }
+
+            string definitionId = !string.IsNullOrWhiteSpace(spriteName) ? spriteName : $"Furniture_{objectName}";
+            FurnitureCategory category = InferCategory(definitionId, objectName);
+            FurniturePlacementType placementType = InferPlacementType(definitionId, objectName);
+            Vector2Int occupiedCells = InferOccupiedCells(category);
+            EnvironmentalBuff buff = InferBuff(definitionId, category);
+
+            FurnitureDefinitionSO definition = ScriptableObject.CreateInstance<FurnitureDefinitionSO>();
+            definition.ConfigureRuntime(definitionId, category, placementType, occupiedCells, buff, renderer?.sprite);
+            _definitions[definitionId] = definition;
+            _buildPalette.Add(definition);
+            return definition;
+        }
+
+        private static void ApplyFurniturePresentation(Furniture furniture, SpriteRenderer renderer, FurnitureDefinitionSO definition)
+        {
+            SortingGroup sortingGroup = furniture.gameObject.GetComponent<SortingGroup>() ?? furniture.gameObject.AddComponent<SortingGroup>();
+            renderer.sortingLayerName = "Furniture";
+            renderer.sortingOrder = CalculateSortingOrder(furniture.transform.position.y, definition.PlacementType);
+            sortingGroup.sortingLayerName = renderer.sortingLayerName;
+            sortingGroup.sortingOrder = renderer.sortingOrder;
+        }
+
+        private void RemoveDestroyedFurnitureEntries()
+        {
+            for (int i = _placedFurniture.Count - 1; i >= 0; i--)
+            {
+                if (_placedFurniture[i] is null)
+                {
+                    _placedFurniture.RemoveAt(i);
+                }
+            }
+        }
+
+        private static FurnitureCategory InferCategory(string definitionId, string objectName)
+        {
+            string hint = $"{definitionId} {objectName}";
+            if (hint.IndexOf("WorkDesk", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return FurnitureCategory.WorkDesk;
+            }
+
+            if (hint.IndexOf("Bed", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return FurnitureCategory.Bed;
+            }
+
+            if (hint.IndexOf("Leisure", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                hint.IndexOf("Harp", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return FurnitureCategory.Leisure;
+            }
+
+            if (hint.IndexOf("Decoration", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                hint.IndexOf("Nightstand", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return FurnitureCategory.Decoration;
+            }
+
+            return FurnitureCategory.Decoration;
+        }
+
+        private static FurniturePlacementType InferPlacementType(string definitionId, string objectName)
+        {
+            string hint = $"{definitionId} {objectName}";
+            return hint.IndexOf("Wall", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   hint.IndexOf("Devil", StringComparison.OrdinalIgnoreCase) >= 0
+                ? FurniturePlacementType.Wall
+                : FurniturePlacementType.Floor;
+        }
+
+        private static Vector2Int InferOccupiedCells(FurnitureCategory category)
+        {
+            return category switch
+            {
+                FurnitureCategory.Bed => new Vector2Int(2, 1),
+                FurnitureCategory.WorkDesk => new Vector2Int(2, 1),
+                _ => Vector2Int.one
+            };
+        }
+
+        private static EnvironmentalBuff InferBuff(string definitionId, FurnitureCategory category)
+        {
+            if (definitionId.IndexOf("Nightstand", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return new EnvironmentalBuff { MoodDelta = 1f, EnergyDelta = 1f };
+            }
+
+            if (definitionId.IndexOf("Harp", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return new EnvironmentalBuff { MoodDelta = 5f, EnergyDelta = 0f };
+            }
+
+            if (definitionId.IndexOf("Devil", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return new EnvironmentalBuff { MoodDelta = 3f, EnergyDelta = -1f };
+            }
+
+            return category switch
+            {
+                FurnitureCategory.Bed => new EnvironmentalBuff { MoodDelta = 2f, EnergyDelta = 6f },
+                FurnitureCategory.WorkDesk => new EnvironmentalBuff { MoodDelta = 1f, EnergyDelta = 2f },
+                FurnitureCategory.Leisure => new EnvironmentalBuff { MoodDelta = 4f, EnergyDelta = 0f },
+                FurnitureCategory.Decoration => new EnvironmentalBuff { MoodDelta = 1f, EnergyDelta = 0f },
+                _ => default
+            };
+        }
+
+        private static int CalculateSortingOrder(float y, FurniturePlacementType placementType)
+        {
+            int sortOrder = -(int)(y * 100f);
+            if (placementType == FurniturePlacementType.Wall)
+            {
+                sortOrder += 500;
+            }
+
+            return sortOrder;
+        }
+
         private static FurnitureCategory ResolveCategory(FurnitureDefinitionSO definition)
         {
             if (definition.Category != FurnitureCategory.Unknown)
@@ -317,30 +509,7 @@ namespace GeminiLab.Modules.Furniture
                 return definition.Category;
             }
 
-            string id = definition.Id;
-            if (id.IndexOf("WorkDesk", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return FurnitureCategory.WorkDesk;
-            }
-
-            if (id.IndexOf("Bed", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return FurnitureCategory.Bed;
-            }
-
-            if (id.IndexOf("Leisure", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                id.IndexOf("Harp", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return FurnitureCategory.Leisure;
-            }
-
-            if (id.IndexOf("Decoration", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                id.IndexOf("Nightstand", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return FurnitureCategory.Decoration;
-            }
-
-            return FurnitureCategory.Unknown;
+            return InferCategory(definition.Id, definition.Id);
         }
     }
 }

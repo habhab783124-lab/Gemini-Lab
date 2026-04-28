@@ -2,6 +2,7 @@
 using GeminiLab.Core;
 using GeminiLab.Core.Events;
 using GeminiLab.Modules.UI.ViewModels;
+using TMPro;
 using UnityEngine;
 
 namespace GeminiLab.Modules.UI
@@ -11,6 +12,8 @@ namespace GeminiLab.Modules.UI
     /// </summary>
     public sealed class StatusPanelController : MonoBehaviour
     {
+        [SerializeField] private TMP_Text? _label;
+
         private PetStatusViewModel? _viewModel;
 
         public string CurrentStateLabel { get; private set; } = "Unknown";
@@ -30,6 +33,7 @@ namespace GeminiLab.Modules.UI
             }
 
             _viewModel = new PetStatusViewModel(eventBus);
+            _label ??= GetComponentInChildren<TMP_Text>();
             _viewModel.Changed += RefreshFromViewModel;
             RefreshFromViewModel();
         }
@@ -53,6 +57,18 @@ namespace GeminiLab.Modules.UI
             CurrentStateLabel = _viewModel.CurrentState;
             WorkStateLabel = _viewModel.WorkStatus;
             WorkDetailLabel = _viewModel.LastWorkMessage;
+
+            if (_label is not null)
+            {
+                _label.text =
+                    "状态面板\n" +
+                    $"State: {_viewModel.CurrentState}\n" +
+                    $"Mood: {_viewModel.Mood:0}  Energy: {_viewModel.Energy:0}\n" +
+                    $"Satiety: {_viewModel.Satiety:0}  Travel: {(_viewModel.IsTraveling ? "Away" : "Home")}\n" +
+                    $"Target: {_viewModel.TargetLabel}\n" +
+                    $"Last Interaction: {_viewModel.LastInteractionSummary}\n" +
+                    $"Work: {_viewModel.WorkStatus} {_viewModel.LastWorkMessage}".TrimEnd();
+            }
         }
     }
 }
