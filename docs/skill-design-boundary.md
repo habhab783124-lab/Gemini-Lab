@@ -1,6 +1,6 @@
 # Gemini-Lab Skill 设计边界
 
-Updated: 2026-04-21
+Updated: 2026-04-27
 
 ## 这份文档的定位
 这份文档专门回答两个问题：
@@ -14,7 +14,7 @@ Updated: 2026-04-21
 ## 当前项目的 skill 组织方式
 - 工作区主入口：`.agents/skills/`
 - Cursor 镜像目录：`.cursor/skills/`
-- 当前两边目录是镜像关系，应保持同步
+- 当前两边目录仍为镜像关系，应持续保持同步
 - 每个 skill 至少应包含自己的 `SKILL.md`
 
 ## 什么适合做 skill
@@ -48,9 +48,10 @@ Updated: 2026-04-21
 
 ### 1. 当前项目的即时事实
 例如：
-- “这个项目现在还没有真实场景文件”
-- “当前 `manifest.json` 还没有导航包”
-- “当前有 66 个本地 skill”
+- “当前 `Assets/_Project/Scenes/` 已经有哪些真实场景文件”
+- “当前 `Assets/_Project/Prefabs/` 里有没有真实 Prefab”
+- “当前 `Packages/manifest.json` 里已经接了哪些导航包或 Unity MCP 包”
+- “当前本地 skill 数量与镜像状态”
 
 这类内容应进入：
 - `docs/ai-memory/`
@@ -99,13 +100,14 @@ Updated: 2026-04-21
 - Unity MCP 工具组合使用流程
 - 资产读取与修改流程
 - 场景 / Prefab 作者化标准流程
+- 动画 / Animator 资产操作流程
 - 测试与日志排查流程
 - 文档修复、索引刷新、验证清单回写流程
 
 ### 不应该写成 skill 的方向
 - Gemini-Lab 当前阶段进度
 - 当前项目结构现状
-- 当前哪些场景或 Prefab 尚未存在
+- 当前哪些场景、Prefab、SO 已存在或尚未存在
 - 当前玩法目标与状态机设计细节
 
 ## 新增或修改 skill 时的同步要求

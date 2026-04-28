@@ -1,6 +1,6 @@
 # Gemini-Lab 美术替换工作流
 
-Updated: 2026-04-21
+Updated: 2026-04-27
 
 ## 文档目标
 这份文档约束 Gemini-Lab 后续进行 Sprite、Tile、动画、UI 图标等视觉资源替换时的标准流程，目标是：
@@ -12,6 +12,7 @@ Updated: 2026-04-21
 1. 自研美术资源进入 `Assets/_Project/Art/`。
 2. 第三方素材包不要混进 `_Project/Art/`，应放到 `Assets/ThirdParty/`。
 3. 替换资源时，不只替图片本身，还要同步检查：
+   - 场景对象
    - Prefab
    - Animator
    - SpriteAtlas
@@ -72,11 +73,11 @@ Updated: 2026-04-21
 #### 宠物资源
 - Animator Clip
 - Animator Controller
-- 宠物 Prefab
+- 宠物场景对象或宠物 Prefab
 - 宠物 Icon 或展示图
 
 #### 家具资源
-- 家具 Prefab
+- 家具场景对象或家具 Prefab
 - `FurnitureDefinitionSO`
 - 家具缩略图 Icon
 - 交互锚点预览与排序效果
@@ -89,7 +90,7 @@ Updated: 2026-04-21
 
 #### UI 资源
 - SpriteAtlas
-- 面板 Prefab
+- 面板 Prefab 或场景内 UI 对象
 - Widget Prefab
 - 多分辨率下的显示效果
 
@@ -140,6 +141,7 @@ Updated: 2026-04-21
 - 不把运行期缓存、导出中间件、临时文件提交进仓库。
 
 ## 当前项目特别需要注意的点
-1. 这个仓库目前还处于骨架阶段，很多资源目录还没有真实资产，因此替换流程会经常伴随“第一次落资源”。
-2. 文档里规划了不少 Prefab、SO、Tile 和动画结构，但它们现在还没有全部实现，替换前要先确认引用对象是否已经存在。
-3. 如果替换导致资源结构第一次成型，要顺手把文件指南和结构总览一起更新。
+1. 这个仓库已经不再是纯骨架；`Assets/_Project/Art/` 与 `Assets/_Project/Animations/` 下已经有宠物、家具、环境示例资源和宠物动画，所以替换前要先确认真实引用链。
+2. `Assets/_Project/Prefabs/` 与 `Assets/_Project/ScriptableObjects/` 仍缺少真实资产，很多替换动作可能会直接作用在场景对象、Animator 或运行时兜底定义上。
+3. 当前 `Apartment_Main.unity` 已经承载一批原型资源与 UI，替换资源后要回到真实场景里看效果，而不是只看文件夹。
+4. 如果替换导致资源结构第一次成型，要顺手把文件指南、结构总览和人工验证清单一起更新。

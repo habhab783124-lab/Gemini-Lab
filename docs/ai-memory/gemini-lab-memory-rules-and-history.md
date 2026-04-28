@@ -1,6 +1,6 @@
 # Gemini-Lab Memory Rules And History
 
-Updated: 2026-04-21
+Updated: 2026-04-27
 
 ## 长期规则
 1. 所有中文文档、中文注释、中文说明都必须保持 UTF-8 正常显示。
@@ -10,32 +10,35 @@ Updated: 2026-04-21
 5. 模块之间不直接硬引用具体实现，只通过接口、事件或服务门面通信。
 6. UI 不承载业务规则、网络请求和持久化逻辑。
 7. 运行态数据不写回 ScriptableObject 资产。
-8. 文件结构变更后必须同步更新：
+8. 文件结构、场景结构或工具入口变更后，至少同步更新：
    - `memory-index.paths.txt`
    - 文件指南
    - 项目结构总览
+   - 主记忆
 9. 手工验证结果要落到 `docs/manual-validation-checklist.md`，不能只停留在聊天记录里。
 
 ## 当前已知问题
-1. `_Project/` 目前只有目录、README 和 `.meta`，还没有真正的运行时代码、场景、Prefab 和 SO 资产。
-2. 根 README、`Assets/README.md` 和模块 README 都提到了导航方案与场景文件，但当前仓库并未落地对应资源。
-3. README 中规划使用 `NavMeshPlus` 路线，但 `Packages/manifest.json` 里还没有对应包。
-4. AI 工具目录同时存在 `.cursor/skills/` 与 `.agents/skills/`，说明协作链路已扩展，但后续需要保持两边同步策略明确。
+1. `Assets/_Project/Prefabs/` 仍没有真实 `.prefab` 资产，很多场景对象与运行时结构尚未完成 Prefab 化。
+2. `Assets/_Project/ScriptableObjects/` 仍没有真实 `.asset` 配置资产；`GatewayConfigSO`、`FurnitureDefinitionSO`、`PetStateValueSO` 等类型已存在，但当前仍依赖场景引用或运行时兜底。
+3. `Packages/manifest.json` 已经包含 `com.unity.ai.navigation`，但当前 `NavigationService` / `NavMesh2DRebaker` 仍是占位实现，不等于真实 2D NavMesh 链路已完成。
+4. `DesktopOverlay` 模块已有运行时代码，但 `WindowModeAdapter` 还没有落真实原生透明窗口 / 点击穿透实现。
+5. 桌面相关文档目前同时存在“设计名 `Desktop`”和“运行时代码目录 `DesktopOverlay`”两套表述，阅读时要显式区分。
+6. 文档体系在 2026-04-21 建立时曾按“骨架阶段”描述仓库，后续若实现继续推进，必须持续刷新文档，避免再出现口径滞后。
 
 ## 最近进展
 
 ### 2026-04-21
 - 浏览并梳理整个 Gemini-Lab 仓库。
-- 校验了项目当前真实状态：
+- 校验了项目当时的真实状态：
   - Unity 版本为 `2022.3.62f3c1`
   - `docs/` 原本不存在
-  - `_Project/` 仍处于脚手架阶段
+  - `_Project/` 当时主要仍处于脚手架阶段
   - MCP、skills 和嵌入式技能包已接入
 - 依据《新项目 AI 工作环境搭建方法论》初始化了 `docs/` 体系：
   - `docs/ai-memory/`
   - 主记忆、架构、规则历史、开发手册、文件指南
   - 玩法规范、结构总览、人工验证清单、美术替换工作流
-- 新增 `docs/project-skill-catalog.md`，整理当前项目本地 skill 清单，并确认 `.agents/skills/` 与 `.cursor/skills/` 当前均为 66 项且一一对应。
+- 新增 `docs/project-skill-catalog.md`，整理项目本地 skill 清单。
 - 新增根目录 `AGENTS.md`，把入口协议、项目规则和文档更新触发器正式固定下来。
 - 依据方法论再做一次逐条合规审计，补齐过期表述、skill 设计边界和方法论对齐说明。
 
@@ -46,6 +49,11 @@ Updated: 2026-04-21
 - 将本地 `main` 对齐到 `upstream/main`，并强制推送到 `origin/main`，完成 fork 与原仓库的主线同步。
 - 从同步后的 `main` 创建新开发分支 `docs/git-fork-pr-workflow`。
 - 新增 `docs/git-fork-upstream-pr-workflow.md`，把当前项目的 fork / upstream / feature branch / PR 流程固化成正式文档。
+- 修复 `Assets/_Project/Scripts/Modules/Pet/PetRuntimeData.cs` 缺少 `TargetFurnitureCategory` 字段的问题。
+- 修复 `Assets/_Project/Scripts/Modules/Furniture/FurnitureModels.cs` 缺少 `FurnitureInteractionQuery.BedOnly` 的问题。
+- 重新浏览仓库后确认：`_Project/` 已经存在真实场景、运行时代码、asmdef、测试程序集、示例动画与美术资源。
+- 刷新主记忆、架构、文件指南、结构总览、skill 清单与索引，移除“没有场景 / 没有脚本 / 没有 asmdef / 没有导航包”的过期表述。
+- 重新确认项目本地 skill 两套目录目前仍保持镜像关系，当前统计为 `72` 项。
 
 ## 已确认决策
 
@@ -56,13 +64,8 @@ Updated: 2026-04-21
 
 ### 2026-04-21：当前文档统一把“现状”和“规划”分开描述
 原因：
-- 这个仓库目前文档多、实现少
+- 这个仓库文档密度高
 - 如果不分开，后续智能体极易误判哪些资源已经存在
-
-### 2026-04-21：本轮先补 `docs/`，暂不擅自新增 `AGENTS.md`
-原因：
-- 用户本轮需求聚焦在“构建 docs 目录”
-- `AGENTS.md` 仍被视为强烈推荐的下一步，但不在本轮主动扩大范围
 
 ### 2026-04-21：已补 `AGENTS.md`，正式把它作为第一入口
 原因：
@@ -74,15 +77,18 @@ Updated: 2026-04-21
 - 方法论文档明确要求约定 skill 的设计边界与组织方法
 - skill 清单文档只回答“有哪些 skill”，不能代替“什么该写成 skill”
 
+### 2026-04-27：主记忆与结构文档必须描述“当前原型状态”，不能继续停留在 2026-04-21 的骨架快照
+原因：
+- 仓库真实状态已经明显前进
+- 如果继续沿用旧口径，会直接误导后续实现与排错
+
+### 2026-04-27：桌面模块在文档中继续保留“Desktop”设计概念名，但必须同时注明当前真实运行时代码目录为 `DesktopOverlay`
+原因：
+- 现有模块 README 仍以 `Desktop` 命名
+- 当前真实 asmdef 与运行时代码目录是 `DesktopOverlay`
+
 ## 后续推荐动作
-1. 开始真正落 Phase 1 工程骨架：
-   - asmdef
-   - Core 基础设施
-   - FSM 核心
-   - Boot 场景
-2. 决定并安装真实导航依赖，修正文档与包配置差异。
-3. 每出现一个真正落地的场景、Prefab、SO、脚本目录，都同步刷新：
-   - 主记忆
-   - 文件指南
-   - 项目结构总览
-   - 人工验证清单
+1. 优先补齐 Prefab 与 ScriptableObject 资产，减少运行时兜底。
+2. 把导航与桌面 Overlay 从占位实现推进到真实可验证实现。
+3. 在 Unity 中补跑 EditMode / PlayMode / 场景验证，并回写人工验证清单。
+4. 每次新增真实场景、Prefab、SO、关键脚本或 skill 结构变化后，及时刷新主记忆、文件指南、结构总览与索引。

@@ -1,6 +1,6 @@
 # Gemini-Lab 项目 Skill 清单
 
-Updated: 2026-04-21
+Updated: 2026-04-27
 
 ## 这份文档记录什么
 这份文档记录当前 Gemini-Lab 仓库内可见的项目本地 skill 清单。
@@ -12,9 +12,10 @@ Updated: 2026-04-21
 不统计系统内置 skill。
 
 ## 当前状态
-- `.agents/skills/` 与 `.cursor/skills/` 当前是镜像关系。
-- 两边目录数都为 `66`。
+- `.agents/skills/` 与 `.cursor/skills/` 当前仍是镜像关系。
+- 两边目录数都为 `72`。
 - 当前没有发现“只存在于一边”的 skill。
+- 相比早期清单，当前已新增动画与 Animator 相关 skill。
 
 ## 存放位置
 
@@ -40,7 +41,17 @@ Updated: 2026-04-21
 
 ## 分类总览
 
-### 1. Asset 与 Prefab 资产操作
+### 1. Animation 与 Animator
+| Skill | 用途 |
+| :--- | :--- |
+| `animation-create` | 创建 Unity AnimationClip 资产。 |
+| `animation-get-data` | 读取 AnimationClip 的曲线、事件与元数据。 |
+| `animation-modify` | 修改 AnimationClip 曲线、属性与事件。 |
+| `animator-create` | 创建 AnimatorController 资产。 |
+| `animator-get-data` | 读取 AnimatorController 的层、参数、状态与过渡。 |
+| `animator-modify` | 修改 AnimatorController 的参数、状态、层与过渡。 |
+
+### 2. Asset 与 Prefab 资产操作
 | Skill | 用途 |
 | :--- | :--- |
 | `assets-copy` | 复制项目资产到新路径。 |
@@ -61,7 +72,7 @@ Updated: 2026-04-21
 | `assets-shader-get-data` | 读取 Shader 的详细结构与编译信息。 |
 | `assets-shader-list-all` | 列出项目与包中可用的 Shader 名称。 |
 
-### 2. Console、Editor 状态与 Selection
+### 3. Console、Editor 状态与 Selection
 | Skill | 用途 |
 | :--- | :--- |
 | `console-clear-logs` | 清空 MCP 缓存日志和 Unity Console。 |
@@ -71,7 +82,7 @@ Updated: 2026-04-21
 | `editor-selection-get` | 读取当前编辑器选择对象。 |
 | `editor-selection-set` | 设置当前编辑器选择对象。 |
 
-### 3. GameObject、Component、Object、粒子与反射
+### 4. GameObject、Component、Object、粒子与反射
 | Skill | 用途 |
 | :--- | :--- |
 | `gameobject-find` | 在当前打开的 Prefab 或当前场景中查找 GameObject。 |
@@ -93,7 +104,7 @@ Updated: 2026-04-21
 | `reflection-method-call` | 直接调用查找到的 C# 方法。 |
 | `type-get-json-schema` | 为指定 C# 类型生成 JSON Schema。 |
 
-### 4. Scene 与截图采样
+### 5. Scene 与截图采样
 | Skill | 用途 |
 | :--- | :--- |
 | `scene-create` | 创建新场景。 |
@@ -107,7 +118,7 @@ Updated: 2026-04-21
 | `screenshot-game-view` | 从 Game View 抓图。 |
 | `screenshot-scene-view` | 从 Scene View 抓图。 |
 
-### 5. 脚本与代码执行
+### 6. 脚本与代码执行
 | Skill | 用途 |
 | :--- | :--- |
 | `script-read` | 读取脚本文件内容。 |
@@ -115,7 +126,7 @@ Updated: 2026-04-21
 | `script-delete` | 删除脚本文件并等待编译完成。 |
 | `script-execute` | 通过 Roslyn 动态编译并执行一段 C# 代码。 |
 
-### 6. Package Manager
+### 7. Package Manager
 | Skill | 用途 |
 | :--- | :--- |
 | `package-search` | 搜索 UPM 注册表和本地已安装包。 |
@@ -123,7 +134,7 @@ Updated: 2026-04-21
 | `package-add` | 安装包。 |
 | `package-remove` | 卸载包。 |
 
-### 7. 测试、工具与项目初始化
+### 8. 测试、工具与项目初始化
 | Skill | 用途 |
 | :--- | :--- |
 | `tests-run` | 运行 Unity 测试，支持按模式或目标过滤。 |
@@ -135,6 +146,14 @@ Updated: 2026-04-21
 | `unity-skill-generate` | 从项目现有 Tools 生成 skills。 |
 
 ## 常见工作流组合
+
+### 动画资产链
+`animation-get-data` -> `animation-modify`  
+`animator-get-data` -> `animator-modify`
+
+适合：
+- 先读取现有动画 / 状态机结构
+- 再做精确修改
 
 ### 资产修改链
 `assets-find` -> `assets-get-data` -> `assets-modify`
@@ -182,7 +201,7 @@ Updated: 2026-04-21
 - 想隔离某次操作引发的问题日志
 
 ## 当前维护建议
-1. 如果这两套 skill 目录继续共存，后续要明确“谁是主源、谁是镜像”。
+1. `.agents/skills/` 继续视为主工作区技能源，`.cursor/skills/` 继续作为镜像目录维护。
 2. 如果新增项目 skill，最好在本文档里同步加条目与用途说明。
 3. 当前 skill 设计边界已经单独写在 `docs/skill-design-boundary.md`，新增 skill 时应先遵守它，再补清单。
-4. 如果技能结构发生大改，除了更新清单，还要同步更新 `docs/skill-design-boundary.md`。
+4. 如果技能结构发生大改，除了更新清单，还要同步更新 `docs/skill-design-boundary.md`、文件指南与主记忆。

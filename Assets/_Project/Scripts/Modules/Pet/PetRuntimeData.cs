@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using GeminiLab.Modules.Furniture;
 using UnityEngine;
 
 namespace GeminiLab.Modules.Pet
@@ -33,6 +34,8 @@ namespace GeminiLab.Modules.Pet
         public Vector2 TargetPosition;
 
         public string TargetFurnitureId = string.Empty;
+
+        public FurnitureCategory TargetFurnitureCategory = FurnitureCategory.Unknown;
 
         public bool TargetReached;
 

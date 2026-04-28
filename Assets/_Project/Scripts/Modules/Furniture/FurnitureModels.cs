@@ -76,6 +76,7 @@ namespace GeminiLab.Modules.Furniture
         public FurnitureCategory RequiredCategory { get; }
 
         public static FurnitureInteractionQuery Any => new(FurnitureCategory.Unknown, hasRequiredCategory: false);
+        public static FurnitureInteractionQuery BedOnly => new(FurnitureCategory.Bed, hasRequiredCategory: true);
         public static FurnitureInteractionQuery WorkDeskOnly => new(FurnitureCategory.WorkDesk, hasRequiredCategory: true);
     }
 }

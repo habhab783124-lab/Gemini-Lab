@@ -1,6 +1,6 @@
 # Gemini-Lab Agent Development Playbook
 
-Updated: 2026-04-21
+Updated: 2026-04-27
 
 ## 这份文档解决什么问题
 它告诉后续进入 Gemini-Lab 的智能体：
@@ -19,7 +19,10 @@ Updated: 2026-04-21
    - 资源/目录层级：读 [项目结构总览](../project-structure-overview.md)
    - skill 的适用边界：读 [Skill 设计边界](../skill-design-boundary.md)
 5. 查看当前工作树状态，避免覆盖用户未提交改动。
-6. 在真正改文件前，再次确认这次任务面对的是“规划文档”还是“真实实现”。
+6. 在真正改文件前，再次确认这次任务面对的是：
+   - 目标态规划
+   - 当前真实实现
+   - 还是两者之间的差距
 
 ## 当前入口约定
 当前正式入口顺序固定为：
@@ -34,14 +37,16 @@ Updated: 2026-04-21
 1. 主记忆
 2. 文件指南
 3. 规则与历史
-4. 相关源 README
+4. 项目结构总览
+5. 相关源 README
 
-### 架构或脚手架任务
+### 架构或原型实现任务
 1. 主记忆
 2. 架构记忆
 3. `Assets/README.md`
 4. `Assets/plan.md`
 5. 模块 README
+6. 对应真实脚本入口
 
 ### 场景 / Prefab / ScriptableObject 任务
 1. 项目结构总览
@@ -49,12 +54,14 @@ Updated: 2026-04-21
 3. `Assets/_Project/Prefabs/README.md`
 4. `Assets/_Project/ScriptableObjects/README.md`
 5. 人工验证清单
+6. 对应真实场景或脚本
 
 ### 美术替换或资源整理任务
 1. [美术替换工作流](../art-replacement-workflow.md)
 2. `Assets/_Project/Art/README.md`
 3. `Assets/_Project/Prefabs/README.md`
 4. `Assets/_Project/ScriptableObjects/README.md`
+5. 受影响的 Animator / 场景 / 脚本
 
 ### 工具链 / 包依赖 / MCP 任务
 1. `Packages/manifest.json`
@@ -62,6 +69,7 @@ Updated: 2026-04-21
 3. `.cursor/mcp.json`
 4. `.cursor/skills/` 与 `.agents/skills/`
 5. 规则与历史
+6. 项目 Skill 清单
 
 ## 执行规则
 1. 每次新需求先复述理解，再执行。
@@ -90,13 +98,14 @@ Updated: 2026-04-21
 5. 若涉及长期规则、历史决策或已知缺口，更新规则与历史文档。
 
 ## 当前推荐开发顺序
-1. 搭建 Phase 1 工程骨架
-2. 让 README 中的规划资源开始真正落地
-3. 修正文档与包配置之间的差异
-4. 再推进 Phase 2 以后的大系统
+1. 先补齐 Prefab 与 ScriptableObject 资产，把当前运行时兜底结构收回到可维护的作者化资产体系。
+2. 再把导航与桌面 Overlay 的占位实现推进到真实可验证实现。
+3. 补跑 Unity 测试与场景验证，并把结果回写人工验证清单。
+4. 最后继续扩展 Gateway、Travel、UI 等面向完整体验的功能闭环。
 
 ## 当前最容易踩的坑
-1. 把 README 里的未来场景当成已经存在的场景来操作。
-2. 以为 `_Project/Scripts/` 下已经有代码实现，实际上现在几乎只有 README。
-3. 忽略 `manifest.json` 与 README 的依赖差异，直接假设导航方案已经装好。
-4. 改了目录或资源路径，却没有同步刷新索引和文件指南。
+1. 把 README 里的未来结构当成已经完整实现的结构来操作。
+2. 只看 README，不看真实脚本与场景，错过仓库已经落地的原型实现。
+3. 看到 SO 类型代码就误以为对应 `.asset` 配置已经存在。
+4. 看到桌面模块文档就假设运行时代码仍在 `Desktop/`，忽略实际目录是 `DesktopOverlay/`。
+5. 改了目录、资源路径或 skill 清单，却没有同步刷新索引和文件指南。
