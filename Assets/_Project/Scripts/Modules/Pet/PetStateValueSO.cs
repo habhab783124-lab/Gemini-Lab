@@ -18,6 +18,13 @@ namespace GeminiLab.Modules.Pet
         [Range(0f, 100f)] public float SleepEnterEnergyThreshold = 25f;
         [Range(0f, 100f)] public float SleepExitEnergyThreshold = 70f;
 
+        [Header("Autonomous Targeting")]
+        [Range(0f, 100f)] public float DaytimeBedSeekEnergyThreshold = 15f;
+        [Range(0f, 100f)] public float NighttimeBedSeekEnergyThreshold = 40f;
+        [Range(0f, 100f)] public float LeisureSeekMoodThreshold = 85f;
+        [Range(0, 23)] public int NightHourStart = 22;
+        [Range(0, 23)] public int NightHourEnd = 6;
+
         [Header("Tick Speeds (Per Second)")]
         [Min(0f)] public float AwakeEnergyDecayPerSecond = 8f;
         [Min(0f)] public float SleepingEnergyRecoveryPerSecond = 15f;

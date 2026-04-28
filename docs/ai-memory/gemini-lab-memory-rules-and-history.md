@@ -83,6 +83,15 @@ Updated: 2026-04-28
   - `PetController` 新增显式 `RuntimeAnimatorController` 引用，并在缺少 `Animator` 时自动补组件并赋值
   - `PetMoveAnimationSetupEditor` 现在会同时把 controller 回写到 `PetController`
   - `Apartment_Main.unity` 中的 `Pet_Angel` 已绑定 `Pet_Angel.controller` 资源引用
+- 开始修正“桌宠白天过于频繁选择 sleep 家具”的自主选目标问题。
+- 当前定位到的根因：
+  - 问题主要在 `MovingState` 的自主目标选择逻辑，而不是寻路算法本身
+  - 旧逻辑对 `Bed` 的选择过于硬阈值化，且缺少“现实夜间”和“轻重疲劳区间”的分层判断
+- 当前修正方向：
+  - 新增白天 / 夜间的 bed 偏好阈值
+  - 白天中等能量优先 `Leisure`
+  - 夜间中等能量才更偏向 `Bed`
+  - 补了 `MovingStateTargetSelectionTests` 覆盖白天 / 夜间 / 极低能量三种情况
 
 ## 已确认决策
 

@@ -26,6 +26,7 @@ namespace GeminiLab.Modules.Pet
             FurnitureService = furnitureService;
             EventBus = eventBus;
             CommandLinkService = commandLinkService;
+            NowProvider = static () => DateTime.Now;
         }
 
         public PetRuntimeData RuntimeData { get; }
@@ -39,6 +40,8 @@ namespace GeminiLab.Modules.Pet
         public EventBus? EventBus { get; set; }
 
         public IPetCommandLinkService? CommandLinkService { get; set; }
+
+        public Func<DateTime> NowProvider { get; set; }
 
         public Action<Vector2>? ApplyPosition { get; set; }
 
@@ -56,6 +59,22 @@ namespace GeminiLab.Modules.Pet
         {
             RuntimeData.TimeInCurrentState += deltaTime;
             RuntimeData.RuntimeTimeSeconds += deltaTime;
+        }
+
+        public bool IsRealWorldNight()
+        {
+            int hour = NowProvider().Hour;
+            int start = Mathf.Clamp(Config.NightHourStart, 0, 23);
+            int end = Mathf.Clamp(Config.NightHourEnd, 0, 23);
+
+            if (start == end)
+            {
+                return true;
+            }
+
+            return start < end
+                ? hour >= start && hour < end
+                : hour >= start || hour < end;
         }
     }
 }
