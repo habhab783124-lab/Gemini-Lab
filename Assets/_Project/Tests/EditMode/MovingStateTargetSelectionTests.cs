@@ -121,7 +121,7 @@ namespace GeminiLab.Tests.EditMode
 
             public void Dispose()
             {
-                Object.DestroyImmediate(_host);
+                UnityEngine.Object.DestroyImmediate(_host);
             }
         }
     }

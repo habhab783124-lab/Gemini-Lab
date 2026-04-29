@@ -101,7 +101,9 @@ SO 分类规划已写明，但当前仍没有实际 `.asset` 文件。
 
 当前可见内容包括：
 - 宠物移动帧
+- 宠物交互帧（`read`、`beside door`）
 - 家具与环境示例 Sprite
+- `Art/Sprites/Furniture/` 下已开始承接从 `公寓场景.psd` 派生出来、准备进入家具系统接线的独立 Sprite，后续按中文语义命名维护
 - 宠物动画片段与 Animator Controller
 
 ### `Assets/_Project/Audio/`

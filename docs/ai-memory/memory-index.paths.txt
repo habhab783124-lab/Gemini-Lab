@@ -14,6 +14,7 @@ docs/project-structure-overview.md
 docs/gameplay-spec.md
 docs/manual-validation-checklist.md
 docs/art-replacement-workflow.md
+docs/apartment-scene-sprite-naming-guide.md
 docs/git-fork-upstream-pr-workflow.md
 docs/project-skill-catalog.md
 docs/skill-design-boundary.md
@@ -30,6 +31,8 @@ Assets/_Project/Scenes/Desktop/Desktop_Overlay.unity
 Assets/_Project/Prefabs/README.md
 Assets/_Project/ScriptableObjects/README.md
 Assets/_Project/Art/README.md
+Assets/_Project/Art/Sprites/Furniture/README.md
+Assets/_Project/Art/Sprites/Environment/ApartmentScene_Extracted/README.md
 Assets/_Project/Audio/README.md
 Assets/_Project/Settings/README.md
 Assets/_Project/Scripts/README.md

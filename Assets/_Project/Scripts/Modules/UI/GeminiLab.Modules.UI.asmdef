@@ -5,7 +5,8 @@
     "GeminiLab.Core",
     "GeminiLab.Modules.Gateway",
     "GeminiLab.Modules.Pet",
-    "GeminiLab.Modules.Furniture"
+    "GeminiLab.Modules.Furniture",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

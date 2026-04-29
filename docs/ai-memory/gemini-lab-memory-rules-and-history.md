@@ -1,6 +1,6 @@
 # Gemini-Lab Memory Rules And History
 
-Updated: 2026-04-28
+Updated: 2026-04-29
 
 ## 长期规则
 1. 所有中文文档、中文注释、中文说明都必须保持 UTF-8 正常显示。
@@ -73,7 +73,7 @@ Updated: 2026-04-28
 - 开始推进任务 2“桌宠基础动画资源”的范围确认，而不是直接补图。
 - 当前确认到的动画现状：
   - `Assets/_Project/Art/Sprites/Pet/Frames/Move/` 已有 `Front / Back / Side` 三组序列帧
-  - `Idle/`、`Interact/`、`Emotion/` 目录当前为空
+  - `Idle/`、`Emotion/` 目录当前为空；`Interact/` 已新增 `read/` 与 `beside door/` 两组状态帧
   - `Assets/_Project/Animations/Pet/` 已有 3 个移动 `.anim` 和 1 个 `Pet_Angel.controller`
   - 当前 controller 只覆盖 `Move_Front / Move_Back / Move_Side`
 - 因此，任务 2 现阶段可直接进入制作的范围是：
@@ -83,6 +83,16 @@ Updated: 2026-04-28
   - `PetController` 新增显式 `RuntimeAnimatorController` 引用，并在缺少 `Animator` 时自动补组件并赋值
   - `PetMoveAnimationSetupEditor` 现在会同时把 controller 回写到 `PetController`
   - `Apartment_Main.unity` 中的 `Pet_Angel` 已绑定 `Pet_Angel.controller` 资源引用
+- 基于新增帧资源继续推进任务 2：
+  - 新增 `Pet_Angel_Interact_Read.anim`
+  - 新增 `Pet_Angel_Interact_BesideDoor.anim`
+  - 这两个 clip 都按“首帧停 10 帧、尾帧停 10 帧”构建
+  - `Pet_Angel.controller` 新增 `Interact_Read`、`Interact_BesideDoor` 两个状态
+  - `PetController` 在 `Interacting / Working` 状态下会切到对应交互动画
+- 当前策略约定：
+  - `WorkDesk`、`Leisure` 暂时复用 `Interact_Read`
+  - `Decoration` 暂时复用 `Interact_BesideDoor`
+  - `公寓场景.psd` 当前仅作为新增环境资源存在，尚未在未确认切图映射前直接替换场景中的 `RoomBase` 贴图
 - 开始修正“桌宠白天过于频繁选择 sleep 家具”的自主选目标问题。
 - 当前定位到的根因：
   - 问题主要在 `MovingState` 的自主目标选择逻辑，而不是寻路算法本身
@@ -92,6 +102,17 @@ Updated: 2026-04-28
   - 白天中等能量优先 `Leisure`
   - 夜间中等能量才更偏向 `Bed`
   - 补了 `MovingStateTargetSelectionTests` 覆盖白天 / 夜间 / 极低能量三种情况
+
+### 2026-04-29
+- 将 `公寓场景.psd` 在原目录下备份为 `公寓场景.backup.psd`。
+- 将 PSD Importer 已导出的公寓场景大层子资源拆成独立 Sprite，放入 `Assets/_Project/Art/Sprites/Environment/ApartmentScene_Extracted/`。
+- 公寓场景派生 Sprite 的正式命名规则改为“中文语义命名”。
+- 当前第一轮实际重命名工作已转移到 `Assets/_Project/Art/Sprites/Furniture/Bed|Decoration|Leisure|WorkDesk/` 下进行。
+- 为了配合中文命名，`FurnitureService` 的家具类别推断与部分 buff 推断已兼容中文关键词：
+  - `床`
+  - `工作桌 / 工作台 / 书桌`
+  - `休闲 / 竖琴`
+  - `装饰 / 床头柜 / 书柜 / 镜子 / 植物 / 摆件`
 
 ## 已确认决策
 

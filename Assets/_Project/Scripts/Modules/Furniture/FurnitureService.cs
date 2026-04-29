@@ -420,24 +420,22 @@ namespace GeminiLab.Modules.Furniture
         private static FurnitureCategory InferCategory(string definitionId, string objectName)
         {
             string hint = $"{definitionId} {objectName}";
-            if (hint.IndexOf("WorkDesk", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (ContainsAnyKeyword(hint, "WorkDesk", "工作桌", "工作台", "书桌"))
             {
                 return FurnitureCategory.WorkDesk;
             }
 
-            if (hint.IndexOf("Bed", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (ContainsAnyKeyword(hint, "Bed", "床"))
             {
                 return FurnitureCategory.Bed;
             }
 
-            if (hint.IndexOf("Leisure", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                hint.IndexOf("Harp", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (ContainsAnyKeyword(hint, "Leisure", "Harp", "休闲", "娱乐", "竖琴"))
             {
                 return FurnitureCategory.Leisure;
             }
 
-            if (hint.IndexOf("Decoration", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                hint.IndexOf("Nightstand", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (ContainsAnyKeyword(hint, "Decoration", "Nightstand", "装饰", "摆件", "植物", "镜子", "床头柜", "书柜", "高柜"))
             {
                 return FurnitureCategory.Decoration;
             }
@@ -448,8 +446,7 @@ namespace GeminiLab.Modules.Furniture
         private static FurniturePlacementType InferPlacementType(string definitionId, string objectName)
         {
             string hint = $"{definitionId} {objectName}";
-            return hint.IndexOf("Wall", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   hint.IndexOf("Devil", StringComparison.OrdinalIgnoreCase) >= 0
+            return ContainsAnyKeyword(hint, "Wall", "Devil", "墙", "壁")
                 ? FurniturePlacementType.Wall
                 : FurniturePlacementType.Floor;
         }
@@ -466,17 +463,17 @@ namespace GeminiLab.Modules.Furniture
 
         private static EnvironmentalBuff InferBuff(string definitionId, FurnitureCategory category)
         {
-            if (definitionId.IndexOf("Nightstand", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (ContainsAnyKeyword(definitionId, "Nightstand", "床头柜"))
             {
                 return new EnvironmentalBuff { MoodDelta = 1f, EnergyDelta = 1f };
             }
 
-            if (definitionId.IndexOf("Harp", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (ContainsAnyKeyword(definitionId, "Harp", "竖琴"))
             {
                 return new EnvironmentalBuff { MoodDelta = 5f, EnergyDelta = 0f };
             }
 
-            if (definitionId.IndexOf("Devil", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (ContainsAnyKeyword(definitionId, "Devil", "恶魔"))
             {
                 return new EnvironmentalBuff { MoodDelta = 3f, EnergyDelta = -1f };
             }
@@ -510,6 +507,19 @@ namespace GeminiLab.Modules.Furniture
             }
 
             return InferCategory(definition.Id, definition.Id);
+        }
+
+        private static bool ContainsAnyKeyword(string source, params string[] keywords)
+        {
+            foreach (string keyword in keywords)
+            {
+                if (source.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

@@ -117,7 +117,7 @@ Updated: 2026-04-28
 
 当前确认事实：
 - `Move/` 目录已有三组真实序列帧：`Front / Back / Side`
-- `Idle/`、`Interact/`、`Emotion/` 目录当前为空
+- `Idle/`、`Emotion/` 目录当前为空；`Interact/` 已新增 `read/` 与 `beside door/` 两组状态帧
 - 当前已有 `Pet_Angel_Move_Front.anim`、`Pet_Angel_Move_Back.anim`、`Pet_Angel_Move_Side.anim`
 - 当前已有 `Pet_Angel.controller`，但其中只有 `Move_Front / Move_Back / Move_Side`
 - `Apartment_Main.unity` 里的 `Pet_Angel` 目前还没有实际 `Animator` 组件挂载记录
@@ -137,3 +137,25 @@ Updated: 2026-04-28
 | 使用现有资源暂时不能直接完成的内容：独立 `Idle` 序列、独立 `Interact` 序列、独立 `Emotion` 序列 |  |  |
 | 若不新增美术，本轮不应把 `Idle / Interact / Emotion` 扩展成“正式完整资源交付” |  |  |
 | 后续若进入正式制作，优先顺序应为：先挂 `Animator` 并验证 Move，再补 `Idle`，最后补 `Interact / Emotion` |  |  |
+
+## J. Pet 新增交互动画接线
+适用范围：
+- 新增状态帧目录：`Assets/_Project/Art/Sprites/Pet/Frames/Interact/read/`
+- 新增状态帧目录：`Assets/_Project/Art/Sprites/Pet/Frames/Interact/beside door/`
+- 新增动画资产：`Assets/_Project/Animations/Pet/Pet_Angel_Interact_Read.anim`
+- 新增动画资产：`Assets/_Project/Animations/Pet/Pet_Angel_Interact_BesideDoor.anim`
+- 规则：两个状态的首尾帧都应保持 10 帧时长
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| `read` 状态序列帧已按当前资源目录完整纳入 clip |  |  |
+| `beside door` 状态序列帧已按当前资源目录完整纳入 clip |  |  |
+| `Pet_Angel_Interact_Read.anim` 的首帧保持时长为 10 帧 |  |  |
+| `Pet_Angel_Interact_Read.anim` 的尾帧保持时长为 10 帧 |  |  |
+| `Pet_Angel_Interact_BesideDoor.anim` 的首帧保持时长为 10 帧 |  |  |
+| `Pet_Angel_Interact_BesideDoor.anim` 的尾帧保持时长为 10 帧 |  |  |
+| `Pet_Angel.controller` 已包含 `Interact_Read` 和 `Interact_BesideDoor` 状态 |  |  |
+| `PetController` 在 `Interacting` 时会根据目标家具类别切换到新增交互动画状态 |  |  |
+| `WorkDesk` 与 `Leisure` 目标当前使用 `Interact_Read` 作为已有资源下的临时交互表现 |  |  |
+| `Decoration` 目标当前使用 `Interact_BesideDoor` 作为已有资源下的临时交互表现 |  |  |
+| `Apartment_Main.unity` 继续使用现有环境贴图，未擅自把 `公寓场景.psd` 替换进场景 |  |  |

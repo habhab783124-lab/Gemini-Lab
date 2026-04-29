@@ -47,12 +47,15 @@ Updated: 2026-04-28
 - `Assets/_Project/Scripts/Modules/Pet/PetRuntimeSnapshotChangedEvent.cs`
 - `Assets/_Project/Scripts/Modules/Furniture/FurnitureService.cs`
 - `Assets/_Project/Scripts/Modules/UI/StatusPanelController.cs`
+- `Assets/_Project/Animations/Pet/Pet_Angel.controller`
 - `Assets/_Project/Scripts/Modules/Gateway/GatewayBootstrap.cs`
 - `Assets/_Project/Tests/EditMode/GeminiLab.Tests.EditMode.asmdef`
 
 ### 想做美术替换
 - `docs/art-replacement-workflow.md`
+- `docs/apartment-scene-sprite-naming-guide.md`
 - `Assets/_Project/Art/README.md`
+- `Assets/_Project/Art/Sprites/Furniture/README.md`
 - `Assets/_Project/Prefabs/README.md`
 - `Assets/_Project/ScriptableObjects/README.md`
 
@@ -97,6 +100,7 @@ Updated: 2026-04-28
   - 已存在 `EditMode` / `PlayMode` 测试程序集
 - `Assets/_Project/Art/` 与 `Assets/_Project/Animations/`
   - 已存在宠物、家具、环境示例资源与宠物动画
+  - `Assets/_Project/Art/Sprites/Furniture/**/` 当前已开始承接从 `公寓场景.psd` 派生出来、准备用于家具系统接线的独立 Sprite，后续按中文语义命名维护
 - `Packages/`
   - 包依赖与嵌入式包
 - `ProjectSettings/`
@@ -110,6 +114,7 @@ Updated: 2026-04-28
 5. `Assets/_Project/Scripts/Modules/Desktop/README.md` 仍承载桌面模块的设计说明，但当前真实运行时代码目录是 `Assets/_Project/Scripts/Modules/DesktopOverlay/`。
 6. 多个系统当前依赖运行时兜底或 Mock 配置，看到“能跑起来”不等于“资产作者化已完成”。
 7. Apartment 场景中的 `TopLeft_StatusPanel`、`Right_InventoryPanel`、`BottomRight_PersonalityRadar` 目前走的是脚本内自动绑定子文本的方式，而不是 Prefab 化 UI 绑定。
+8. `Assets/_Project/Animations/Pet/` 当前除 3 个 move clip 外，已新增 `Pet_Angel_Interact_Read.anim` 与 `Pet_Angel_Interact_BesideDoor.anim`，但 `Idle` / `Emotion` 仍未补齐。
 
 ## 模块 README 导航
 - `Assets/_Project/Scripts/Modules/Pet/README.md`

@@ -19,13 +19,18 @@ namespace GeminiLab.EditorTools.Pet
     /// </summary>
     public static class PetMoveAnimationSetupEditor
     {
-        private const string SpriteFolder = "Assets/_Project/Art/Sprites/Pet/Frames/Move";
+        private const string MoveSpriteFolder = "Assets/_Project/Art/Sprites/Pet/Frames/Move";
+        private const string InteractReadFolder = "Assets/_Project/Art/Sprites/Pet/Frames/Interact/read";
+        private const string InteractBesideDoorFolder = "Assets/_Project/Art/Sprites/Pet/Frames/Interact/beside door";
         private const string AnimationFolder = "Assets/_Project/Animations/Pet";
         private const string FrontClipPath = AnimationFolder + "/Pet_Angel_Move_Front.anim";
         private const string BackClipPath = AnimationFolder + "/Pet_Angel_Move_Back.anim";
         private const string SideClipPath = AnimationFolder + "/Pet_Angel_Move_Side.anim";
+        private const string InteractReadClipPath = AnimationFolder + "/Pet_Angel_Interact_Read.anim";
+        private const string InteractBesideDoorClipPath = AnimationFolder + "/Pet_Angel_Interact_BesideDoor.anim";
         private const string ControllerPath = AnimationFolder + "/Pet_Angel.controller";
         private const float DefaultFps = 12f;
+        private const int EdgeHoldFrames = 10;
 
         [MenuItem("Tools/GeminiLab/Pet/Setup Move Animations")]
         public static void SetupMoveAnimations()
@@ -37,6 +42,8 @@ namespace GeminiLab.EditorTools.Pet
                 List<Sprite> frontSprites = LoadSpritesByPrefix("Pet_Angel_Move_Front_");
                 List<Sprite> backSprites = LoadSpritesByPrefix("Pet_Angel_Move_Back_");
                 List<Sprite> sideSprites = LoadSpritesByPrefix("Pet_Angel_Move_Side_");
+                List<Sprite> interactReadSprites = LoadSpritesFromFolder(InteractReadFolder);
+                List<Sprite> interactBesideDoorSprites = LoadSpritesFromFolder(InteractBesideDoorFolder);
 
                 if (frontSprites.Count == 0 || backSprites.Count == 0 || sideSprites.Count == 0)
                 {
@@ -47,15 +54,27 @@ namespace GeminiLab.EditorTools.Pet
                 AnimationClip frontClip = CreateOrUpdateSpriteClip(FrontClipPath, frontSprites, DefaultFps);
                 AnimationClip backClip = CreateOrUpdateSpriteClip(BackClipPath, backSprites, DefaultFps);
                 AnimationClip sideClip = CreateOrUpdateSpriteClip(SideClipPath, sideSprites, DefaultFps);
+                AnimationClip? interactReadClip = interactReadSprites.Count > 0
+                    ? CreateOrUpdateSpriteClipWithHeldEdges(InteractReadClipPath, interactReadSprites, DefaultFps, EdgeHoldFrames, EdgeHoldFrames)
+                    : null;
+                AnimationClip? interactBesideDoorClip = interactBesideDoorSprites.Count > 0
+                    ? CreateOrUpdateSpriteClipWithHeldEdges(InteractBesideDoorClipPath, interactBesideDoorSprites, DefaultFps, EdgeHoldFrames, EdgeHoldFrames)
+                    : null;
 
-                AnimatorController controller = CreateOrUpdateController(ControllerPath, frontClip, backClip, sideClip);
+                AnimatorController controller = CreateOrUpdateController(
+                    ControllerPath,
+                    frontClip,
+                    backClip,
+                    sideClip,
+                    interactReadClip,
+                    interactBesideDoorClip);
                 int assigned = BindControllerToPetControllers(controller);
                 EditorSceneManager.MarkAllScenesDirty();
 
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
 
-                Debug.Log($"[PetAnimSetup] Completed. Clips updated: 3, controller: {controller.name}, animators assigned/updated: {assigned}.");
+                Debug.Log($"[PetAnimSetup] Completed. Move clips updated: 3, interact clips updated: {(interactReadClip is null ? 0 : 1) + (interactBesideDoorClip is null ? 0 : 1)}, controller: {controller.name}, animators assigned/updated: {assigned}.");
             }
             catch (Exception ex)
             {
@@ -101,7 +120,13 @@ namespace GeminiLab.EditorTools.Pet
             return assigned;
         }
 
-        private static AnimatorController CreateOrUpdateController(string path, AnimationClip front, AnimationClip back, AnimationClip side)
+        private static AnimatorController CreateOrUpdateController(
+            string path,
+            AnimationClip front,
+            AnimationClip back,
+            AnimationClip side,
+            AnimationClip? interactRead,
+            AnimationClip? interactBesideDoor)
         {
             AnimatorController? controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
             if (controller is null)
@@ -118,6 +143,16 @@ namespace GeminiLab.EditorTools.Pet
             AnimatorState frontState = GetOrCreateState(sm, "Move_Front", front);
             AnimatorState backState = GetOrCreateState(sm, "Move_Back", back);
             AnimatorState sideState = GetOrCreateState(sm, "Move_Side", side);
+            if (interactRead is not null)
+            {
+                _ = GetOrCreateState(sm, "Interact_Read", interactRead);
+            }
+
+            if (interactBesideDoor is not null)
+            {
+                _ = GetOrCreateState(sm, "Interact_BesideDoor", interactBesideDoor);
+            }
+
             sm.defaultState = frontState;
 
             ClearAnyStateTransitions(sm);
@@ -224,7 +259,7 @@ namespace GeminiLab.EditorTools.Pet
 
         private static List<Sprite> LoadSpritesByPrefix(string prefix)
         {
-            string[] guids = AssetDatabase.FindAssets($"t:Sprite {prefix}", new[] { SpriteFolder });
+            string[] guids = AssetDatabase.FindAssets($"t:Sprite {prefix}", new[] { MoveSpriteFolder });
             Regex suffixRegex = new(@"_(\d+)$", RegexOptions.Compiled);
 
             return guids
@@ -232,6 +267,22 @@ namespace GeminiLab.EditorTools.Pet
                 .Select(path => AssetDatabase.LoadAssetAtPath<Sprite>(path))
                 .Where(sprite => sprite is not null && sprite.name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(sprite => ExtractOrder(sprite!.name, suffixRegex))
+                .Cast<Sprite>()
+                .ToList();
+        }
+
+        private static List<Sprite> LoadSpritesFromFolder(string folderPath)
+        {
+            if (!AssetDatabase.IsValidFolder(folderPath))
+            {
+                return new List<Sprite>();
+            }
+
+            return AssetDatabase.FindAssets("t:Sprite", new[] { folderPath })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Select(path => AssetDatabase.LoadAssetAtPath<Sprite>(path))
+                .Where(sprite => sprite is not null)
+                .OrderBy(sprite => ExtractTrailingNumber(sprite!.name))
                 .Cast<Sprite>()
                 .ToList();
         }
@@ -245,6 +296,71 @@ namespace GeminiLab.EditorTools.Pet
             }
 
             return int.TryParse(match.Groups[1].Value, out int order) ? order : int.MaxValue;
+        }
+
+        private static int ExtractTrailingNumber(string spriteName)
+        {
+            Match match = Regex.Match(spriteName, @"(\d+)$");
+            if (!match.Success)
+            {
+                return int.MaxValue;
+            }
+
+            return int.TryParse(match.Groups[1].Value, out int order) ? order : int.MaxValue;
+        }
+
+        private static AnimationClip CreateOrUpdateSpriteClipWithHeldEdges(
+            string assetPath,
+            IReadOnlyList<Sprite> sprites,
+            float fps,
+            int leadingHoldFrames,
+            int trailingHoldFrames)
+        {
+            AnimationClip? clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(assetPath);
+            if (clip is null)
+            {
+                clip = new AnimationClip
+                {
+                    frameRate = fps,
+                    name = Path.GetFileNameWithoutExtension(assetPath)
+                };
+                AssetDatabase.CreateAsset(clip, assetPath);
+            }
+
+            clip.frameRate = fps;
+
+            EditorCurveBinding binding = EditorCurveBinding.PPtrCurve(
+                string.Empty,
+                typeof(SpriteRenderer),
+                "m_Sprite");
+
+            ObjectReferenceKeyframe[] frames = new ObjectReferenceKeyframe[sprites.Count];
+            float currentTime = 0f;
+            for (int i = 0; i < sprites.Count; i++)
+            {
+                frames[i] = new ObjectReferenceKeyframe
+                {
+                    time = currentTime,
+                    value = sprites[i]
+                };
+
+                if (i == 0)
+                {
+                    currentTime += leadingHoldFrames / fps;
+                }
+                else if (i < sprites.Count - 1)
+                {
+                    currentTime += 1f / fps;
+                }
+            }
+
+            AnimationUtility.SetObjectReferenceCurve(clip, binding, frames);
+            AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
+            settings.loopTime = true;
+            settings.stopTime = currentTime + (trailingHoldFrames / fps);
+            AnimationUtility.SetAnimationClipSettings(clip, settings);
+            EditorUtility.SetDirty(clip);
+            return clip;
         }
 
         private static void EnsureFolder(string folderPath)

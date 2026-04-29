@@ -13,6 +13,10 @@ namespace GeminiLab.Modules.Pet
     /// </summary>
     public sealed class PetController : MonoBehaviour
     {
+        private const string MoveFrontStateName = "Move_Front";
+        private const string InteractReadStateName = "Interact_Read";
+        private const string InteractBesideDoorStateName = "Interact_BesideDoor";
+
         private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
         private static readonly int MoveXHash = Animator.StringToHash("MoveX");
         private static readonly int MoveYHash = Animator.StringToHash("MoveY");
@@ -33,6 +37,7 @@ namespace GeminiLab.Modules.Pet
         private SpriteRenderer? _spriteRenderer;
         private Vector2 _lastAnimationPosition;
         private Vector2 _lastMoveDirection = Vector2.down;
+        private string _lastForcedAnimatorStateName = string.Empty;
         private PetRuntimeSnapshotChangedEvent? _lastPublishedSnapshot;
 
         public string CurrentState => _context?.RuntimeData.CurrentState ?? "None";
@@ -269,13 +274,30 @@ namespace GeminiLab.Modules.Pet
                 return;
             }
 
+            string? currentState = _context?.RuntimeData.CurrentState;
+            if (currentState == InteractingState.StateName || currentState == WorkingState.StateName)
+            {
+                PlayForcedAnimatorState(ResolveInteractionStateName());
+                _animator.SetBool(IsMovingHash, false);
+                _animator.speed = 1f;
+                return;
+            }
+
             Vector2 currentPosition = transform.position;
             Vector2 delta = currentPosition - _lastAnimationPosition;
             _lastAnimationPosition = currentPosition;
 
-            string? currentState = _context?.RuntimeData.CurrentState;
             bool isMoving = string.Equals(currentState, MovingState.StateName, System.StringComparison.Ordinal);
             bool hasDelta = delta.sqrMagnitude > DirectionEpsilonSqr;
+
+            if (!isMoving)
+            {
+                PlayForcedAnimatorState(MoveFrontStateName);
+            }
+            else
+            {
+                _lastForcedAnimatorStateName = string.Empty;
+            }
 
             if (hasDelta)
             {
@@ -328,6 +350,38 @@ namespace GeminiLab.Modules.Pet
 
             bool movingRight = direction.x > 0f;
             _spriteRenderer.flipX = _sideFramesFaceLeft ? movingRight : !movingRight;
+        }
+
+        private string ResolveInteractionStateName()
+        {
+            if (_context?.RuntimeData.RequiredWorkTargetType == PetWorkTargetType.WorkDesk ||
+                _context?.RuntimeData.TargetFurnitureCategory == FurnitureCategory.WorkDesk)
+            {
+                return InteractReadStateName;
+            }
+
+            return _context?.RuntimeData.TargetFurnitureCategory switch
+            {
+                FurnitureCategory.Leisure => InteractReadStateName,
+                FurnitureCategory.Decoration => InteractBesideDoorStateName,
+                _ => MoveFrontStateName
+            };
+        }
+
+        private void PlayForcedAnimatorState(string stateName)
+        {
+            if (_animator is null || string.IsNullOrWhiteSpace(stateName))
+            {
+                return;
+            }
+
+            if (_lastForcedAnimatorStateName == stateName)
+            {
+                return;
+            }
+
+            _animator.Play(stateName, 0, 0f);
+            _lastForcedAnimatorStateName = stateName;
         }
 
         private void PublishSnapshotIfChanged(PetContext context)
