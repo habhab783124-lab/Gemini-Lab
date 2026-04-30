@@ -77,6 +77,7 @@ AI 协作工具链目录。
 - 这 3 个场景已经足以说明仓库不再是“没有场景”的状态
 - 但它们仍然更接近原型场景，而不是完整量产场景集
 - `Apartment_Main.unity` 当前已经承载宠物、现成家具与状态/库存/概览面板，是任务 1 的主验证场景
+- `Apartment_Main.unity` 当前除可交互家具对象外，还可能包含一个仅承载纯静态补景家具的 `StaticFurnitureDecorOnly` 子节点
 
 ### `Assets/_Project/Tests/`
 当前已存在：

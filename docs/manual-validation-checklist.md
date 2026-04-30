@@ -40,6 +40,7 @@ Updated: 2026-04-28
 | 家具放置合法性校验可用 |  |  |
 | 宠物可对家具发起自主交互 |  |  |
 | 家具摆放后导航系统能正确更新 |  |  |
+| `Furniture/StaticFurnitureDecorOnly` 下的纯静态补景对象与现有可交互家具不会明显重叠或错位 |  |  |
 
 ## D. Phase 3 Gateway 与 AI 交互
 | 检查项 | 结果 | 备注 |
