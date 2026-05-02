@@ -166,6 +166,8 @@ namespace GeminiLab.Modules.Furniture
                 bestFurniture.InstanceId,
                 bestFurniture.Definition.Id,
                 bestCategory,
+                bestFurniture.Definition.InteractionType,
+                bestFurniture.Definition.InteractionDurationSeconds,
                 interactionPoint,
                 bestScore);
             return true;
@@ -363,7 +365,9 @@ namespace GeminiLab.Modules.Furniture
                             resolvedDefinition.PlacementType,
                             resolvedDefinition.OccupiedCells,
                             resolvedDefinition.Buff,
-                            renderer.sprite);
+                            renderer.sprite,
+                            resolvedDefinition.InteractionType,
+                            resolvedDefinition.InteractionDurationSeconds);
                     }
 
                     ApplyFurniturePresentation(furniture, renderer, resolvedDefinition);
@@ -379,6 +383,51 @@ namespace GeminiLab.Modules.Furniture
             string spriteName = renderer?.sprite?.name ?? string.Empty;
             string objectName = furniture.gameObject.name;
 
+            if (furniture.TryGetComponent(out SceneFurnitureDefinitionHint hint) && hint.EnabledHint)
+            {
+                string hintedDefinitionId = !string.IsNullOrWhiteSpace(hint.DefinitionId)
+                    ? hint.DefinitionId
+                    : (!string.IsNullOrWhiteSpace(spriteName) ? spriteName : $"Furniture_{objectName}");
+
+                if (_definitions.TryGetValue(hintedDefinitionId, out FurnitureDefinitionSO? hintedExisting))
+                {
+                    return hintedExisting;
+                }
+
+                FurnitureCategory hintedCategory = hint.Category != FurnitureCategory.Unknown
+                    ? hint.Category
+                    : InferCategory(hintedDefinitionId, objectName);
+                FurnitureInteractionType hintedInteractionType = hint.InteractionType != FurnitureInteractionType.Unknown
+                    ? hint.InteractionType
+                    : InferInteractionType(hintedDefinitionId, hintedCategory);
+                float hintedInteractionDuration = hint.InteractionDurationSeconds > 0f
+                    ? hint.InteractionDurationSeconds
+                    : InferInteractionDuration(hintedInteractionType);
+
+                Vector2Int hintedOccupiedCells = hint.OccupiedCells.x > 0 && hint.OccupiedCells.y > 0
+                    ? hint.OccupiedCells
+                    : InferOccupiedCells(hintedCategory);
+
+                FurnitureDefinitionSO hintedDefinition = ScriptableObject.CreateInstance<FurnitureDefinitionSO>();
+                hintedDefinition.ConfigureRuntime(
+                    hintedDefinitionId,
+                    hintedCategory,
+                    hint.PlacementType,
+                    hintedOccupiedCells,
+                    hint.Buff,
+                    renderer?.sprite,
+                    hintedInteractionType,
+                    hintedInteractionDuration);
+
+                _definitions[hintedDefinitionId] = hintedDefinition;
+                if (hint.IncludeInBuildPalette)
+                {
+                    _buildPalette.Add(hintedDefinition);
+                }
+
+                return hintedDefinition;
+            }
+
             if (!string.IsNullOrWhiteSpace(spriteName) && _definitions.TryGetValue(spriteName, out FurnitureDefinitionSO? bySprite))
             {
                 return bySprite;
@@ -386,12 +435,14 @@ namespace GeminiLab.Modules.Furniture
 
             string definitionId = !string.IsNullOrWhiteSpace(spriteName) ? spriteName : $"Furniture_{objectName}";
             FurnitureCategory category = InferCategory(definitionId, objectName);
+            FurnitureInteractionType interactionType = InferInteractionType(definitionId, category);
+            float interactionDuration = InferInteractionDuration(interactionType);
             FurniturePlacementType placementType = InferPlacementType(definitionId, objectName);
             Vector2Int occupiedCells = InferOccupiedCells(category);
             EnvironmentalBuff buff = InferBuff(definitionId, category);
 
             FurnitureDefinitionSO definition = ScriptableObject.CreateInstance<FurnitureDefinitionSO>();
-            definition.ConfigureRuntime(definitionId, category, placementType, occupiedCells, buff, renderer?.sprite);
+            definition.ConfigureRuntime(definitionId, category, placementType, occupiedCells, buff, renderer?.sprite, interactionType, interactionDuration);
             _definitions[definitionId] = definition;
             _buildPalette.Add(definition);
             return definition;
@@ -449,6 +500,153 @@ namespace GeminiLab.Modules.Furniture
             return ContainsAnyKeyword(hint, "Wall", "Devil", "墙", "壁")
                 ? FurniturePlacementType.Wall
                 : FurniturePlacementType.Floor;
+        }
+
+        private static FurnitureInteractionType InferInteractionType(string definitionId, FurnitureCategory category)
+        {
+            if (ContainsAnyKeyword(definitionId, "床"))
+            {
+                return FurnitureInteractionType.SleepInBed;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "工作桌", "工作台", "书桌", "公告板"))
+            {
+                return FurnitureInteractionType.WorkFocus;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "高书柜", "书柜"))
+            {
+                return FurnitureInteractionType.InspectBookshelf;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "镜子", "小圆镜"))
+            {
+                return FurnitureInteractionType.InspectMirror;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "床头柜"))
+            {
+                return FurnitureInteractionType.InspectNightstand;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "竖琴"))
+            {
+                return FurnitureInteractionType.PlayHarp;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "吉他"))
+            {
+                return FurnitureInteractionType.PlayGuitar;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "画架"))
+            {
+                return FurnitureInteractionType.PaintAtEasel;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "照片板"))
+            {
+                return FurnitureInteractionType.ViewPhotoBoard;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "盆栽", "窗台上的盆栽"))
+            {
+                return FurnitureInteractionType.ObservePlant;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "窗台"))
+            {
+                return FurnitureInteractionType.ObserveWindow;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "玩偶"))
+            {
+                return FurnitureInteractionType.InspectToy;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "枕头"))
+            {
+                return FurnitureInteractionType.ArrangePillow;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "纸张"))
+            {
+                return FurnitureInteractionType.InspectPapers;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "音响", "耳机", "乐器"))
+            {
+                return FurnitureInteractionType.ListenToAudio;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "左下小家具", "左下窄家具", "柜子", "储物", "边柜"))
+            {
+                return FurnitureInteractionType.OrganizeStorage;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "地毯", "园地毯"))
+            {
+                return FurnitureInteractionType.RestOnRug;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "凳子", "椅子"))
+            {
+                return FurnitureInteractionType.SitOnSeat;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "沙发"))
+            {
+                return FurnitureInteractionType.LoungeOnSofa;
+            }
+
+            if (ContainsAnyKeyword(definitionId, "休闲"))
+            {
+                return FurnitureInteractionType.LeisureEngage;
+            }
+
+            if (category == FurnitureCategory.Decoration)
+            {
+                return FurnitureInteractionType.DecorInspect;
+            }
+
+            return category switch
+            {
+                FurnitureCategory.Bed => FurnitureInteractionType.SleepRest,
+                FurnitureCategory.WorkDesk => FurnitureInteractionType.WorkFocus,
+                FurnitureCategory.Leisure => FurnitureInteractionType.LeisureEngage,
+                FurnitureCategory.Decoration => FurnitureInteractionType.DecorInspect,
+                _ => FurnitureInteractionType.Unknown
+            };
+        }
+
+        private static float InferInteractionDuration(FurnitureInteractionType interactionType)
+        {
+            return interactionType switch
+            {
+                FurnitureInteractionType.SleepRest => 2.5f,
+                FurnitureInteractionType.SleepInBed => 3.2f,
+                FurnitureInteractionType.WorkFocus => 1.4f,
+                FurnitureInteractionType.DecorInspect => 1.6f,
+                FurnitureInteractionType.LeisureEngage => 2.0f,
+                FurnitureInteractionType.InspectBookshelf => 2.2f,
+                FurnitureInteractionType.InspectMirror => 1.5f,
+                FurnitureInteractionType.InspectNightstand => 1.8f,
+                FurnitureInteractionType.PlayHarp => 2.4f,
+                FurnitureInteractionType.PlayGuitar => 2.3f,
+                FurnitureInteractionType.PaintAtEasel => 2.2f,
+                FurnitureInteractionType.ViewPhotoBoard => 1.8f,
+                FurnitureInteractionType.ObservePlant => 1.5f,
+                FurnitureInteractionType.ObserveWindow => 1.8f,
+                FurnitureInteractionType.InspectToy => 1.6f,
+                FurnitureInteractionType.ArrangePillow => 1.4f,
+                FurnitureInteractionType.InspectPapers => 1.4f,
+                FurnitureInteractionType.ListenToAudio => 1.9f,
+                FurnitureInteractionType.OrganizeStorage => 1.7f,
+                FurnitureInteractionType.RestOnRug => 2.1f,
+                FurnitureInteractionType.SitOnSeat => 1.6f,
+                FurnitureInteractionType.LoungeOnSofa => 2.4f,
+                _ => 1.0f
+            };
         }
 
         private static Vector2Int InferOccupiedCells(FurnitureCategory category)

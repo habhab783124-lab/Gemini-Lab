@@ -1,6 +1,6 @@
 # Gemini-Lab Memory Main
 
-Updated: 2026-04-28
+Updated: 2026-05-02
 
 ## 定位
 这份文档是 Gemini-Lab 的长期项目记忆总览。
@@ -39,6 +39,49 @@ Updated: 2026-04-28
 - `2026-04-28` 已基于新增美术资源补上两个交互动画 clip：`Interact_Read` 与 `Interact_BesideDoor`，并把它们接进现有 `Pet_Angel.controller`。
 - `2026-04-29` 已把 `公寓场景.psd` 备份到原目录，并把 PSD Importer 子资源转为独立 Sprite；当前第一轮实际用于家具整理的资源已开始放入 `Assets/_Project/Art/Sprites/Furniture/**/`，并按中文语义命名维护。
 - `2026-04-29` 在 `Apartment_Main.unity` 中追加了一次“仅家具层补景”的试验：当前会在 `Furniture` 下额外挂一个 `StaticFurnitureDecorOnly`，用于承载与交互逻辑无关的纯静态补景家具。
+- `2026-05-01` 已开始把公寓场景里真实存在的关键家具对象显式接入家具系统：
+  - 新增 `SceneFurnitureDefinitionHint`
+  - 新增 `ApartmentSceneFurnitureBindings`
+  - `FurnitureService` 现已支持优先读取场景显式提示，而不是只靠名称推断
+  - `Apartment_Main.unity` 的 `Furniture` 根当前已配置首批 8 个关键对象：天使床、天使床头柜、天使竖琴、天使工作桌、恶魔工作桌、天使书柜、天使花盆方桌、天使底部盆栽
+- `2026-05-01` 已开始补“最优先的 3 个交互类型”代码：
+  - `睡眠交互`
+  - `装饰观察`
+  - `休闲交互`
+  当前交互类型已经进入 `FurnitureDefinitionSO`、`FurnitureInteractionTarget`、`PetRuntimeData` 和状态面板链路，不再只是口头分类。
+- `2026-05-01` 已进一步把一部分家具从“类别级交互”推进到“对象级交互类型”：
+  - `上床休息`
+  - `看书柜`
+  - `照镜子`
+  - `整理床头柜`
+  - `演奏竖琴`
+  - `弹吉他`
+  - `看画架`
+  - `看照片板`
+  - `观察植物`
+  - `地毯休息`
+  - `沙发休息`
+  - `坐下休息`
+- `2026-05-02` 已继续把第二批对象接入场景与交互链路：
+  - 场景里已补进或绑定：镜子、恶魔地毯、恶魔沙发、恶魔凳子、天使凳子、恶魔画架、恶魔照片板、恶魔椅子
+  - `ApartmentSceneFurnitureBindings` 当前已从最初的 5 个关键对象扩展到覆盖主要可交互家具与第二批静态装饰对象
+- `2026-05-02` 已继续把第三轮装饰类对象补进对象级交互与场景绑定：
+  - 纸张
+  - 耳机
+  - 音响
+  - 音响和乐器
+  - 柜子
+  - 储物家具
+- `2026-05-02` 已继续把第四轮剩余可做装饰对象接入对象级交互或场景绑定：
+  - 窗台
+  - 窗台上的盆栽
+  - 床上玩偶
+  - 沙发上枕头
+- `2026-05-02` 已对 Apartment 家具交互链路做一轮精修：
+  - 清理 `ApartmentSceneFurnitureBindings` 中的重复 `_target` 绑定
+  - 把 `花盆方桌` 的场景定义从误写的装饰类修正为 `WorkDesk`
+  - 为 `窗台 / 玩偶 / 枕头` 补上更贴近对象语义的对象级交互类型
+  - 让 `小圆镜`、`园地毯`、`左下小家具`、`左下窄家具` 与当前脚本推断口径重新对齐
 - `Assets/_Project/Prefabs/` 目前仍没有真实 `.prefab` 资产；`Assets/_Project/ScriptableObjects/` 目前仍没有真实 `.asset` 配置资产。
 - README 系列文档描述的目标状态仍然大于当前实现范围，阅读时必须显式区分“已实现事实”和“规划目标”。
 - 项目本地 skill 目录当前仍保持 `.agents/skills/` 与 `.cursor/skills/` 镜像关系，当前统计为 `72` 项。

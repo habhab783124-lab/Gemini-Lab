@@ -59,7 +59,7 @@ namespace GeminiLab.Modules.UI.ViewModels
             Energy = payload.Energy;
             Satiety = payload.Satiety;
             IsTraveling = payload.IsTraveling;
-            TargetLabel = BuildTargetLabel(payload.TargetFurnitureId, payload.TargetFurnitureCategory, payload.WorkRequested);
+            TargetLabel = BuildTargetLabel(payload.TargetFurnitureId, payload.TargetFurnitureCategory, payload.TargetFurnitureInteractionType, payload.WorkRequested);
             if (!string.IsNullOrWhiteSpace(payload.LastInteractionSummary))
             {
                 LastInteractionSummary = payload.LastInteractionSummary;
@@ -89,7 +89,7 @@ namespace GeminiLab.Modules.UI.ViewModels
             Changed?.Invoke();
         }
 
-        private static string BuildTargetLabel(string furnitureId, FurnitureCategory category, bool workRequested)
+        private static string BuildTargetLabel(string furnitureId, FurnitureCategory category, FurnitureInteractionType interactionType, bool workRequested)
         {
             if (string.IsNullOrWhiteSpace(furnitureId))
             {
@@ -97,7 +97,8 @@ namespace GeminiLab.Modules.UI.ViewModels
             }
 
             string categoryLabel = category == FurnitureCategory.Unknown ? "Furniture" : category.ToString();
-            return $"{categoryLabel} ({furnitureId})";
+            string interactionLabel = interactionType == FurnitureInteractionType.Unknown ? "普通交互" : interactionType.ToDisplayLabel();
+            return $"{categoryLabel}/{interactionLabel} ({furnitureId})";
         }
     }
 }

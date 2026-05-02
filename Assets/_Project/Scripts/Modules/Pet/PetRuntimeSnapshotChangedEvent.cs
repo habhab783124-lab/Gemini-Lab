@@ -16,6 +16,7 @@ namespace GeminiLab.Modules.Pet
             bool workRequested,
             string targetFurnitureId,
             FurnitureCategory targetFurnitureCategory,
+            FurnitureInteractionType targetFurnitureInteractionType,
             bool isTraveling,
             string lastInteractionFurnitureId,
             string lastInteractionSummary)
@@ -27,6 +28,7 @@ namespace GeminiLab.Modules.Pet
             WorkRequested = workRequested;
             TargetFurnitureId = targetFurnitureId;
             TargetFurnitureCategory = targetFurnitureCategory;
+            TargetFurnitureInteractionType = targetFurnitureInteractionType;
             IsTraveling = isTraveling;
             LastInteractionFurnitureId = lastInteractionFurnitureId;
             LastInteractionSummary = lastInteractionSummary;
@@ -45,6 +47,8 @@ namespace GeminiLab.Modules.Pet
         public string TargetFurnitureId { get; }
 
         public FurnitureCategory TargetFurnitureCategory { get; }
+
+        public FurnitureInteractionType TargetFurnitureInteractionType { get; }
 
         public bool IsTraveling { get; }
 

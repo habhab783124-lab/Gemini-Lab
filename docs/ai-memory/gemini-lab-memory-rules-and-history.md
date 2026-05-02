@@ -1,6 +1,6 @@
 # Gemini-Lab Memory Rules And History
 
-Updated: 2026-04-29
+Updated: 2026-05-02
 
 ## 长期规则
 1. 所有中文文档、中文注释、中文说明都必须保持 UTF-8 正常显示。
@@ -117,6 +117,55 @@ Updated: 2026-04-29
   - 不改 `RoomBase`
   - 不整体平移 `Furniture` 根
   - 仅在 `Furniture` 下新增 `StaticFurnitureDecorOnly`，补入书柜、花盆方桌、窗台花和底部盆栽四个纯静态装饰
+
+### 2026-05-01
+- 开始进入“基于当前公寓场景真实游戏物体”的脚本编写阶段，而不是继续只改资源和场景 YAML。
+- 新增 `SceneFurnitureDefinitionHint`，用于在 Scene / Inspector 中显式标注场景家具对象的：
+  - 定义 ID
+  - 家具类别
+  - 放置类型
+  - 占格尺寸
+  - Buff
+  - 是否进入 build palette
+- 新增 `ApartmentSceneFurnitureBindings`，作为 `Apartment_Main.unity` 的场景绑定入口：
+  - 当前挂在 `Furniture` 根上
+  - 首批已扩展到 8 个关键对象：天使床、天使床头柜、天使竖琴、天使工作桌、恶魔工作桌、天使书柜、天使花盆方桌、天使底部盆栽
+- `FurnitureService.ResolveSceneFurnitureDefinition` 现已优先读取 `SceneFurnitureDefinitionHint`，从“纯名称推断”升级为“显式提示优先、推断兜底”。
+- 新增 `FurnitureServiceSceneHintTests.cs`，覆盖“场景提示优先于名称推断”的最小验证。
+- 开始把静态家具交互从“类别级”推进到“交互类型级”：
+  - 新增 `FurnitureInteractionType`
+  - 当前首批重点落地类型：`SleepRest`、`DecorInspect`、`LeisureEngage`
+  - `FurnitureService` 会为场景家具推断或读取交互类型与交互时长
+  - `PetController`、`InteractingState`、`PetStateMachineBuilder`、`PetStatusViewModel` 已开始消费这些交互类型
+- 在此基础上，继续把部分家具推进到对象级交互类型：
+  - `SleepInBed`
+  - `InspectBookshelf`
+  - `InspectMirror`
+  - `InspectNightstand`
+  - `PlayHarp`
+  - `PlayGuitar`
+  - `PaintAtEasel`
+  - `ViewPhotoBoard`
+  - `ObservePlant`
+  - `RestOnRug`
+  - `LoungeOnSofa`
+  - `SitOnSeat`
+- `Apartment_Main.unity` 当前已把镜子对象补进场景显式绑定；
+  现在已继续把镜子、恶魔地毯、恶魔沙发、恶魔凳子、天使凳子、恶魔画架、恶魔照片板、恶魔椅子接进 `Apartment_Main` 的显式绑定或静态摆件层。
+- 当前阶段的重点已经从“只给类别”推进到“给场景里真实出现的具体对象配置对象级交互类型与持续时长”。
+- 已继续把第三轮装饰类对象推进到对象级交互类型并接入场景绑定：
+  - `InspectPapers`
+  - `ListenToAudio`
+  - `OrganizeStorage`
+- 已继续把第四轮剩余装饰对象推进到对象级交互或场景绑定：
+  - 窗台与窗台盆栽继续复用 `ObservePlant`
+  - 床上玩偶当前继续作为轻观察对象处理
+  - 沙发上枕头当前继续并入 `LoungeOnSofa`
+- 已对 Apartment 家具交互链路做一轮精修：
+  - 清理 `ApartmentSceneFurnitureBindings` 中 3 组重复 `_target`
+  - 把 `花盆方桌` 的场景定义从误写的装饰类修正为 `WorkDesk`
+  - 新增 `ObserveWindow`、`InspectToy`、`ArrangePillow` 三个对象级交互类型，替换此前对窗台、玩偶、枕头的语义借位
+  - 让 `小圆镜`、`园地毯`、`左下小家具`、`左下窄家具` 的脚本覆盖情况与交互覆盖表重新对齐
 
 ## 已确认决策
 

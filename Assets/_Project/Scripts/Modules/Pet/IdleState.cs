@@ -19,6 +19,8 @@ namespace GeminiLab.Modules.Pet
             context.RuntimeData.TargetReached = false;
             context.RuntimeData.TargetFurnitureId = string.Empty;
             context.RuntimeData.TargetFurnitureCategory = FurnitureCategory.Unknown;
+            context.RuntimeData.TargetFurnitureInteractionType = FurnitureInteractionType.Unknown;
+            context.RuntimeData.TargetInteractionDurationSeconds = 1f;
             context.RuntimeData.ActivePath.Clear();
             context.RuntimeData.PathIndex = 0;
         }

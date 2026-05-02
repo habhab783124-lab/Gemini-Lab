@@ -23,7 +23,7 @@ namespace GeminiLab.Modules.Pet
                 StatTickService.ApplyEnvironmentalBuff(context.RuntimeData, buff.MoodDelta, buff.EnergyDelta);
                 context.RuntimeData.LastInteractionFurnitureId = context.RuntimeData.TargetFurnitureId;
                 context.RuntimeData.LastInteractionSummary =
-                    $"{context.RuntimeData.TargetFurnitureCategory} (Mood {FormatSigned(buff.MoodDelta)}, Energy {FormatSigned(buff.EnergyDelta)})";
+                    $"{context.RuntimeData.TargetFurnitureInteractionType.ToDisplayLabel()} / {context.RuntimeData.TargetFurnitureCategory} (Mood {FormatSigned(buff.MoodDelta)}, Energy {FormatSigned(buff.EnergyDelta)})";
             }
         }
 

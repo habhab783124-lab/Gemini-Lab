@@ -26,6 +26,8 @@ namespace GeminiLab.Tests.EditMode
 
             Assert.IsTrue(found);
             Assert.AreEqual(FurnitureCategory.WorkDesk, target.Category);
+            Assert.AreEqual(FurnitureInteractionType.WorkFocus, target.InteractionType);
+            Assert.Greater(target.InteractionDurationSeconds, 1f);
 
             Object.DestroyImmediate(host);
             Object.DestroyImmediate(workDesk);
@@ -47,7 +49,9 @@ namespace GeminiLab.Tests.EditMode
                 FurniturePlacementType.Floor,
                 Vector2Int.one,
                 new EnvironmentalBuff(),
-                null!
+                null!,
+                FurnitureInteractionType.Unknown,
+                1f
             });
 
             return definition;

@@ -23,17 +23,18 @@ namespace GeminiLab.Tests.EditMode
                 workRequested: false,
                 targetFurnitureId: "bed_01",
                 targetFurnitureCategory: FurnitureCategory.Bed,
+                targetFurnitureInteractionType: FurnitureInteractionType.SleepRest,
                 isTraveling: false,
                 lastInteractionFurnitureId: "harp_01",
-                lastInteractionSummary: "Leisure (Mood +5, Energy +0)"));
+                lastInteractionSummary: "休闲交互 / Leisure (Mood +5, Energy +0)"));
             eventBus.Publish(new PetWorkStartedEvent("trace_work", "desk_01"));
 
             Assert.AreEqual("Moving", viewModel.CurrentState);
             Assert.AreEqual(66f, viewModel.Mood, 0.01f);
             Assert.AreEqual(82f, viewModel.Energy, 0.01f);
             Assert.AreEqual(71f, viewModel.Satiety, 0.01f);
-            Assert.AreEqual("Bed (bed_01)", viewModel.TargetLabel);
-            Assert.AreEqual("Leisure (Mood +5, Energy +0)", viewModel.LastInteractionSummary);
+            Assert.AreEqual("Bed/睡眠交互 (bed_01)", viewModel.TargetLabel);
+            Assert.AreEqual("休闲交互 / Leisure (Mood +5, Energy +0)", viewModel.LastInteractionSummary);
             Assert.AreEqual("Working", viewModel.WorkStatus);
             Assert.AreEqual("At desk_01", viewModel.LastWorkMessage);
         }

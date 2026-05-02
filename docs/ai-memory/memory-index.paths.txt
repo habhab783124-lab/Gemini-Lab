@@ -1,5 +1,5 @@
 # Gemini-Lab AI memory index
-# Updated: 2026-04-28
+# Updated: 2026-05-02
 
 AGENTS.md
 
@@ -15,6 +15,7 @@ docs/gameplay-spec.md
 docs/manual-validation-checklist.md
 docs/art-replacement-workflow.md
 docs/apartment-scene-sprite-naming-guide.md
+docs/furniture-interaction-coverage-map.md
 docs/git-fork-upstream-pr-workflow.md
 docs/project-skill-catalog.md
 docs/skill-design-boundary.md
@@ -48,11 +49,14 @@ Assets/_Project/Scripts/Modules/Persistence/README.md
 Assets/_Project/Scripts/UI/README.md
 Assets/_Project/Scripts/Modules/Pet/PetRuntimeSnapshotChangedEvent.cs
 Assets/_Project/Scripts/Modules/Furniture/FurnitureService.cs
+Assets/_Project/Scripts/Modules/Furniture/ApartmentSceneFurnitureBindings.cs
+Assets/_Project/Scripts/Modules/Furniture/SceneFurnitureDefinitionHint.cs
 Assets/_Project/Scripts/Modules/UI/StatusPanelController.cs
 Assets/_Project/Tests/EditMode/GeminiLab.Tests.EditMode.asmdef
 Assets/_Project/Tests/PlayMode/GeminiLab.Tests.PlayMode.asmdef
 Assets/_Project/Tests/EditMode/PetStatusViewModelTests.cs
 Assets/_Project/Tests/EditMode/FurnitureServiceSceneRegistrationTests.cs
+Assets/_Project/Tests/EditMode/FurnitureServiceSceneHintTests.cs
 
 Packages/manifest.json
 Packages/packages-lock.json

@@ -3,24 +3,23 @@ using UnityEngine;
 
 namespace GeminiLab.Modules.Furniture
 {
-    /// <summary>
-    /// Data-driven furniture definition.
-    /// </summary>
-    [CreateAssetMenu(menuName = "GeminiLab/Furniture/Definition", fileName = "FurnitureDefinition")]
-    public sealed class FurnitureDefinitionSO : ScriptableObject
+    public sealed class SceneFurnitureDefinitionHint : MonoBehaviour
     {
-        [SerializeField] private string _id = "Furniture.Definition";
-        [SerializeField] private Sprite? _sprite;
-        [SerializeField] private FurnitureCategory _category = FurnitureCategory.Decoration;
+        [SerializeField] private bool _enabledHint = true;
+        [SerializeField] private bool _includeInBuildPalette;
+        [SerializeField] private string _definitionId = string.Empty;
+        [SerializeField] private FurnitureCategory _category = FurnitureCategory.Unknown;
         [SerializeField] private FurnitureInteractionType _interactionType = FurnitureInteractionType.Unknown;
-        [SerializeField] private float _interactionDurationSeconds = 1f;
+        [SerializeField] private float _interactionDurationSeconds = -1f;
         [SerializeField] private FurniturePlacementType _placementType = FurniturePlacementType.Floor;
         [SerializeField] private Vector2Int _occupiedCells = Vector2Int.one;
         [SerializeField] private EnvironmentalBuff _buff;
 
-        public string Id => _id;
+        public bool EnabledHint => _enabledHint;
 
-        public Sprite? Sprite => _sprite;
+        public bool IncludeInBuildPalette => _includeInBuildPalette;
+
+        public string DefinitionId => _definitionId;
 
         public FurnitureCategory Category => _category;
 
@@ -34,24 +33,26 @@ namespace GeminiLab.Modules.Furniture
 
         public EnvironmentalBuff Buff => _buff;
 
-        internal void ConfigureRuntime(
-            string id,
+        public void Configure(
+            string definitionId,
             FurnitureCategory category,
+            FurnitureInteractionType interactionType,
+            float interactionDurationSeconds,
             FurniturePlacementType placementType,
             Vector2Int occupiedCells,
             EnvironmentalBuff buff,
-            Sprite? sprite = null,
-            FurnitureInteractionType interactionType = FurnitureInteractionType.Unknown,
-            float interactionDurationSeconds = 1f)
+            bool includeInBuildPalette = false,
+            bool enabledHint = true)
         {
-            _id = id;
+            _definitionId = definitionId;
             _category = category;
             _interactionType = interactionType;
             _interactionDurationSeconds = interactionDurationSeconds;
             _placementType = placementType;
             _occupiedCells = occupiedCells;
             _buff = buff;
-            _sprite = sprite;
+            _includeInBuildPalette = includeInBuildPalette;
+            _enabledHint = enabledHint;
         }
     }
 }

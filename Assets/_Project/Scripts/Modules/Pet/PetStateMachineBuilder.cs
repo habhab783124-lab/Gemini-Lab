@@ -35,7 +35,7 @@ namespace GeminiLab.Modules.Pet
                     !string.IsNullOrEmpty(ctx.RuntimeData.TargetFurnitureId) &&
                     ctx.RuntimeData.Energy > ctx.Config.SleepEnterEnergyThreshold)
                 .AddTransition<InteractingState, IdleState>(ctx =>
-                    ctx.RuntimeData.TimeInCurrentState >= 1.0f || ctx.RuntimeData.WorkRequested)
+                    ctx.RuntimeData.TimeInCurrentState >= ctx.RuntimeData.TargetInteractionDurationSeconds || ctx.RuntimeData.WorkRequested)
                 .AddTransition<IdleState, MovingState>(ctx =>
                     ctx.RuntimeData.WorkRequested &&
                     !ctx.RuntimeData.IsAtRequiredWorkTarget &&

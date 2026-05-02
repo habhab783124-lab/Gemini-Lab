@@ -68,6 +68,8 @@ namespace GeminiLab.Modules.Pet
                 context.RuntimeData.TargetReached = true;
                 context.RuntimeData.TargetFurnitureId = string.Empty;
                 context.RuntimeData.TargetFurnitureCategory = FurnitureCategory.Unknown;
+                context.RuntimeData.TargetFurnitureInteractionType = FurnitureInteractionType.Unknown;
+                context.RuntimeData.TargetInteractionDurationSeconds = 1f;
                 context.RuntimeData.ActivePath.Clear();
                 context.RuntimeData.PathIndex = 0;
                 return;
@@ -101,6 +103,8 @@ namespace GeminiLab.Modules.Pet
                 context.RuntimeData.TargetReached = true;
                 context.RuntimeData.TargetFurnitureId = string.Empty;
                 context.RuntimeData.TargetFurnitureCategory = FurnitureCategory.Unknown;
+                context.RuntimeData.TargetFurnitureInteractionType = FurnitureInteractionType.Unknown;
+                context.RuntimeData.TargetInteractionDurationSeconds = 1f;
                 context.RuntimeData.ActivePath.Clear();
                 context.RuntimeData.PathIndex = 0;
                 if (context.RuntimeData.WorkRequested)
@@ -113,6 +117,8 @@ namespace GeminiLab.Modules.Pet
 
             context.RuntimeData.TargetFurnitureId = target.FurnitureId;
             context.RuntimeData.TargetFurnitureCategory = target.Category;
+            context.RuntimeData.TargetFurnitureInteractionType = target.InteractionType;
+            context.RuntimeData.TargetInteractionDurationSeconds = target.InteractionDurationSeconds;
             context.RuntimeData.TargetPosition = target.InteractionPoint;
             context.RuntimeData.IsAtRequiredWorkTarget =
                 !context.RuntimeData.WorkRequested ||

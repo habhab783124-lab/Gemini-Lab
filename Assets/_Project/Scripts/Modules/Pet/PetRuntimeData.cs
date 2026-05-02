@@ -37,6 +37,10 @@ namespace GeminiLab.Modules.Pet
 
         public FurnitureCategory TargetFurnitureCategory = FurnitureCategory.Unknown;
 
+        public FurnitureInteractionType TargetFurnitureInteractionType = FurnitureInteractionType.Unknown;
+
+        public float TargetInteractionDurationSeconds = 1f;
+
         public bool TargetReached;
 
         public int PathIndex;

@@ -263,6 +263,8 @@ namespace GeminiLab.Modules.Pet
             context.RuntimeData.IsAtRequiredWorkTarget = false;
             context.RuntimeData.TargetFurnitureId = string.Empty;
             context.RuntimeData.TargetFurnitureCategory = FurnitureCategory.Unknown;
+            context.RuntimeData.TargetFurnitureInteractionType = FurnitureInteractionType.Unknown;
+            context.RuntimeData.TargetInteractionDurationSeconds = 1f;
             context.RuntimeData.TargetReached = false;
             context.RuntimeData.ActivePath.Clear();
         }
@@ -355,15 +357,35 @@ namespace GeminiLab.Modules.Pet
         private string ResolveInteractionStateName()
         {
             if (_context?.RuntimeData.RequiredWorkTargetType == PetWorkTargetType.WorkDesk ||
+                _context?.RuntimeData.TargetFurnitureInteractionType == FurnitureInteractionType.WorkFocus ||
                 _context?.RuntimeData.TargetFurnitureCategory == FurnitureCategory.WorkDesk)
             {
                 return InteractReadStateName;
             }
 
-            return _context?.RuntimeData.TargetFurnitureCategory switch
+            return _context?.RuntimeData.TargetFurnitureInteractionType switch
             {
-                FurnitureCategory.Leisure => InteractReadStateName,
-                FurnitureCategory.Decoration => InteractBesideDoorStateName,
+                FurnitureInteractionType.PlayHarp => InteractReadStateName,
+                FurnitureInteractionType.PlayGuitar => InteractReadStateName,
+                FurnitureInteractionType.PaintAtEasel => InteractReadStateName,
+                FurnitureInteractionType.ViewPhotoBoard => InteractReadStateName,
+                FurnitureInteractionType.LeisureEngage => InteractReadStateName,
+                FurnitureInteractionType.InspectBookshelf => InteractBesideDoorStateName,
+                FurnitureInteractionType.InspectMirror => InteractBesideDoorStateName,
+                FurnitureInteractionType.InspectNightstand => InteractBesideDoorStateName,
+                FurnitureInteractionType.ObservePlant => InteractBesideDoorStateName,
+                FurnitureInteractionType.ObserveWindow => InteractBesideDoorStateName,
+                FurnitureInteractionType.InspectToy => InteractBesideDoorStateName,
+                FurnitureInteractionType.ArrangePillow => InteractBesideDoorStateName,
+                FurnitureInteractionType.InspectPapers => InteractBesideDoorStateName,
+                FurnitureInteractionType.ListenToAudio => InteractBesideDoorStateName,
+                FurnitureInteractionType.OrganizeStorage => InteractBesideDoorStateName,
+                FurnitureInteractionType.DecorInspect => InteractBesideDoorStateName,
+                FurnitureInteractionType.RestOnRug => MoveFrontStateName,
+                FurnitureInteractionType.SitOnSeat => MoveFrontStateName,
+                FurnitureInteractionType.LoungeOnSofa => MoveFrontStateName,
+                FurnitureInteractionType.SleepInBed => MoveFrontStateName,
+                FurnitureInteractionType.SleepRest => MoveFrontStateName,
                 _ => MoveFrontStateName
             };
         }
@@ -400,6 +422,7 @@ namespace GeminiLab.Modules.Pet
                 runtime.WorkRequested,
                 runtime.TargetFurnitureId,
                 runtime.TargetFurnitureCategory,
+                runtime.TargetFurnitureInteractionType,
                 runtime.IsTraveling,
                 runtime.LastInteractionFurnitureId,
                 runtime.LastInteractionSummary);
@@ -422,6 +445,7 @@ namespace GeminiLab.Modules.Pet
                    previous.WorkRequested == current.WorkRequested &&
                    previous.TargetFurnitureId == current.TargetFurnitureId &&
                    previous.TargetFurnitureCategory == current.TargetFurnitureCategory &&
+                   previous.TargetFurnitureInteractionType == current.TargetFurnitureInteractionType &&
                    previous.IsTraveling == current.IsTraveling &&
                    previous.LastInteractionFurnitureId == current.LastInteractionFurnitureId &&
                    previous.LastInteractionSummary == current.LastInteractionSummary;
