@@ -1,6 +1,6 @@
 # Gemini-Lab Project File Guide
 
-Updated: 2026-05-27
+Updated: 2026-05-31
 
 ## 入口文件
 - `AGENTS.md`
@@ -59,6 +59,7 @@ Updated: 2026-05-27
 - `Assets/_Project/Scenes/Boot.unity`
 - `Assets/_Project/Scripts/Core/GameBootstrap.cs`
 - `Assets/_Project/Scripts/Modules/Pet/PetController.cs`
+- `Assets/_Project/Scripts/Modules/Pet/PetInteractionVisualStrategy.cs`
 - `Assets/_Project/Scripts/Modules/Pet/PetPlayerInputController.cs`
 - `Assets/_Project/Scripts/Modules/Pet/PetPlayerFurnitureInteractionController.cs`
 - `Assets/_Project/Scripts/Modules/Pet/PetClickReactionController.cs`
@@ -171,7 +172,7 @@ Updated: 2026-05-27
 6. 多个系统当前依赖运行时兜底或 Mock 配置，看到“能跑起来”不等于“资产作者化已完成”。
 7. `2026-05-26` 起，Apartment 场景里的旧占位 UI 残留（`TopLeft_StatusPanel`、`Right_InventoryPanel`、`BottomRight_PersonalityRadar`）已从 `Apartment_Main.unity` 真实移除；旧的 `SpaceSystemPrototypeRoot` 原型 UI 也不再作为后续 UI 制作基础。当前保留的新主界面骨架为 `Panel_PetStatus`、`Panel_SpaceSys`、`Sidebar`、`SidebarOverlay`、`ApartmentViewportHost`、`ApartmentViewportImage` 与 `ApartmentViewportCamera`。此前尝试绑定到 `Panel_PetStatus` 的 `profile` 贴图、宠物正面待机预览 Sprite、雷达配色与尺寸微调已撤回；当前公寓 viewport 已改挂到 `Panel_SpaceSys`，`Profile` 重新只承担双宠资料展示。具体 UI 美术资源选择、贴图映射与最终视觉作者化后续由人工完成，AI 后续只继续承接弱视觉或非美术资源相关的逻辑、结构、输入桥接、验证与文档任务。同日已完成一轮非美术 UI 技术收口：`ApartmentViewportInputBridge` 增加矩形内点击判定与可测试坐标转换，`SidebarController` / `StubPanelBase` 增加 `IUIRouter` / `EventBus` 兜底注册，`ProfilePanelStub` / `TarotPanelStub` / `InventoryPanelStub` 增加服务缺失或空数据兜底；`Assets/_Project/Prefabs/UI/Panels` 与 `Assets/_Project/Prefabs/UI/Widgets` 已建立目录说明但尚无正式 UI prefab。
 8. `2026-05-22` 起，Apartment 场景中的 `Pet` 根节点已同时包含 `Pet_Angel` 与 `Pet_Devil`；当前玩家控制方式为“默认天使可控，点击恶魔后切换恶魔主控”，不再是简单复制输入组件后让双宠同时吃同一套方向键；未被选中的桌宠当前会保持待机，不再继续跑自动睡觉链路。当前 `Pet_Angel` 与 `Pet_Devil` 也不再共用同一个移动边界：恶魔已切到左侧专用 `PetMovementBounds_Devil`。
-9. `Assets/_Project/Animations/Pet/` 当前除 3 个 move clip 外，已新增 `Pet_Angel_Interact_Read.anim` 与 `Pet_Angel_Interact_BesideDoor.anim`，并新增 `Pet_Devil_Move_* / Pet_Devil_Idle_* / Pet_Devil_Sleep.anim`、`Pet_Devil_Interact_BesideDoor.anim`、`Pet_Devil_Interact_Write.anim` 与 `Pet_Devil_Interact_PlayingMusic.anim`；但恶魔其余完整交互动画仍未补齐。
+9. `Assets/_Project/Animations/Pet/` 当前除天使现有 `move / idle / sleep / interact` 资产外，恶魔侧也已落地 `Pet_Devil_Move_* / Pet_Devil_Idle_* / Pet_Devil_Sleep.anim`、`Pet_Devil_Interact_BesideDoor.anim`、`Pet_Devil_Interact_左右看.anim`、`Pet_Devil_Interact_玩掌机.anim`、`Pet_Devil_Interact_画画.anim` 与 `Pet_Devil_Interact_睡觉.anim`。
 10. `2026-05-25` 起，Apartment 场景已开始搭第一版 `viewport` 结构：当前 `ApartmentViewportHost` 与 `ApartmentViewportImage` 已归属 `Panel_SpaceSys/Content`，并新增 `ArtGenerated/ApartmentViewportCamera`；当前 `RenderTexture` 资产路径为 `Assets/_Project/Settings/RenderTextures/ApartmentViewport_RT.renderTexture`。同日已补 `ApartmentViewportInputBridge`，当前可把 viewport 内点击先桥接到桌宠点击，再桥接到当前宠物的家具交互链路；当 `BuildModeController` 开启时，也会优先桥接到建造模式的放置/删除家具入口。
 11. `Assets/_Project/Art/Sprites/Pet/Frames/Move/` 当前已经从旧的平铺命名，切换为 `正面 / 背面 / 侧面` 三个子目录；对应导入链路由 `PetMoveAnimationSetupEditor` 兼容新旧两套来源。
 12. `Assets/_Project/Art/Sprites/Pet/Frames/Interact/` 当前两组交互帧已经统一改为规范命名：`Pet_Angel_Interact_Read_0001...` 与 `Pet_Angel_Interact_BesideDoor_0001...`，不再使用 `IMG_986x.PNG`。
@@ -187,6 +188,10 @@ Updated: 2026-05-27
    - 当场景里同时存在 `Pet_Angel` 与 `Pet_Devil` 时，点击桌宠不仅会触发气泡回应，也会显式切换当前键盘控制对象
    - 当前恶魔的 `门边` 交互已沿用天使同一条 `Interact_BesideDoor` 触发链路，但 controller 已切到恶魔自己的 `Pet_Devil_Interact_BesideDoor.anim`
    - `2026-05-27` 起，恶魔当前还额外拥有两条玩家自交互接线：`画画` 会对着 `家具_休闲_画架_恶魔_01` 触发并坐到 `家具_装饰_椅子_恶魔_01`，`玩掌机` 会坐到 `家具_装饰_沙发_恶魔_02`
+   - `2026-05-30` 起，`F` 键家具交互入口仍统一走 `PetPlayerFurnitureInteractionController`，但最终显示策略已拆到 `PetInteractionVisualStrategy`
+   - 当前 `Apartment_Main.unity` 中天使显式保留 `Sleep / Interact_Flower / Interact_PlayingMusic / Interact_Write` 的 detached visual；恶魔则显式让 `Interact_LookAround / Interact_PlayGame / Interact_Draw / Interact_DevilSleep` 继续使用主 `Pet_Devil` 渲染器显示，避免主渲染器被隐藏后画面只剩停顿
+  - `2026-05-31` 起，恶魔“按 `F` 后只停顿”的排查重点已转向运行时 Animator 覆盖链路；此前一度怀疑 `Pet_Devil.controller` 的 3 条 `Any State -> Idle_*` 过渡会抢回待机，但该假设已被用户否定，对应 controller 删除已撤回
+   - 同日 `PetController.cs` 已补一轮最小位姿修复：玩家交互若启用 `UsePetPoseOverride` 且走主宠物渲染器显示，交互 pose 的应用与恢复会同步 `RuntimeData.Position / TargetPosition`，并在 pose override 生效期间避免被统一位置回写立即覆盖；当前这条修复仍待 Unity Play 人工复测
 13. `Apartment_Main.unity` 当前会用 `StaticFurnitureDecorOnly` 承载一部分“已有独立 Sprite、但不直接走原始关卡对象”的静态家具；这类对象进入交互系统时，也要同步补进 `ApartmentSceneFurnitureBindings`，避免出现“场景有图但无交互绑定”或“绑定有定义但 `_target` 为空”。
 14. 当前工作流已开始显式区分三层记忆：
    - `L1`：`docs/current-task-card.md`

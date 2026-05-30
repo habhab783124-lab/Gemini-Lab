@@ -1,6 +1,6 @@
 # Gemini-Lab Memory Main
 
-Updated: 2026-05-27
+Updated: 2026-05-31
 
 ## 定位
 这份文档是 Gemini-Lab 的长期项目记忆总览。
@@ -196,6 +196,17 @@ Updated: 2026-05-27
   - `Pet_Devil.controller` 的 `Interact_Write` 与 `Interact_PlayingMusic` 已改接恶魔自己的 clip，不再继续引用天使对应交互动画像
   - `Apartment_Main.unity` 中恶魔现有玩家交互绑定已改成 `画画 / 玩掌机`：`画画` 对应 `家具_休闲_画架_恶魔_01` 的交互点并坐到 `家具_装饰_椅子_恶魔_01`，`玩掌机` 坐到 `家具_装饰_沙发_恶魔_02`
   - 为保证这两条交互时恶魔不会被指定家具遮挡，当前场景绑定已关闭它们的 `UseTargetSortingWhileInteracting`，沿用恶魔自身较高的默认排序层
+- `2026-05-30` 已进一步收口恶魔交互动画显示链路：
+  - Unity 日志已确认恶魔 `玩掌机 / 画画 / 睡觉 / 左右看` 的主 `Pet_Devil` Animator 实际都会切进正确交互状态；当前运行时状态 ID 已统一为 `Interact_PlayGame / Interact_Draw / Interact_DevilSleep / Interact_LookAround`
+  - 此前“按 `F` 后只停顿、动画没显示”的直接根因，不是家具触发失败，而是 `玩掌机 / 画画 / 睡觉` 被归入 detached interaction visual 分支后，主渲染器被隐藏，但额外可视对象没有稳定承担最终显示
+  - 当前保留共享的 `PetPlayerFurnitureInteractionController` 作为 `F` 键家具交互入口，但 `PetController` 已不再写死天使/恶魔哪些状态走 detached visual；这层判断已拆到可序列化的 `PetInteractionVisualStrategy`
+  - `Apartment_Main.unity` 当前已对双宠分别 author 这套显示策略：天使显式保留 `Sleep / Interact_Flower / Interact_PlayingMusic / Interact_Write` 的 detached visual；恶魔显式保持 `Interact_LookAround / Interact_PlayGame / Interact_Draw / Interact_DevilSleep` 继续走主 `Pet_Devil` 渲染器
+- `2026-05-31` 已继续排查恶魔交互“按 `F` 后只停顿”的 Animator 链路：
+  - 曾短暂怀疑 `Pet_Devil.controller` 的 `Base Layer` 中 3 条 `Any State -> Idle_*` 过渡会在 `IsMoving == false` 时抢回待机，并与 `PetController` 在交互态里主动把 `IsMoving` 设为 `false` 的逻辑冲突
+  - 用户已明确否定这一路径，对应 controller 删除已撤回；当前不再把这 3 条 `Any State` 过渡记为已确认根因
+  - 当前后续排查方向已转向运行时 Animator 状态覆盖链路，需继续确认是否有脚本在交互后持续 `Play`、重绑 controller、改参数或覆盖显示状态
+  - 同日已在 `PetController` 落一轮最小位姿修复：当玩家交互启用 `UsePetPoseOverride` 且走主宠物渲染器显示时，交互 pose 的应用与恢复现在会同步 `RuntimeData.Position / TargetPosition`，并在 pose override 生效期间暂停用旧世界坐标回写运行态位置，避免 `Pose Target / Pet Interaction Local Offset` 在下一帧被顶掉
+  - 这轮位姿修复当前只完成代码落地与静态检查，仍待 Unity Play 中人工复测恶魔 `玩掌机 / 画画 / 睡觉 / 左右看` 的实际摆位是否恢复正常
 - `2026-05-25` 已为 Apartment 场景补出第一版 viewport 结构骨架：
   - `Panel_SpaceSys/Content` 下新增 `ApartmentViewportHost`
   - 其下新增 `ApartmentViewportImage`，当前引用 `Assets/_Project/Settings/RenderTextures/ApartmentViewport_RT.renderTexture`

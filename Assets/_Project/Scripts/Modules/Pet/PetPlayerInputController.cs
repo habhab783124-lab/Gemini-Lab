@@ -36,11 +36,13 @@ namespace GeminiLab.Modules.Pet
         private void Awake()
         {
             TryBecomeActiveController();
+            Debug.Log($"[PetInput] Awake on '{gameObject.name}' — IsActiveController={IsActiveController}");
         }
 
         private void OnEnable()
         {
             TryBecomeActiveController();
+            Debug.Log($"[PetInput] OnEnable on '{gameObject.name}' — IsActiveController={IsActiveController}, _preferControlOnEnable={_preferControlOnEnable}");
         }
 
         private void OnDisable()

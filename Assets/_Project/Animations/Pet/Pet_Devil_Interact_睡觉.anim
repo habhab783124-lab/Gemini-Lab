@@ -6,7 +6,7 @@ AnimationClip:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Pet_Devil_Interact_左右看
+  m_Name: Pet_Devil_Interact_睡觉
   serializedVersion: 7
   m_Legacy: 0
   m_Compressed: 0
@@ -21,25 +21,27 @@ AnimationClip:
   - serializedVersion: 2
     curve:
     - time: 0
-      value: {fileID: 21300000, guid: 285d484654a93024fb0f644db122891e, type: 3}
+      value: {fileID: 21300000, guid: 2cc7a08223cd37d48a59d08cbb27d84d, type: 3}
     - time: 0.08333333
-      value: {fileID: 21300000, guid: 66f4e9e062bb5e04281a44eefaf5421b, type: 3}
+      value: {fileID: 21300000, guid: fee560669016980429b6220f4cb96036, type: 3}
     - time: 0.16666667
-      value: {fileID: 21300000, guid: bb9fd228877a7984690d9305a8b46737, type: 3}
+      value: {fileID: 21300000, guid: db0ae75b126aa9248a66d7f011480107, type: 3}
     - time: 0.25
-      value: {fileID: 21300000, guid: f6d74d0c90054ca45b1b8c4953015b45, type: 3}
+      value: {fileID: 21300000, guid: 46b5161c95402b546b31a22396e632f7, type: 3}
     - time: 0.33333333
-      value: {fileID: 21300000, guid: 20b300204a8ec8448bc948a323bf33b7, type: 3}
+      value: {fileID: 21300000, guid: ed265137c45dceb4bae4f08ac0c3455e, type: 3}
     - time: 0.41666667
-      value: {fileID: 21300000, guid: 47d8935066da9a34caaae366f501e93b, type: 3}
+      value: {fileID: 21300000, guid: a383699d71bcb4a4e9cf623692926176, type: 3}
     - time: 0.5
-      value: {fileID: 21300000, guid: 5622a63018571284db578d7e8dcc1fce, type: 3}
+      value: {fileID: 21300000, guid: 737fe7edd84ae164da6bdc6031493503, type: 3}
     - time: 0.58333333
-      value: {fileID: 21300000, guid: 4036178e4a1368e4488a5bc1cbf72ae9, type: 3}
+      value: {fileID: 21300000, guid: 7aaabe06485e83d40a2bd31ef9448722, type: 3}
     - time: 0.66666667
-      value: {fileID: 21300000, guid: aa58f66fd79d16241b2efb49ec19faa9, type: 3}
+      value: {fileID: 21300000, guid: 48fd6435f1c90384fa7e79514cf80888, type: 3}
+    - time: 0.75
+      value: {fileID: 21300000, guid: 3bb71457e9820a2458b70f995dab641e, type: 3}
     attribute: m_Sprite
-    path: 
+    path:
     classID: 212
     script: {fileID: 0}
     flags: 2
@@ -60,21 +62,22 @@ AnimationClip:
       isIntCurve: 0
       isSerializeReferenceCurve: 0
     pptrCurveMapping:
-    - {fileID: 21300000, guid: 285d484654a93024fb0f644db122891e, type: 3}
-    - {fileID: 21300000, guid: 66f4e9e062bb5e04281a44eefaf5421b, type: 3}
-    - {fileID: 21300000, guid: bb9fd228877a7984690d9305a8b46737, type: 3}
-    - {fileID: 21300000, guid: f6d74d0c90054ca45b1b8c4953015b45, type: 3}
-    - {fileID: 21300000, guid: 20b300204a8ec8448bc948a323bf33b7, type: 3}
-    - {fileID: 21300000, guid: 47d8935066da9a34caaae366f501e93b, type: 3}
-    - {fileID: 21300000, guid: 5622a63018571284db578d7e8dcc1fce, type: 3}
-    - {fileID: 21300000, guid: 4036178e4a1368e4488a5bc1cbf72ae9, type: 3}
-    - {fileID: 21300000, guid: aa58f66fd79d16241b2efb49ec19faa9, type: 3}
+    - {fileID: 21300000, guid: 2cc7a08223cd37d48a59d08cbb27d84d, type: 3}
+    - {fileID: 21300000, guid: fee560669016980429b6220f4cb96036, type: 3}
+    - {fileID: 21300000, guid: db0ae75b126aa9248a66d7f011480107, type: 3}
+    - {fileID: 21300000, guid: 46b5161c95402b546b31a22396e632f7, type: 3}
+    - {fileID: 21300000, guid: ed265137c45dceb4bae4f08ac0c3455e, type: 3}
+    - {fileID: 21300000, guid: a383699d71bcb4a4e9cf623692926176, type: 3}
+    - {fileID: 21300000, guid: 737fe7edd84ae164da6bdc6031493503, type: 3}
+    - {fileID: 21300000, guid: 7aaabe06485e83d40a2bd31ef9448722, type: 3}
+    - {fileID: 21300000, guid: 48fd6435f1c90384fa7e79514cf80888, type: 3}
+    - {fileID: 21300000, guid: 3bb71457e9820a2458b70f995dab641e, type: 3}
   m_AnimationClipSettings:
     serializedVersion: 2
     m_AdditiveReferencePoseClip: {fileID: 0}
     m_AdditiveReferencePoseTime: 0
     m_StartTime: 0
-    m_StopTime: 1.1666666
+    m_StopTime: 0.83333333
     m_OrientationOffsetY: 0
     m_Level: 0
     m_CycleOffset: 0

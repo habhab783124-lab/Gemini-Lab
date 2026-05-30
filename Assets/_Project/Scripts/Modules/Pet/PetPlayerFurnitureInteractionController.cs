@@ -12,6 +12,8 @@ namespace GeminiLab.Modules.Pet
     [DisallowMultipleComponent]
     public sealed class PetPlayerFurnitureInteractionController : MonoBehaviour
     {
+        private const string DevilFTracePrefix = "[DEVIL_F_TRACE]";
+
         [Serializable]
         public sealed class InteractionAnimationOption
         {
@@ -29,7 +31,9 @@ namespace GeminiLab.Modules.Pet
         {
             [SerializeField] private string _label = string.Empty;
             [SerializeField] private GameObject? _target;
+            [SerializeField] private GameObject? _poseTarget;
             [SerializeField] private string _fallbackTargetName = string.Empty;
+            [SerializeField] private string _fallbackPoseTargetName = string.Empty;
             [SerializeField] private bool _useFallbackWorldPoint;
             [SerializeField] private Vector2 _fallbackWorldPoint;
             [SerializeField] private float _activationDistance = 1.5f;
@@ -52,7 +56,9 @@ namespace GeminiLab.Modules.Pet
 
             public string Label => _label;
             public GameObject? Target => _target;
+            public GameObject? PoseTarget => _poseTarget;
             public string FallbackTargetName => _fallbackTargetName;
+            public string FallbackPoseTargetName => _fallbackPoseTargetName;
             public bool UseFallbackWorldPoint => _useFallbackWorldPoint;
             public Vector2 FallbackWorldPoint => _fallbackWorldPoint;
             public float ActivationDistance => Mathf.Max(0.1f, _activationDistance);
@@ -76,6 +82,11 @@ namespace GeminiLab.Modules.Pet
             public void SetResolvedTarget(GameObject target)
             {
                 _target = target;
+            }
+
+            public void SetResolvedPoseTarget(GameObject poseTarget)
+            {
+                _poseTarget = poseTarget;
             }
 
             public void SetResolvedSortingTarget(GameObject sortingTarget)
@@ -109,6 +120,7 @@ namespace GeminiLab.Modules.Pet
         [SerializeField] private KeyCode _interactKey = KeyCode.F;
         [SerializeField] private InteractionBinding[] _bindings = Array.Empty<InteractionBinding>();
 
+        private static int s_lastProcessedInteractFrame = -1;
         private PetController? _petController;
 
         private void Awake()
@@ -123,46 +135,16 @@ namespace GeminiLab.Modules.Pet
                 return;
             }
 
-            if (_petController == null)
-            {
-                _petController = GetComponent<PetController>();
-            }
-
-            if (_petController == null || !_petController.IsPlayerControlEnabled)
+            if (s_lastProcessedInteractFrame == Time.frameCount)
             {
                 return;
             }
 
-            if (!TryGetClosestBinding(transform.position, out InteractionBinding? binding, out string targetName, out GameObject? targetObject))
+            s_lastProcessedInteractFrame = Time.frameCount;
+            if (!TryHandleGlobalInteractKey(_interactKey))
             {
-                return;
+                Debug.LogWarning($"[PetPlayerFurnitureInteraction] No eligible binding found for key '{_interactKey}' on frame {Time.frameCount}.");
             }
-
-            GameObject? sortingTarget = binding.UseTargetSortingWhileInteracting
-                ? ResolveSortingTarget(binding, targetObject)
-                : null;
-
-            PetPlayerInteractionRequest request = new(
-                targetName: !string.IsNullOrWhiteSpace(binding.Label) ? binding.Label : targetName,
-                category: binding.Category,
-                interactionType: binding.InteractionType,
-                animationVariant: ResolveAnimationVariant(binding),
-                animatorStateNameOverride: ResolveAnimatorStateOverride(binding),
-                hideTargetWhileInteracting: binding.HideTargetWhileInteracting,
-                visualHideTarget: binding.HideTargetWhileInteracting ? targetObject : null,
-                additionalVisualHideTargets: binding.AdditionalHideTargets,
-                useTargetSortingWhileInteracting: binding.UseTargetSortingWhileInteracting,
-                visualSortingTarget: sortingTarget,
-                sortingOrderOffsetWhileInteracting: binding.SortingOrderOffsetWhileInteracting,
-                usePetPoseOverride: binding.UsePetPoseOverride,
-                useTargetPositionForPetPose: binding.UseTargetPositionForPetPose,
-                petInteractionLocalOffset: binding.PetInteractionLocalOffset,
-                petInteractionWorldPoint: binding.PetInteractionWorldPoint,
-                petInteractionScale: binding.PetInteractionScale,
-                interactionDurationSeconds: binding.InteractionDurationSeconds);
-
-            Debug.Log($"[PetPlayerFurnitureInteraction] Selected binding label='{binding.Label}' target='{targetName}' variant='{request.AnimationVariant}' animatorState='{request.AnimatorStateNameOverride}'.");
-            _ = _petController.TryStartPlayerInteraction(request);
         }
 
         public bool TryHandleWorldPoint(Vector2 worldPoint)
@@ -177,49 +159,35 @@ namespace GeminiLab.Modules.Pet
                 _petController = GetComponent<PetController>();
             }
 
-            if (_petController == null || !_petController.IsPlayerControlEnabled)
-            {
-                return false;
-            }
-
             if (!TryGetBindingForWorldPoint(transform.position, worldPoint, out InteractionBinding? binding, out string targetName, out GameObject? targetObject))
             {
                 return false;
             }
 
-            GameObject? sortingTarget = binding.UseTargetSortingWhileInteracting
-                ? ResolveSortingTarget(binding, targetObject)
-                : null;
-
-            PetPlayerInteractionRequest request = new(
-                targetName: !string.IsNullOrWhiteSpace(binding.Label) ? binding.Label : targetName,
-                category: binding.Category,
-                interactionType: binding.InteractionType,
-                animationVariant: ResolveAnimationVariant(binding),
-                animatorStateNameOverride: ResolveAnimatorStateOverride(binding),
-                hideTargetWhileInteracting: binding.HideTargetWhileInteracting,
-                visualHideTarget: binding.HideTargetWhileInteracting ? targetObject : null,
-                additionalVisualHideTargets: binding.AdditionalHideTargets,
-                useTargetSortingWhileInteracting: binding.UseTargetSortingWhileInteracting,
-                visualSortingTarget: sortingTarget,
-                sortingOrderOffsetWhileInteracting: binding.SortingOrderOffsetWhileInteracting,
-                usePetPoseOverride: binding.UsePetPoseOverride,
-                useTargetPositionForPetPose: binding.UseTargetPositionForPetPose,
-                petInteractionLocalOffset: binding.PetInteractionLocalOffset,
-                petInteractionWorldPoint: binding.PetInteractionWorldPoint,
-                petInteractionScale: binding.PetInteractionScale,
-                interactionDurationSeconds: binding.InteractionDurationSeconds);
-
-            Debug.Log($"[PetPlayerFurnitureInteraction] Viewport binding label='{binding.Label}' target='{targetName}' variant='{request.AnimationVariant}' animatorState='{request.AnimatorStateNameOverride}'.");
-            return _petController.TryStartPlayerInteraction(request);
+            return TryStartResolvedInteraction(binding, targetName, targetObject, "world point");
         }
 
         private bool TryGetClosestBinding(Vector2 petPosition, out InteractionBinding? bestBinding, out string bestTargetName, out GameObject? bestTargetObject)
         {
+            return TryGetClosestBinding(
+                petPosition,
+                out bestBinding,
+                out bestTargetName,
+                out bestTargetObject,
+                out _);
+        }
+
+        private bool TryGetClosestBinding(
+            Vector2 petPosition,
+            out InteractionBinding? bestBinding,
+            out string bestTargetName,
+            out GameObject? bestTargetObject,
+            out float bestBindingDistance)
+        {
             bestBinding = null;
             bestTargetName = string.Empty;
             bestTargetObject = null;
-            float bestDistance = float.MaxValue;
+            bestBindingDistance = float.MaxValue;
 
             for (int i = 0; i < _bindings.Length; i++)
             {
@@ -230,18 +198,240 @@ namespace GeminiLab.Modules.Pet
                 }
 
                 float distance = Vector2.Distance(petPosition, interactionPoint);
-                if (distance > binding.ActivationDistance || distance >= bestDistance)
+                if (distance > binding.ActivationDistance || distance >= bestBindingDistance)
                 {
                     continue;
                 }
 
-                bestDistance = distance;
+                bestBindingDistance = distance;
                 bestBinding = binding;
                 bestTargetName = targetName;
                 bestTargetObject = targetObject;
             }
 
             return bestBinding != null && !string.IsNullOrWhiteSpace(bestTargetName);
+        }
+
+        private bool TryEnsurePetController(out PetController? petController)
+        {
+            if (_petController == null)
+            {
+                _petController = GetComponent<PetController>();
+            }
+
+            petController = _petController;
+            return petController != null;
+        }
+
+        private bool ShouldTraceDevilInteraction()
+        {
+            return TryEnsurePetController(out PetController? petController) &&
+                   petController.PetId == PetId.Devil;
+        }
+
+        private void LogDevilTrace(string message)
+        {
+            if (!ShouldTraceDevilInteraction())
+            {
+                return;
+            }
+
+            Debug.Log($"{DevilFTracePrefix} {message}");
+        }
+
+        private void LogDevilTraceWarning(string message)
+        {
+            if (!ShouldTraceDevilInteraction())
+            {
+                return;
+            }
+
+            Debug.LogWarning($"{DevilFTracePrefix} {message}");
+        }
+
+        private bool IsPetCurrentlyControlled()
+        {
+            return TryEnsurePetController(out PetController? petController) &&
+                   petController.IsPlayerControlEnabled;
+        }
+
+        private bool TryPromoteToActiveController()
+        {
+            if (!TryGetComponent(out PetPlayerInputController inputController))
+            {
+                return false;
+            }
+
+            inputController.TakeControl();
+            return inputController.IsActiveController;
+        }
+
+        private bool TryStartResolvedInteraction(
+            InteractionBinding binding,
+            string targetName,
+            GameObject? targetObject,
+            string triggerSource)
+        {
+            if (!TryEnsurePetController(out PetController? petController))
+            {
+                Debug.LogWarning($"[PetPlayerFurnitureInteraction] Missing PetController on '{gameObject.name}' for {triggerSource} trigger.");
+                return false;
+            }
+
+            if (!petController.IsPlayerControlEnabled)
+            {
+                if (!TryPromoteToActiveController() || !petController.IsPlayerControlEnabled)
+                {
+                    LogDevilTraceWarning(
+                        $"Failed to acquire active control. trigger='{triggerSource}', label='{binding.Label}', target='{targetName}'");
+                    Debug.LogWarning(
+                        $"[PetPlayerFurnitureInteraction] '{gameObject.name}' could not acquire active control for {triggerSource} trigger.");
+                    return false;
+                }
+
+                LogDevilTrace(
+                    $"Auto-took control. trigger='{triggerSource}', label='{binding.Label}', target='{targetName}'");
+                Debug.Log($"[PetPlayerFurnitureInteraction] '{gameObject.name}' auto-took control for {triggerSource} trigger.");
+            }
+
+            PetPlayerInteractionRequest request = BuildInteractionRequest(binding, targetName, targetObject);
+            Debug.Log(
+                $"[PetPlayerFurnitureInteraction] TriggerSource='{triggerSource}' label='{binding.Label}' target='{targetName}' " +
+                $"variant='{request.AnimationVariant}' animatorState='{request.AnimatorStateNameOverride}'.");
+            bool started = petController.TryStartPlayerInteraction(request);
+            LogDevilTrace(
+                $"TryStartResolvedInteraction trigger='{triggerSource}', label='{binding.Label}', target='{targetName}', " +
+                $"variant='{request.AnimationVariant}', animatorState='{request.AnimatorStateNameOverride}', started={started}");
+            return started;
+        }
+
+        private static bool TryHandleGlobalInteractKey(KeyCode interactKey)
+        {
+            if (!TrySelectInteractionCandidate(
+                    interactKey,
+                    out PetPlayerFurnitureInteractionController? controller,
+                    out InteractionBinding? binding,
+                    out string targetName,
+                    out GameObject? targetObject,
+                    out bool selectedFromActivePet))
+            {
+                return false;
+            }
+
+            Debug.Log(
+                $"[PetPlayerFurnitureInteraction] Key '{interactKey}' selected pet '{controller.gameObject.name}' " +
+                $"via {(selectedFromActivePet ? "active" : "fallback")} candidate.");
+            controller.LogDevilTrace(
+                $"Selected by F key. label='{binding.Label}', target='{targetName}', " +
+                $"via={(selectedFromActivePet ? "active" : "fallback")}");
+            return controller.TryStartResolvedInteraction(binding, targetName, targetObject, "F key");
+        }
+
+        private static bool TrySelectInteractionCandidate(
+            KeyCode interactKey,
+            out PetPlayerFurnitureInteractionController? bestController,
+            out InteractionBinding? bestBinding,
+            out string bestTargetName,
+            out GameObject? bestTargetObject,
+            out bool selectedFromActivePet)
+        {
+            bestController = null;
+            bestBinding = null;
+            bestTargetName = string.Empty;
+            bestTargetObject = null;
+            selectedFromActivePet = false;
+            float bestDistance = float.MaxValue;
+            bool foundActivePetCandidate = false;
+
+            PetPlayerFurnitureInteractionController[] controllers =
+                FindObjectsByType<PetPlayerFurnitureInteractionController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+            for (int i = 0; i < controllers.Length; i++)
+            {
+                PetPlayerFurnitureInteractionController controller = controllers[i];
+                if (controller == null ||
+                    !controller.isActiveAndEnabled ||
+                    !controller._enableInteraction ||
+                    controller._interactKey != interactKey ||
+                    !controller.TryEnsurePetController(out _))
+                {
+                    continue;
+                }
+
+                if (!controller.TryGetClosestBinding(
+                        controller.transform.position,
+                        out InteractionBinding? binding,
+                        out string targetName,
+                        out GameObject? targetObject,
+                        out float distance))
+                {
+                    continue;
+                }
+
+                bool isActivePet = controller.IsPetCurrentlyControlled();
+                if (isActivePet)
+                {
+                    if (!foundActivePetCandidate || distance < bestDistance)
+                    {
+                        foundActivePetCandidate = true;
+                        bestDistance = distance;
+                        bestController = controller;
+                        bestBinding = binding;
+                        bestTargetName = targetName;
+                        bestTargetObject = targetObject;
+                        selectedFromActivePet = true;
+                    }
+
+                    continue;
+                }
+
+                if (foundActivePetCandidate || distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestDistance = distance;
+                bestController = controller;
+                bestBinding = binding;
+                bestTargetName = targetName;
+                bestTargetObject = targetObject;
+                selectedFromActivePet = false;
+            }
+
+            return bestController != null &&
+                   bestBinding != null &&
+                   !string.IsNullOrWhiteSpace(bestTargetName);
+        }
+
+        private static PetPlayerInteractionRequest BuildInteractionRequest(
+            InteractionBinding binding,
+            string targetName,
+            GameObject? targetObject)
+        {
+            GameObject? poseTarget = ResolvePoseTarget(binding, targetObject);
+            GameObject? sortingTarget = binding.UseTargetSortingWhileInteracting
+                ? ResolveSortingTarget(binding, poseTarget ?? targetObject)
+                : null;
+
+            return new PetPlayerInteractionRequest(
+                targetName: !string.IsNullOrWhiteSpace(binding.Label) ? binding.Label : targetName,
+                category: binding.Category,
+                interactionType: binding.InteractionType,
+                animationVariant: ResolveAnimationVariant(binding),
+                animatorStateNameOverride: ResolveAnimatorStateOverride(binding),
+                hideTargetWhileInteracting: binding.HideTargetWhileInteracting,
+                visualHideTarget: binding.HideTargetWhileInteracting ? targetObject : null,
+                visualPoseTarget: poseTarget,
+                additionalVisualHideTargets: binding.AdditionalHideTargets,
+                useTargetSortingWhileInteracting: binding.UseTargetSortingWhileInteracting,
+                visualSortingTarget: sortingTarget,
+                sortingOrderOffsetWhileInteracting: binding.SortingOrderOffsetWhileInteracting,
+                usePetPoseOverride: binding.UsePetPoseOverride,
+                useTargetPositionForPetPose: binding.UseTargetPositionForPetPose,
+                petInteractionLocalOffset: binding.PetInteractionLocalOffset,
+                petInteractionWorldPoint: binding.PetInteractionWorldPoint,
+                petInteractionScale: binding.PetInteractionScale,
+                interactionDurationSeconds: binding.InteractionDurationSeconds);
         }
 
         private bool TryGetBindingForWorldPoint(
@@ -308,6 +498,16 @@ namespace GeminiLab.Modules.Pet
         private static GameObject? ResolveTarget(InteractionBinding binding)
         {
             return ResolveSceneObject(binding.Target, binding.FallbackTargetName, binding.SetResolvedTarget);
+        }
+
+        private static GameObject? ResolvePoseTarget(InteractionBinding binding, GameObject? defaultTargetObject)
+        {
+            GameObject? poseTarget = ResolveSceneObject(
+                binding.PoseTarget,
+                binding.FallbackPoseTargetName,
+                binding.SetResolvedPoseTarget);
+
+            return poseTarget ?? defaultTargetObject;
         }
 
         private static GameObject? ResolveSortingTarget(InteractionBinding binding, GameObject? defaultTargetObject)
@@ -456,6 +656,7 @@ namespace GeminiLab.Modules.Pet
             string animatorStateNameOverride,
             bool hideTargetWhileInteracting,
             GameObject? visualHideTarget,
+            GameObject? visualPoseTarget,
             GameObject[]? additionalVisualHideTargets,
             bool useTargetSortingWhileInteracting,
             GameObject? visualSortingTarget,
@@ -474,6 +675,7 @@ namespace GeminiLab.Modules.Pet
             AnimatorStateNameOverride = animatorStateNameOverride;
             HideTargetWhileInteracting = hideTargetWhileInteracting;
             VisualHideTarget = visualHideTarget;
+            VisualPoseTarget = visualPoseTarget;
             AdditionalVisualHideTargets = additionalVisualHideTargets ?? Array.Empty<GameObject>();
             UseTargetSortingWhileInteracting = useTargetSortingWhileInteracting;
             VisualSortingTarget = visualSortingTarget;
@@ -493,6 +695,7 @@ namespace GeminiLab.Modules.Pet
         public string AnimatorStateNameOverride { get; }
         public bool HideTargetWhileInteracting { get; }
         public GameObject? VisualHideTarget { get; }
+        public GameObject? VisualPoseTarget { get; }
         public GameObject[] AdditionalVisualHideTargets { get; }
         public bool UseTargetSortingWhileInteracting { get; }
         public GameObject? VisualSortingTarget { get; }
@@ -511,7 +714,11 @@ namespace GeminiLab.Modules.Pet
         Flower = 1,
         PlayingMusic = 2,
         Read = 3,
-        Sleep = 4
+        Sleep = 4,
+        LookAround = 5,
+        PlayGame = 6,
+        Draw = 7,
+        DevilSleep = 8
     }
 
     public static class PetSelfInteractionVariantExtensions
@@ -525,6 +732,10 @@ namespace GeminiLab.Modules.Pet
                 PetSelfInteractionVariant.PlayingMusic => "playing music",
                 PetSelfInteractionVariant.Read => "read",
                 PetSelfInteractionVariant.Sleep => "sleep",
+                PetSelfInteractionVariant.LookAround => "look around",
+                PetSelfInteractionVariant.PlayGame => "play game",
+                PetSelfInteractionVariant.Draw => "draw",
+                PetSelfInteractionVariant.DevilSleep => "devil sleep",
                 _ => "read"
             };
         }

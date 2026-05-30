@@ -1,6 +1,6 @@
 # Gemini-Lab 项目结构总览
 
-Updated: 2026-05-27
+Updated: 2026-05-31
 
 ## 这份文档怎么看
 这不是“理想中的最终目录图”，而是“当前仓库已经有什么，以及这些目录将来分别负责什么”的说明。
@@ -131,6 +131,9 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 - `2026-05-23` 起，恶魔也已拥有自己的门边交互动画 `Pet_Devil_Interact_BesideDoor.anim`，当前通过 `Pet_Devil.controller` 的 `Interact_BesideDoor` 状态接入
 - `2026-05-27` 起，恶魔还新增 `Pet_Devil_Interact_Write.anim` 与 `Pet_Devil_Interact_PlayingMusic.anim`，当前分别通过 `Pet_Devil.controller` 的 `Interact_Write` 与 `Interact_PlayingMusic` 状态接入
 - `2026-05-27` 起，`Apartment_Main.unity` 中恶魔现有玩家交互绑定已把旧的天使竖琴 / 写字目标替换为恶魔 `玩掌机 / 画画`：`玩掌机` 坐到 `家具_装饰_沙发_恶魔_02`，`画画` 对着 `家具_休闲_画架_恶魔_01` 触发并坐到 `家具_装饰_椅子_恶魔_01`
+- `2026-05-30` 起，`Apartment_Main.unity` 的双宠仍共用 `PetPlayerFurnitureInteractionController` 作为 `F` 键家具交互入口，但最终显示策略已拆成可序列化的 `PetInteractionVisualStrategy`：当前天使显式保留 `Sleep / Interact_Flower / Interact_PlayingMusic / Interact_Write` 的 detached visual，恶魔显式让 `Interact_LookAround / Interact_PlayGame / Interact_Draw / Interact_DevilSleep` 继续走主 `Pet_Devil` 渲染器
+- `2026-05-31` 起，恶魔交互显示异常的排查重点已转向运行时 Animator 覆盖链路；此前一度怀疑 `Pet_Devil.controller` 的 3 条 `Any State -> Idle_*` 过渡会抢回待机，但该假设已被用户否定，对应 controller 删除已撤回
+- 同日 `PetController` 已补一轮最小交互位姿修复：当玩家交互启用 `UsePetPoseOverride` 且直接移动主宠物本体时，会同步运行态位置并临时阻止旧世界坐标回写把 pose 顶掉；当前该修复仍待 Unity Play 人工复测
 
 ### `Assets/_Project/Audio/`
 当前仍主要是目录规范与 README，真实音频资产尚未开始落地。

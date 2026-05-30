@@ -42,6 +42,12 @@ namespace GeminiLab.Modules.Pet
         private const string InteractFlowerStateName = "Interact_Flower";
         private const string InteractPlayingMusicStateName = "Interact_PlayingMusic";
         private const string InteractWriteStateName = "Interact_Write";
+        private const string InteractLookAroundStateName = "Interact_LookAround";
+        private const string InteractPlayGameStateName = "Interact_PlayGame";
+        private const string InteractDrawStateName = "Interact_Draw";
+        private const string InteractSleepStateName = "Interact_DevilSleep";
+        private const string BaseLayerStatePrefix = "Base Layer.";
+        private const string DevilFTracePrefix = "[DEVIL_F_TRACE]";
 
         private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
         private static readonly int MoveXHash = Animator.StringToHash("MoveX");
@@ -59,6 +65,7 @@ namespace GeminiLab.Modules.Pet
         [SerializeField] private Transform? _sortingAnchor;
         [SerializeField] private int _sortingOrderOffset;
         [SerializeField] private PetId _petId = PetId.Angel;
+        [SerializeField] private PetInteractionVisualStrategy _interactionVisualStrategy = new();
 
         public PetId PetId => _petId;
 
@@ -84,6 +91,13 @@ namespace GeminiLab.Modules.Pet
         private bool _hasStoredInteractionPose;
         private Vector3 _storedInteractionPosition;
         private Vector3 _storedInteractionScale;
+        private bool _hasInteractionPoseRuntimeOverride;
+        private bool _hasInteractionPhysicsOverride;
+        private bool _storedInteractionRigidbodySimulated = true;
+        private bool _storedInteractionCapsuleColliderEnabled = true;
+        private const int DevilPoseTickTraceFrameInterval = 5;
+        private int _lastDevilPoseUpdateTraceFrame = -9999;
+        private int _lastDevilPoseFixedTraceFrame = -9999;
         private bool _hasStoredInteractionSorting;
         private int _storedInteractionSortingLayerId;
         private int _storedInteractionSortingOrder;
@@ -175,7 +189,16 @@ namespace GeminiLab.Modules.Pet
                 return;
             }
 
-            _context.RuntimeData.Position = GetCurrentWorldPosition();
+            if (_hasInteractionPoseRuntimeOverride)
+            {
+                _context.RuntimeData.Position = ClampToMovementBounds(_context.RuntimeData.Position);
+                _context.RuntimeData.TargetPosition = _context.RuntimeData.Position;
+            }
+            else
+            {
+                _context.RuntimeData.Position = GetCurrentWorldPosition();
+            }
+
             RefreshLateBoundServices(_context);
             if (IsInactivePlayerPet())
             {
@@ -198,6 +221,7 @@ namespace GeminiLab.Modules.Pet
             _tickService.Tick(_context, Time.deltaTime);
             _stateMachine.Tick(Time.deltaTime);
             UpdateMovementAnimation();
+            TraceDevilInteractionTickIfNeeded("Update", ref _lastDevilPoseUpdateTraceFrame);
             PublishSnapshotIfChanged(_context);
         }
 
@@ -214,6 +238,7 @@ namespace GeminiLab.Modules.Pet
             }
 
             _stateMachine?.FixedTick(Time.fixedDeltaTime);
+            TraceDevilInteractionTickIfNeeded("FixedUpdate", ref _lastDevilPoseFixedTraceFrame);
         }
 
         private void LateUpdate()
@@ -643,8 +668,27 @@ namespace GeminiLab.Modules.Pet
 
         public bool TryStartPlayerInteraction(PetPlayerInteractionRequest request)
         {
-            if (_context is null || !IsPlayerControlled() || _context.RuntimeData.IsPlayerInteractionActive)
+            if (_context is null)
             {
+                LogDevilFTraceWarning(
+                    $"TryStartPlayerInteraction rejected: context null, target='{request.TargetName}', variant='{request.AnimationVariant}', state='{request.AnimatorStateNameOverride}'");
+                Debug.LogWarning("[PetInteraction] TryStartPlayerInteraction failed: _context is null.");
+                return false;
+            }
+
+            if (!IsPlayerControlled())
+            {
+                LogDevilFTraceWarning(
+                    $"TryStartPlayerInteraction rejected: not player controlled, target='{request.TargetName}', variant='{request.AnimationVariant}', state='{request.AnimatorStateNameOverride}'");
+                Debug.LogWarning("[PetInteraction] TryStartPlayerInteraction failed: IsPlayerControlled is false.");
+                return false;
+            }
+
+            if (_context.RuntimeData.IsPlayerInteractionActive)
+            {
+                LogDevilFTraceWarning(
+                    $"TryStartPlayerInteraction rejected: already interacting, target='{request.TargetName}', variant='{request.AnimationVariant}', state='{request.AnimatorStateNameOverride}'");
+                Debug.LogWarning("[PetInteraction] TryStartPlayerInteraction failed: already interacting.");
                 return false;
             }
 
@@ -664,6 +708,9 @@ namespace GeminiLab.Modules.Pet
             ApplyInteractionSortingOverride(request);
             ApplyInteractionPoseOverride(request);
             ApplySpecialInteractionVisualOverride(request);
+            LogDevilFTrace(
+                $"TryStartPlayerInteraction accepted: target='{request.TargetName}', variant='{request.AnimationVariant}', " +
+                $"state='{request.AnimatorStateNameOverride}', duration={_context.RuntimeData.PlayerInteractionRemainingSeconds:F2}");
             Debug.Log($"[PetInteraction] Triggered player interaction target='{request.TargetName}' variant='{request.AnimationVariant}'.");
             return true;
         }
@@ -676,6 +723,7 @@ namespace GeminiLab.Modules.Pet
             }
 
             SetPlayerControlledState(context, InteractingState.StateName);
+            Debug.Log($"[PetInteraction] TickPlayerInteraction: state=Interacting, remainingSeconds={context.RuntimeData.PlayerInteractionRemainingSeconds:F2}, animState='{context.RuntimeData.PlayerInteractionAnimatorStateName}', variant='{context.RuntimeData.PlayerInteractionAnimationVariant}'");
             context.Advance(deltaTime);
             _tickService?.Tick(context, deltaTime);
             context.RuntimeData.WorkRequested = false;
@@ -815,11 +863,21 @@ namespace GeminiLab.Modules.Pet
         private void ApplySpecialInteractionVisualOverride(PetPlayerInteractionRequest request)
         {
             RestoreSleepInteractionVisual();
-            if (!RequiresDetachedInteractionVisual(request.AnimationVariant) ||
-                request.VisualHideTarget == null)
+            if (!UsesDetachedInteractionVisual(request))
             {
                 return;
             }
+
+            GameObject? poseTarget = request.VisualPoseTarget ?? request.VisualHideTarget;
+            if (poseTarget == null)
+            {
+                LogDevilFTrace(
+                    $"PoseTrace branch='detached' skipped='poseTarget null' state='{ResolveInteractionAnimatorStateName(request)}' " +
+                    $"localOffset={FormatVector2(request.PetInteractionLocalOffset)} worldPoint={FormatVector2(request.PetInteractionWorldPoint)}");
+                return;
+            }
+
+            GameObject sortingTarget = request.VisualSortingTarget ?? poseTarget;
 
             EnsureSleepInteractionVisual();
             if (_sleepInteractionVisualTransform == null ||
@@ -830,18 +888,25 @@ namespace GeminiLab.Modules.Pet
             }
 
             Vector2 posePoint = request.UseTargetPositionForPetPose
-                ? ResolveInteractionPosePoint(request.VisualHideTarget.transform, request.PetInteractionLocalOffset)
+                ? ResolveInteractionPosePoint(poseTarget.transform, request.PetInteractionLocalOffset)
                 : request.PetInteractionWorldPoint;
+
+            LogDevilFTrace(
+                $"PoseTrace branch='detached' state='{ResolveInteractionAnimatorStateName(request)}' " +
+                $"poseTarget='{DescribeObject(poseTarget)}' sortingTarget='{DescribeObject(sortingTarget)}' " +
+                $"positionSource='{(request.UseTargetPositionForPetPose ? "target+offset" : "worldPoint")}' " +
+                $"localOffset={FormatVector2(request.PetInteractionLocalOffset)} worldPoint={FormatVector2(request.PetInteractionWorldPoint)} " +
+                $"finalPosePoint={FormatVector2(posePoint)} scale={FormatVector3(request.PetInteractionScale)}");
 
             _sleepInteractionVisualTransform.position = new Vector3(
                 posePoint.x,
                 posePoint.y,
                 transform.position.z);
             _sleepInteractionVisualTransform.localScale = request.PetInteractionScale;
-            ApplySleepInteractionVisualSorting(request.VisualHideTarget);
+            ApplySleepInteractionVisualSorting(sortingTarget, request.SortingOrderOffsetWhileInteracting);
             _sleepInteractionVisualSpriteRenderer.enabled = true;
             _sleepInteractionVisualAnimator.Play(
-                ResolvePlayerInteractionStateName(request.AnimationVariant),
+                ResolveInteractionAnimatorStateName(request),
                 0,
                 0f);
 
@@ -907,26 +972,22 @@ namespace GeminiLab.Modules.Pet
             {
                 _sleepInteractionVisualAnimator.runtimeAnimatorController = _movementController;
             }
+
+            _sleepInteractionVisualAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         }
 
-        private void ApplySleepInteractionVisualSorting(GameObject sortingTarget)
+        private void ApplySleepInteractionVisualSorting(GameObject sortingTarget, int sortingOrderOffset)
         {
             if (_sleepInteractionVisualSpriteRenderer == null)
             {
                 return;
             }
 
-            if (sortingTarget.TryGetComponent(out SortingGroup sortingGroup))
+            int resolvedOffset = sortingOrderOffset != 0 ? sortingOrderOffset : 1;
+            if (TryResolveSortingReference(sortingTarget, out int sortingLayerId, out int sortingOrder))
             {
-                _sleepInteractionVisualSpriteRenderer.sortingLayerID = sortingGroup.sortingLayerID;
-                _sleepInteractionVisualSpriteRenderer.sortingOrder = sortingGroup.sortingOrder;
-                return;
-            }
-
-            if (sortingTarget.TryGetComponent(out SpriteRenderer targetRenderer))
-            {
-                _sleepInteractionVisualSpriteRenderer.sortingLayerID = targetRenderer.sortingLayerID;
-                _sleepInteractionVisualSpriteRenderer.sortingOrder = targetRenderer.sortingOrder;
+                _sleepInteractionVisualSpriteRenderer.sortingLayerID = sortingLayerId;
+                _sleepInteractionVisualSpriteRenderer.sortingOrder = sortingOrder + resolvedOffset;
             }
         }
 
@@ -935,11 +996,15 @@ namespace GeminiLab.Modules.Pet
             RestoreInteractionPose();
             if (!request.UsePetPoseOverride)
             {
+                LogDevilFTrace(
+                    $"PoseTrace branch='main' skipped='UsePetPoseOverride=false' state='{ResolveInteractionAnimatorStateName(request)}'");
                 return;
             }
 
-            if (RequiresDetachedInteractionVisual(request.AnimationVariant))
+            if (UsesDetachedInteractionVisual(request))
             {
+                LogDevilFTrace(
+                    $"PoseTrace branch='main' skipped='detached visual branch' state='{ResolveInteractionAnimatorStateName(request)}'");
                 return;
             }
 
@@ -947,9 +1012,25 @@ namespace GeminiLab.Modules.Pet
             _storedInteractionPosition = GetCurrentWorldPosition();
             _storedInteractionScale = transform.localScale;
             Vector2 posePoint = request.PetInteractionWorldPoint;
-            if (request.UseTargetPositionForPetPose && request.VisualHideTarget != null)
+            GameObject? poseTarget = request.VisualPoseTarget ?? request.VisualHideTarget;
+            if (request.UseTargetPositionForPetPose && poseTarget != null)
             {
-                posePoint = ResolveInteractionPosePoint(request.VisualHideTarget.transform, request.PetInteractionLocalOffset);
+                posePoint = ResolveInteractionPosePoint(poseTarget.transform, request.PetInteractionLocalOffset);
+            }
+
+            posePoint = ClampToMovementBounds(posePoint);
+            LogDevilFTrace(
+                $"PoseTrace branch='main' state='{ResolveInteractionAnimatorStateName(request)}' " +
+                $"poseTarget='{DescribeObject(poseTarget)}' positionSource='{(request.UseTargetPositionForPetPose && poseTarget != null ? "target+offset" : "worldPoint")}' " +
+                $"localOffset={FormatVector2(request.PetInteractionLocalOffset)} worldPoint={FormatVector2(request.PetInteractionWorldPoint)} " +
+                $"finalPosePoint={FormatVector2(posePoint)} storedPosition={FormatVector2(_storedInteractionPosition)} " +
+                $"scale={FormatVector3(request.PetInteractionScale)}");
+            ApplyInteractionPhysicsOverride();
+            _hasInteractionPoseRuntimeOverride = true;
+            if (_context != null)
+            {
+                _context.RuntimeData.Position = posePoint;
+                _context.RuntimeData.TargetPosition = posePoint;
             }
 
             ApplyRuntimePosition(posePoint);
@@ -977,12 +1058,23 @@ namespace GeminiLab.Modules.Pet
         {
             if (!_hasStoredInteractionPose)
             {
+                _hasInteractionPoseRuntimeOverride = false;
+                RestoreInteractionPhysicsOverride();
                 return;
             }
 
-            ApplyRuntimePosition(_storedInteractionPosition);
+            Vector2 restoredPosition = ClampToMovementBounds(_storedInteractionPosition);
+            if (_context != null)
+            {
+                _context.RuntimeData.Position = restoredPosition;
+                _context.RuntimeData.TargetPosition = restoredPosition;
+            }
+
+            ApplyRuntimePosition(restoredPosition);
             transform.localScale = _storedInteractionScale;
             _hasStoredInteractionPose = false;
+            _hasInteractionPoseRuntimeOverride = false;
+            RestoreInteractionPhysicsOverride();
         }
 
         private void ApplyInteractionSortingOverride(PetPlayerInteractionRequest request)
@@ -997,17 +1089,13 @@ namespace GeminiLab.Modules.Pet
             _storedInteractionSortingLayerId = _spriteRenderer.sortingLayerID;
             _storedInteractionSortingOrder = _spriteRenderer.sortingOrder;
 
-            if (request.VisualSortingTarget.TryGetComponent(out SortingGroup sortingGroup))
+            if (TryResolveSortingReference(
+                    request.VisualSortingTarget,
+                    out int sortingLayerId,
+                    out int sortingOrder))
             {
-                _spriteRenderer.sortingLayerID = sortingGroup.sortingLayerID;
-                _spriteRenderer.sortingOrder = sortingGroup.sortingOrder + request.SortingOrderOffsetWhileInteracting;
-                return;
-            }
-
-            if (request.VisualSortingTarget.TryGetComponent(out SpriteRenderer targetRenderer))
-            {
-                _spriteRenderer.sortingLayerID = targetRenderer.sortingLayerID;
-                _spriteRenderer.sortingOrder = targetRenderer.sortingOrder + request.SortingOrderOffsetWhileInteracting;
+                _spriteRenderer.sortingLayerID = sortingLayerId;
+                _spriteRenderer.sortingOrder = sortingOrder + request.SortingOrderOffsetWhileInteracting;
             }
         }
 
@@ -1209,20 +1297,63 @@ namespace GeminiLab.Modules.Pet
                 "read" => InteractReadStateName,
                 "write" => InteractWriteStateName,
                 "sleep" => SleepStateName,
+                "look around" => InteractLookAroundStateName,
+                "play game" => InteractPlayGameStateName,
+                "draw" => InteractDrawStateName,
+                "devil sleep" => InteractSleepStateName,
                 _ => MoveFrontStateName
             };
         }
 
-        private static bool RequiresDetachedInteractionVisual(string variant)
+        private static string ResolveInteractionAnimatorStateName(PetPlayerInteractionRequest request)
         {
-            return variant switch
+            return !string.IsNullOrWhiteSpace(request.AnimatorStateNameOverride)
+                ? request.AnimatorStateNameOverride
+                : ResolvePlayerInteractionStateName(request.AnimationVariant);
+        }
+
+        private bool UsesDetachedInteractionVisual(PetPlayerInteractionRequest request)
+        {
+            return _interactionVisualStrategy.UsesDetachedVisual(
+                ResolveInteractionAnimatorStateName(request),
+                _petId);
+        }
+
+        private static bool TryResolveSortingReference(GameObject target, out int sortingLayerId, out int sortingOrder)
+        {
+            if (target.TryGetComponent(out SortingGroup directSortingGroup))
             {
-                "sleep" => true,
-                "flower" => true,
-                "playing music" => true,
-                "write" => true,
-                _ => false
-            };
+                sortingLayerId = directSortingGroup.sortingLayerID;
+                sortingOrder = directSortingGroup.sortingOrder;
+                return true;
+            }
+
+            if (target.TryGetComponent(out SpriteRenderer directSpriteRenderer))
+            {
+                sortingLayerId = directSpriteRenderer.sortingLayerID;
+                sortingOrder = directSpriteRenderer.sortingOrder;
+                return true;
+            }
+
+            SortingGroup? childSortingGroup = target.GetComponentInChildren<SortingGroup>(true);
+            if (childSortingGroup != null)
+            {
+                sortingLayerId = childSortingGroup.sortingLayerID;
+                sortingOrder = childSortingGroup.sortingOrder;
+                return true;
+            }
+
+            SpriteRenderer? childSpriteRenderer = target.GetComponentInChildren<SpriteRenderer>(true);
+            if (childSpriteRenderer != null)
+            {
+                sortingLayerId = childSpriteRenderer.sortingLayerID;
+                sortingOrder = childSpriteRenderer.sortingOrder;
+                return true;
+            }
+
+            sortingLayerId = 0;
+            sortingOrder = 0;
+            return false;
         }
 
         private static string ResolveIdleStateName(Vector2 direction)
@@ -1236,9 +1367,214 @@ namespace GeminiLab.Modules.Pet
             };
         }
 
+        private bool TryResolveAnimatorPlaybackStateName(
+            string requestedStateName,
+            out string resolvedStateName,
+            out string fallbackStateName)
+        {
+            fallbackStateName = requestedStateName.StartsWith(
+                BaseLayerStatePrefix,
+                System.StringComparison.Ordinal)
+                ? requestedStateName
+                : $"{BaseLayerStatePrefix}{requestedStateName}";
+
+            resolvedStateName = string.Empty;
+            if (_animator == null)
+            {
+                return false;
+            }
+
+            if (_animator.HasState(0, Animator.StringToHash(requestedStateName)))
+            {
+                resolvedStateName = requestedStateName;
+                return true;
+            }
+
+            if (!string.Equals(
+                    fallbackStateName,
+                    requestedStateName,
+                    System.StringComparison.Ordinal) &&
+                _animator.HasState(0, Animator.StringToHash(fallbackStateName)))
+            {
+                resolvedStateName = fallbackStateName;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool ShouldTraceDevilInteraction()
+        {
+            return _petId == PetId.Devil;
+        }
+
+        private bool ShouldTraceDevilAnimatorState(string stateName)
+        {
+            return ShouldTraceDevilInteraction() &&
+                   ((_context?.RuntimeData.IsPlayerInteractionActive ?? false) ||
+                    stateName.StartsWith("Interact_", System.StringComparison.Ordinal));
+        }
+
+        private void LogDevilFTrace(string message)
+        {
+            if (!ShouldTraceDevilInteraction())
+            {
+                return;
+            }
+
+            Debug.Log($"{DevilFTracePrefix} {message}");
+        }
+
+        private void ApplyInteractionPhysicsOverride()
+        {
+            if (_hasInteractionPhysicsOverride)
+            {
+                return;
+            }
+
+            _hasInteractionPhysicsOverride = true;
+            if (_rigidbody2D != null)
+            {
+                _storedInteractionRigidbodySimulated = _rigidbody2D.simulated;
+                _rigidbody2D.velocity = Vector2.zero;
+                _rigidbody2D.angularVelocity = 0f;
+                _rigidbody2D.simulated = false;
+            }
+
+            if (_capsuleCollider2D != null)
+            {
+                _storedInteractionCapsuleColliderEnabled = _capsuleCollider2D.enabled;
+                _capsuleCollider2D.enabled = false;
+            }
+
+            LogDevilFTrace(
+                $"InteractionPhysicsOverride enabled: rigidbodySimulated={_storedInteractionRigidbodySimulated} " +
+                $"capsuleEnabled={_storedInteractionCapsuleColliderEnabled}");
+        }
+
+        private void RestoreInteractionPhysicsOverride()
+        {
+            if (!_hasInteractionPhysicsOverride)
+            {
+                return;
+            }
+
+            if (_capsuleCollider2D != null)
+            {
+                _capsuleCollider2D.enabled = _storedInteractionCapsuleColliderEnabled;
+            }
+
+            if (_rigidbody2D != null)
+            {
+                _rigidbody2D.simulated = _storedInteractionRigidbodySimulated;
+                _rigidbody2D.velocity = Vector2.zero;
+                _rigidbody2D.angularVelocity = 0f;
+            }
+
+            _hasInteractionPhysicsOverride = false;
+            LogDevilFTrace(
+                $"InteractionPhysicsOverride restored: rigidbodySimulated={_storedInteractionRigidbodySimulated} " +
+                $"capsuleEnabled={_storedInteractionCapsuleColliderEnabled}");
+        }
+
+        private void TraceDevilInteractionTickIfNeeded(string phase, ref int lastTraceFrame)
+        {
+            if (!ShouldTraceDevilInteraction() ||
+                _context == null ||
+                !_context.RuntimeData.IsPlayerInteractionActive)
+            {
+                return;
+            }
+
+            int currentFrame = Time.frameCount;
+            if (currentFrame - lastTraceFrame < DevilPoseTickTraceFrameInterval)
+            {
+                return;
+            }
+
+            lastTraceFrame = currentFrame;
+            TraceDevilInteractionTick(phase);
+        }
+
+        private void TraceDevilInteractionTick(string phase)
+        {
+            if (_context == null || !ShouldTraceDevilInteraction())
+            {
+                return;
+            }
+
+            PetRuntimeData runtimeData = _context.RuntimeData;
+            string currentState = runtimeData.CurrentState;
+            string interactionState = runtimeData.PlayerInteractionAnimatorStateName;
+            string transformPosition = FormatVector3(transform.position);
+            string rigidbodyPosition = _rigidbody2D != null
+                ? FormatVector2(_rigidbody2D.position)
+                : "null";
+            string worldPosition = FormatVector2(GetCurrentWorldPosition());
+            string runtimePosition = FormatVector2(runtimeData.Position);
+            string targetPosition = FormatVector2(runtimeData.TargetPosition);
+            bool petSpriteVisible = _spriteRenderer != null && _spriteRenderer.enabled;
+            bool detachedVisible = _sleepInteractionVisualSpriteRenderer != null &&
+                                   _sleepInteractionVisualSpriteRenderer.enabled;
+            string detachedPosition = _sleepInteractionVisualTransform != null
+                ? FormatVector3(_sleepInteractionVisualTransform.position)
+                : "null";
+            bool detachedObjectActive = _sleepInteractionVisualObject != null &&
+                                        _sleepInteractionVisualObject.activeInHierarchy;
+            bool detachedAnimatorEnabled = _sleepInteractionVisualAnimator != null &&
+                                           _sleepInteractionVisualAnimator.enabled;
+
+            LogDevilFTrace(
+                $"PoseTick phase='{phase}' frame={Time.frameCount} " +
+                $"state='{currentState}' interactionState='{interactionState}' " +
+                $"forcedState='{_lastForcedAnimatorStateName}' poseOverride={_hasInteractionPoseRuntimeOverride} " +
+                $"physicsOverride={_hasInteractionPhysicsOverride} " +
+                $"transform={transformPosition} rigidbody={rigidbodyPosition} world={worldPosition} " +
+                $"runtime={runtimePosition} target={targetPosition} " +
+                $"petSpriteVisible={petSpriteVisible} detachedVisible={detachedVisible} " +
+                $"detachedActive={detachedObjectActive} detachedAnimatorEnabled={detachedAnimatorEnabled} " +
+                $"detachedPosition={detachedPosition}");
+        }
+
+        private static string DescribeObject(GameObject? target)
+        {
+            return target != null ? target.name : "null";
+        }
+
+        private static string FormatVector2(Vector2 value)
+        {
+            return $"({value.x:F2}, {value.y:F2})";
+        }
+
+        private static string FormatVector3(Vector3 value)
+        {
+            return $"({value.x:F2}, {value.y:F2}, {value.z:F2})";
+        }
+
+        private void LogDevilFTraceWarning(string message)
+        {
+            if (!ShouldTraceDevilInteraction())
+            {
+                return;
+            }
+
+            Debug.LogWarning($"{DevilFTracePrefix} {message}");
+        }
+
         private void PlayForcedAnimatorState(string stateName)
         {
-            if (_animator == null || string.IsNullOrWhiteSpace(stateName))
+            if (_animator == null)
+            {
+                if (ShouldTraceDevilAnimatorState(stateName))
+                {
+                    LogDevilFTraceWarning($"PlayForcedAnimatorState failed: _animator is null, state='{stateName}'");
+                }
+
+                Debug.LogWarning($"[PetAnimation] PlayForcedAnimatorState failed: _animator is null. stateName='{stateName}'");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(stateName))
             {
                 return;
             }
@@ -1248,7 +1584,38 @@ namespace GeminiLab.Modules.Pet
                 return;
             }
 
-            _animator.Play(stateName, 0, 0f);
+            if (!TryResolveAnimatorPlaybackStateName(
+                    stateName,
+                    out string resolvedStateName,
+                    out string fallbackStateName))
+            {
+                string controllerName = _animator.runtimeAnimatorController != null
+                    ? _animator.runtimeAnimatorController.name
+                    : "null";
+                if (ShouldTraceDevilAnimatorState(stateName))
+                {
+                    LogDevilFTraceWarning(
+                        $"Animator state missing. requested='{stateName}', fallback='{fallbackStateName}', controller='{controllerName}'");
+                }
+
+                Debug.LogWarning(
+                    $"[PetAnimation] Animator state missing on '{gameObject.name}'. " +
+                    $"requested='{stateName}', fallback='{fallbackStateName}', controller='{controllerName}'");
+                _lastForcedAnimatorStateName = stateName;
+                return;
+            }
+
+            if (ShouldTraceDevilAnimatorState(stateName))
+            {
+                LogDevilFTrace(
+                    $"PlayForcedAnimatorState requested='{stateName}', resolved='{resolvedStateName}', " +
+                    $"interactionActive={_context?.RuntimeData.IsPlayerInteractionActive == true}");
+            }
+
+            Debug.Log(
+                $"[PetAnimation] Playing animator state '{stateName}' on '{gameObject.name}' " +
+                $"(resolved='{resolvedStateName}')");
+            _animator.Play(resolvedStateName, 0, 0f);
             _lastForcedAnimatorStateName = stateName;
         }
 
@@ -1367,6 +1734,12 @@ namespace GeminiLab.Modules.Pet
         private void ApplyRuntimePosition(Vector2 position)
         {
             position = ClampToMovementBounds(position);
+            if (_hasInteractionPhysicsOverride)
+            {
+                ApplyDirectRuntimePosition(position);
+                return;
+            }
+
             if (_rigidbody2D != null)
             {
                 _rigidbody2D.MovePosition(position);
@@ -1374,6 +1747,18 @@ namespace GeminiLab.Modules.Pet
             }
 
             transform.position = new Vector3(position.x, position.y, transform.position.z);
+        }
+
+        private void ApplyDirectRuntimePosition(Vector2 position)
+        {
+            Vector3 worldPosition = new(position.x, position.y, transform.position.z);
+            transform.position = worldPosition;
+            if (_rigidbody2D != null)
+            {
+                _rigidbody2D.position = position;
+                _rigidbody2D.velocity = Vector2.zero;
+                _rigidbody2D.angularVelocity = 0f;
+            }
         }
 
         private Vector2 GetCurrentWorldPosition()

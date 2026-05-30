@@ -1,5 +1,5 @@
 # Gemini-Lab AI memory index
-# Updated: 2026-05-27
+# Updated: 2026-05-31
 
 AGENTS.md
 docs/current-task-card.md
@@ -68,6 +68,8 @@ Assets/_Project/Scripts/README.md
 Assets/_Project/Scripts/Core/README.md
 Assets/_Project/Scripts/Modules/README.md
 Assets/_Project/Scripts/Modules/Pet/README.md
+Assets/_Project/Scripts/Modules/Pet/PetController.cs
+Assets/_Project/Scripts/Modules/Pet/PetInteractionVisualStrategy.cs
 Assets/_Project/Scripts/Modules/Pet/PetPlayerInputController.cs
 Assets/_Project/Scripts/Modules/Pet/PetPlayerFurnitureInteractionController.cs
 Assets/_Project/Scripts/Modules/Pet/PetClickReactionController.cs

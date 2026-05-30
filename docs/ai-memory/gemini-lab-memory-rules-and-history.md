@@ -1,6 +1,6 @@
 # Gemini-Lab Memory Rules And History
 
-Updated: 2026-05-20
+Updated: 2026-05-31
 
 ## 长期规则
 1. 所有中文文档、中文注释、中文说明都必须保持 UTF-8 正常显示。
@@ -29,6 +29,29 @@ Updated: 2026-05-20
 7. `Gateway`、`Travel` 与 AI 对话相关代码当前仍存在于仓库中，但 2026-05-08 起不再作为现阶段原型的默认开发入口；当前阶段应以玩家直接控制桌宠移动与场景交互为准。
 
 ## 最近进展
+
+### 2026-05-31
+- 继续排查恶魔四个家具交互动画“按 `F` 后只停顿、动画没显示”的 Animator 链路。
+- 当前记录一条已撤回的排查分支：
+  - 曾怀疑 `Pet_Devil.controller` 的 `Base Layer` 中 3 条 `Any State -> Idle_Front / Idle_Back / Idle_Side` 过渡会在 `IsMoving == false` 时抢回待机
+  - 这一路径与 `PetController` 在交互态中主动把 `IsMoving` 设为 `false` 的逻辑确实存在表面冲突
+  - 但用户已明确否定这是当前问题根因，因此对应的 controller 删除已撤回，不再记为有效修复
+- 后续继续转向运行时 Animator 覆盖链路，重点核对是否有脚本在交互触发后持续 `Play`、改参数、重绑 controller 或覆盖可视显示。
+- 同日继续排查恶魔交互摆位问题时，已确认另一个高概率覆盖点：`PetController` 的玩家交互位姿应用此前只调用一次 `ApplyRuntimePosition()`，但没有稳定同步 `RuntimeData.Position / TargetPosition`，随后又会被 `Update / FixedUpdate` 的统一位置回写顶掉。
+- 当前已在 `PetController` 落最小修复：
+  - 交互 pose 应用时同步写回 `RuntimeData.Position / TargetPosition`
+  - 交互 pose 恢复时同步恢复运行态位置
+  - 在交互 pose override 生效期间，暂停用旧世界坐标覆盖这段运行态位置
+- 该修复目前只完成代码落地与静态检查，尚未在 Unity Play 中完成人工复测。
+
+### 2026-05-30
+- 继续排查恶魔四个家具交互动画“按 `F` 后只停顿、动画没显示”的根因。
+- Unity Editor 日志已确认：
+  - 恶魔 `玩掌机 / 画画 / 睡觉 / 左右看` 的交互触发与 `TickPlayerInteraction` 都在正常执行
+  - `Pet_Devil` 主 Animator 也确实会切进 `Interact_PlayGame`、`Interact_Draw`、`Interact_DevilSleep`、`Interact_LookAround`
+- 因此本轮确认到的直接根因不是状态没切进去，而是恶魔 `玩掌机 / 画画 / 睡觉` 这三条被归入 detached interaction visual 分支后，主 SpriteRenderer 被隐藏，但额外可视对象没有稳定承担最终显示。
+- 当前没有继续拆第二套恶魔专用 `F` 键交互脚本；而是保留共享 `PetPlayerFurnitureInteractionController`，把 `PetController` 里写死的 detached visual 判断拆成可序列化的 `PetInteractionVisualStrategy`。
+- 当前 `Apartment_Main.unity` 已显式 author 双宠策略：天使保留 `Sleep / Interact_Flower / Interact_PlayingMusic / Interact_Write` 的 detached visual，恶魔 `Interact_LookAround / Interact_PlayGame / Interact_Draw / Interact_DevilSleep` 保持主 `Pet_Devil` 渲染器显示。
 
 ### 2026-05-20
 - 新增视觉一致性硬规则：
