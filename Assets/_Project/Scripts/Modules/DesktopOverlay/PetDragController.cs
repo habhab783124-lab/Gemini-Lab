@@ -18,6 +18,12 @@ public class PetDragController : MonoBehaviour
     public float clickMaxMovePixels = 8f;
     public float clickMaxTime = 0.25f;
 
+    [Header("Position Save")]
+    public bool loadSavedPositionOnStart = true;
+    public bool savePositionOnRelease = true;
+    public string saveKey = "";
+
+
     private Vector3 offset;
     private bool isDragging;
     private bool hasMovedEnough;
@@ -36,6 +42,16 @@ public class PetDragController : MonoBehaviour
         if (skeletonAnimation == null)
             skeletonAnimation = GetComponentInChildren<SkeletonAnimation>();
     }
+
+        private void Start()
+    {
+        if (string.IsNullOrEmpty(saveKey))
+            saveKey = gameObject.name;
+
+        if (loadSavedPositionOnStart)
+            LoadPosition();
+    }
+
 
     private void OnMouseDown()
     {
@@ -90,6 +106,12 @@ public class PetDragController : MonoBehaviour
         {
             PlayLoop(idleAnimation);
         }
+
+        if (savePositionOnRelease)
+        {
+            SavePosition();
+        }
+
     }
 
     private Vector3 GetMouseWorldPosition()
@@ -153,4 +175,54 @@ public class PetDragController : MonoBehaviour
             skeletonAnimation.AnimationState.AddAnimation(0, idleAnimation, true, 0f);
         }
     }
+
+    private string SavePrefix
+{
+    get
+    {
+        return "DesktopPet_" + saveKey + "_";
+    }
+}
+
+private void SavePosition()
+{
+    if (target == null)
+        return;
+
+    PlayerPrefs.SetFloat(SavePrefix + "x", target.position.x);
+    PlayerPrefs.SetFloat(SavePrefix + "y", target.position.y);
+    PlayerPrefs.SetFloat(SavePrefix + "z", target.position.z);
+    PlayerPrefs.Save();
+
+    Debug.Log($"{name} 已保存位置：{target.position}");
+}
+
+    private void LoadPosition()
+    {
+        if (target == null)
+            return;
+
+        if (!PlayerPrefs.HasKey(SavePrefix + "x"))
+            return;
+
+        float x = PlayerPrefs.GetFloat(SavePrefix + "x");
+        float y = PlayerPrefs.GetFloat(SavePrefix + "y");
+        float z = PlayerPrefs.GetFloat(SavePrefix + "z");
+
+        target.position = new Vector3(x, y, z);
+
+        Debug.Log($"{name} 已读取位置：{target.position}");
+    }
+
+    [ContextMenu("Clear Saved Position")]
+    private void ClearSavedPosition()
+    {
+        PlayerPrefs.DeleteKey(SavePrefix + "x");
+        PlayerPrefs.DeleteKey(SavePrefix + "y");
+        PlayerPrefs.DeleteKey(SavePrefix + "z");
+        PlayerPrefs.Save();
+
+        Debug.Log($"{name} 已清除保存位置");
+    }
+
 }
