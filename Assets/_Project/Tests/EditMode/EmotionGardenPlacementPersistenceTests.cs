@@ -77,6 +77,30 @@ namespace GeminiLab.Tests.EditMode
         }
 
         [Test]
+        public void SubmitEmotion_CreatesAndPersistsDailySummary()
+        {
+            EmotionFlowerData? flower = _service.SubmitEmotion(string.Empty, "今天有点累，但完成了一件重要的事", "angel");
+
+            Assert.True(flower.HasValue);
+            EmotionDailySummaryData? summary = _service.GetTodayDailySummary();
+            Assert.True(summary.HasValue);
+            Assert.AreEqual("2026-08-12", summary.Value.DateIso);
+            StringAssert.Contains("今天有点累", summary.Value.InputSentence);
+            Assert.IsNotEmpty(summary.Value.Summary);
+            Assert.IsNotEmpty(summary.Value.AngelNote);
+            Assert.IsNotEmpty(summary.Value.DevilNote);
+
+            string captured = ((IPersistentService)_service).CaptureJson();
+            Restore(captured);
+
+            EmotionDailySummaryData? restored = _service.GetTodayDailySummary();
+            Assert.True(restored.HasValue);
+            Assert.AreEqual(summary.Value.Summary, restored.Value.Summary);
+            Assert.AreEqual(summary.Value.AngelNote, restored.Value.AngelNote);
+            Assert.AreEqual(summary.Value.DevilNote, restored.Value.DevilNote);
+        }
+
+        [Test]
         public void CaptureAndRestore_RoundTripsClusterPlacement()
         {
             Restore(@"{""Version"":3,""Flowers"":[],""Clusters"":[],""PlacementInventories"":[{""EmotionType"":""平静"",""Owner"":""demon"",""SingleCount"":0,""ClusterCount"":1}]}");

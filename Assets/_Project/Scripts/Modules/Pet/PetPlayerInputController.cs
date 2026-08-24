@@ -156,7 +156,9 @@ namespace GeminiLab.Modules.Pet
                 return;
             }
 
-            if (s_activeController == null || _preferControlOnEnable)
+            // 自由行走场景默认不抢占控制权；只有明确标记 PreferControlOnEnable
+            // 的公寓实例才会在启用时接管键盘。点击桌宠仍会通过 TakeControl() 接管。
+            if (_preferControlOnEnable)
             {
                 s_activeController = this;
             }
@@ -168,7 +170,7 @@ namespace GeminiLab.Modules.Pet
             for (int i = 0; i < controllers.Length; i++)
             {
                 PetPlayerInputController controller = controllers[i];
-                if (controller == null || !controller._enableInput || !controller.isActiveAndEnabled)
+                if (controller == null || !controller._enableInput || !controller._preferControlOnEnable || !controller.isActiveAndEnabled)
                 {
                     continue;
                 }

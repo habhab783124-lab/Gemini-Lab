@@ -11,14 +11,15 @@ namespace GeminiLab.Editor.SceneBootstrap
     public static class AutoSetup
     {
         private const string SetupDoneKey = "GeminiLab.AutoSetupDone";
-        private const int ExpectedVersion = 65;
+        private const int ExpectedVersion = 69;
 
         static AutoSetup()
         {
             EditorApplication.delayCall += () =>
             {
                 int currentVersion = EditorPrefs.GetInt(SetupDoneKey, 0);
-                if (currentVersion >= ExpectedVersion) return;
+                bool needsLatestAuthoring = RequiresLatestAuthoring();
+                if (currentVersion >= ExpectedVersion && !needsLatestAuthoring) return;
 
                 if (EditorApplication.isPlayingOrWillChangePlaymode || Application.isPlaying)
                 {
@@ -446,6 +447,17 @@ namespace GeminiLab.Editor.SceneBootstrap
                         ApartmentAppleBalanceAuthoring.Patch();
                     }
 
+                    if (currentVersion < 66 || needsLatestAuthoring)
+                    {
+                        DailySummaryMailboxAuthoring.Patch();
+                        WorldMapOutdoorPetAnimationAuthoring.Patch();
+                    }
+
+                    if (currentVersion < 69)
+                    {
+                        ApartmentFurnitureSelectionAuthoring.Patch();
+                    }
+
                     EditorPrefs.SetInt(SetupDoneKey, ExpectedVersion);
                     Debug.Log($"[AutoSetup] 升级到版本 {ExpectedVersion} 完成。");
                 }
@@ -528,6 +540,25 @@ namespace GeminiLab.Editor.SceneBootstrap
             so.FindProperty("_moveSpeed").floatValue = 1.2f;
             so.FindProperty("_horizontalOnly").boolValue = true;
             so.ApplyModifiedProperties();
+        }
+
+        private static bool RequiresLatestAuthoring()
+        {
+            const string apartmentScene = "Assets/_Project/Scenes/Apartment/Apartment_Main.unity";
+            const string worldMapScene = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
+            if (!System.IO.File.Exists(apartmentScene) || !System.IO.File.Exists(worldMapScene))
+            {
+                return true;
+            }
+
+            string apartmentText = System.IO.File.ReadAllText(apartmentScene);
+            string worldMapText = System.IO.File.ReadAllText(worldMapScene);
+            int freeControlCount = worldMapText.Split(
+                new[] { "_preferControlOnEnable: 0" },
+                System.StringSplitOptions.None).Length - 1;
+            return !apartmentText.Contains("MailboxButton", System.StringComparison.Ordinal) ||
+                   !worldMapText.Contains("c24671ba6d25cb246bdc627378a8fa9e", System.StringComparison.Ordinal) ||
+                   freeControlCount < 2;
         }
 
         public static void Reset()

@@ -1,13 +1,24 @@
 # Gemini-Lab Project File Guide
 
-Updated: 2026-08-07
+## 2026-08-21 furniture selection feedback
 
-## 苹果资源系统（2026-08-14）
+Indoor furniture selection paths: `Assets/_Project/Scripts/Modules/HubUI/ApartmentFurnitureSelectionPresenter.cs`, `Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentFurnitureSelectionAuthoring.cs`, and the authored nodes `ApartmentFurnitureSelection`, `FurnitureSelectionHighlight`, and `FurnitureSelectionMessage` in `Assets/_Project/Scenes/Apartment/Apartment_Main.unity`. Runtime only toggles authored objects and text; the viewport bridge owns click routing. The nine original targets plus `家具_装饰_储物的家具_恶魔_01` are wired; “苹果垫” is the requirement label for this existing storage furniture.
+
+Updated: 2026-08-22
+
+## 2026-08-18 Play verification addendum
+
+- Outdoor `WorldMap_Main/室外背景/邮箱` -> hidden `WorldMapDailySummaryMailboxOpenTarget.PanelOpenButton.OnClick` -> WorldMap `Panel_DailySummaryMailbox` routing was verified after scene authoring; the Apartment legacy entry is inactive.
+- Both WorldMap pets moved within their serialized `RandomWander` bounds and drove the existing Animator movement parameters; no runtime visual nodes were created.
+- Daily-summary persistence remains covered by the targeted EditMode suite (`EmotionGardenPlacementPersistenceTests`, 5/5).
+
+## 苹果资源系统（2026-08-18 新版规则）
 
 - 运行时模块：`Assets/_Project/Scripts/Modules/Apple/`；`AppleService` 实现 `IAppleService` 与 `IPersistentService`，存档 key 为 `apple`。
-- 规则：新档 20 个苹果；每棵大树每 6 小时生成 1 个、最多缓存 3 个；时间戳和待领取数量随存档保存。时间来源必须是 `IGameClock`。
-- WorldMap 交互：`AppleTreeInteractable` 挂在现有「大树 1」～「大树 5」，`WorldMapAppleTreeAuthoring` 只写入树 ID 和组件，不创建运行时视觉。点击树领取缓存苹果。
-- 消费入口：`GachaService` 使用苹果支付单抽/五连（1/5）；`TarotService.CreateSession` 使用 1 个苹果开启会话，余额不足时不进入有效选牌。
+- 规则：新档 20 个苹果；每棵大树按现实 UTC 时间 45–90 分钟随机生成一轮、每天最多 5 轮、每轮 70% 为 1 个/30% 为 2 个；未领取缓存不设 3 个上限，时间表、当日轮数和缓存随存档保存。时间来源必须是 `IGameClock`。
+- WorldMap 交互：`AppleTreeInteractable` 与 `AppleTreeFeedback` 只挂在「大树 2」～「大树 5」；「大树 1」不是苹果树，不绑定苹果领取或反馈。苹果树点击领取全部缓存，无缓存时播放反馈。
+- 消费入口：`GachaService` 使用苹果支付单抽/五连（20/100）；`TarotService.CreateSession` 使用 8 个苹果开启会话，余额不足时不进入有效选牌。
+- 花朵奖励：`EmotionGardenService.BloomAt` 首次成熟奖励 12 个苹果，重复成熟不重复奖励。
 - UI：`ApartmentAppleBalanceAuthoring` 复用四个现有 `TopResource/BalanceLabel`，移除旧版重复 `AppleBalanceLabel`；`StubPanelBase`、`GachaPanelController` 和 `Collection/AppleBalanceDisplay` 统一更新苹果数字余额。
 
 ## 入口文件
@@ -27,6 +38,12 @@ Updated: 2026-08-07
   - 当前人工版“做梦整理”执行清单。
 - `tools/check-task-gate.ps1`
   - 当前最小闭环执行闸门脚本。
+- `tools/task-card-utils.ps1`
+  - 读取任务卡、规范化仓库路径并计算排除执行态字段后的计划 hash。
+- `tools/check-task-scope.ps1`
+  - 创建/验证任务开始时的工作树基线，阻止未列入 `direct_files` 的新增或变化路径。
+- `tools/verify-task.ps1`
+  - 统一执行 review 闸门、任务范围、`git diff --check` 和 PowerShell 语法检查，并输出 JSON 报告。
 - `tools/check-scene-visual-contract.ps1`
   - 按当前任务卡中的 `scene_visual_contracts` 检查 Scene 节点及关键 Sprite 序列化引用。
 - `tools/check-runtime-visual-contract.ps1`
@@ -49,6 +66,12 @@ Updated: 2026-08-07
 - `direct_files` 命中 `.unity`、`Assets/_Project/Art/`、运行时 `Scripts/Modules` / `Scripts/UI`、WorldMap SceneBootstrap 或编辑器视觉工具时，会被任务闸门视为视觉任务，必须把 Scene 作为事实源。
 - 视觉任务的最终 Sprite、AnimatorController、RectTransform、排序层级和 UI 节点必须在 Scene / Prefab / Inspector 中可见并可调。运行时只允许读取数据、切换已有对象状态和填充动态文本，不允许把最终视觉藏在运行时资源赋值或动态 UI 生成里。
 - 修改或评审视觉任务时必须同时运行 `tools/check-task-gate.ps1`、`tools/check-scene-visual-contract.ps1` 和 `tools/check-runtime-visual-contract.ps1`；子检查失败即视为任务未完成。
+
+### 工作流兼容增强
+- 原有流程仍然是“探索 → 规划 → 用户确认 → 行动”；机器约束只在任务卡和工具层验证这条流程，不改变四段式规划模板。
+- 新任务卡使用 `task_id` 区分任务，使用 `human_approved=true` 和 `approval_source` 记录用户确认，使用 `plan_hash` 防止批准后的范围被悄悄改写。
+- 写入前先通过 `tools/check-task-gate.ps1 -Mode write`，然后运行 `tools/check-task-scope.ps1 -Mode CreateBaseline`；收尾运行 `tools/verify-task.ps1 -JsonOnly`。
+- 直接文件工具或外部进程仍可能绕过仓库内脚本，因此这些检查是可执行的仓库防线，不等同于操作系统级权限隔离。
 
 ### 想知道项目现在处于什么状态
 - `AGENTS.md`
@@ -212,7 +235,7 @@ Updated: 2026-08-07
   - 包依赖与嵌入式包
   - 当前保留的关键本地包是 `SkillsForUnity`
 - `PackageBackups/`
-  - 当前用于临时停用并备份 4 个 Unity MCP 包
+  - 保留旧版 4 个 Unity MCP 包与 NuGet DLL 的停用备份；当前活动 MCP 插件由 `Packages/manifest.json` 的 `com.ivanmurzak.unity.mcp` `0.88.0` 提供
   - 当前还用于暂存从 `Assets/Plugins/NuGet` 软移出的 MCP NuGet DLL 目录
 - `ProjectSettings/`
   - Unity 项目级设置
@@ -237,7 +260,8 @@ Updated: 2026-08-07
 13. `Assets/_Project/Art/Sprites/Pet/Frames/Move/` 当前已经从旧的平铺命名，切换为 `正面 / 背面 / 侧面` 三个子目录；对应导入链路由 `PetMoveAnimationSetupEditor` 兼容新旧两套来源。
 14. `Assets/_Project/Art/Sprites/Pet/Frames/Interact/` 当前两组交互帧已经统一改为规范命名：`Pet_Angel_Interact_Read_0001...` 与 `Pet_Angel_Interact_BesideDoor_0001...`，不再使用 `IMG_986x.PNG`。
 14. `2026-06-02` 起，项目已补一条 Windows 构建防护：`Assets/_Project/Scripts/Editor/Build/McpNuGetPlayerImportGuard.cs` 会把 `Assets/Plugins/NuGet` 下由 Unity MCP 依赖解析器解压出的 `McpPlugin / SignalR / Microsoft.Extensions.*` DLL 统一校正为 `Editor-only`，避免它们以 Player 插件身份进入 Bee / Burst 构建链。
-15. `2026-06-02` 同日，项目又把 4 个 Unity MCP 包临时从 `Packages/` 移到了 `PackageBackups/MCP-disabled-2026-06-02/`，并从 `Packages/manifest.json` 取消引用；当前保留不动的是 `Packages/SkillsForUnity`。
+15. `2026-06-02` 同日，项目曾把 4 个旧版 Unity MCP 包临时从 `Packages/` 移到了 `PackageBackups/MCP-disabled-2026-06-02/`；`2026-08-18` 起活动依赖改为 `com.ivanmurzak.unity.mcp` `0.88.0`，旧备份继续保留，`Packages/SkillsForUnity` 不受影响。
+16. `2026-08-18` 起全局工具链为 Node.js `v24.19.0` + `unity-mcp-cli` `v0.88.0`；Unity 已安全重启并连接 `http://localhost:27345`，`unity-tool-list` 与定向 EditMode 测试可通过 CLI 实跑。
 16. `2026-06-02` 同日，项目还把 `Assets/Plugins/NuGet` 整个目录及其 `.meta` 软移出到了 `PackageBackups/NuGet-disabled-2026-06-02/`，并清空了 `ProjectSettings/ProjectSettings.asset` 里的 `Standalone` `UNITY_MCP_READY`，用于让 Windows Build 不再继续命中这批 MCP NuGet 残留 DLL。
 17. `Apartment_Main.unity` 当前并不是所有“看起来像家具”的对象都天然进入家具逻辑；首轮显式接线通过 `ApartmentSceneFurnitureBindings` 给关键对象补 `Furniture` / `InteractionAnchor` / `SceneFurnitureDefinitionHint`。
 18. `ApartmentSceneFurnitureBindings` 当前已经覆盖公寓场景里主要可交互对象，但仍要注意两类现实区别：
@@ -308,21 +332,29 @@ Updated: 2026-08-07
 ### 2026-08-04 WorldMap 花朵自由摆放
 - 运行时脚本：`Assets/_Project/Scripts/Modules/WorldMap/WorldMapFlowerPlacementController.cs`。
 - 场景作者化脚本：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapFlowerPlacementAuthoring.cs`。
-- 网格配置：由 `WorldMapFlowerPlacementController` 读取 `garden/中景/花丛.png` 的 Sprite 完整尺寸得到二维 `Vector2` 单元（当前为 `4.01 x 2.24` Unity 单位），再结合网格原点和摆放区域生成完整 X/Y 网格线；不绑定或读取图鉴花朵资源作为显示。
+- 网格配置：由 `WorldMapFlowerPlacementController` 读取 `garden/中景/花丛.png` 的 Sprite 完整尺寸得到二维 `Vector2` 单元（当前为 `4.01 x 2.24` Unity 单位），再结合网格原点和摆放区域生成完整 X/Y 网格线；网格线仅作为作者化/调试资源保存，运行时隐藏；不绑定或读取图鉴花朵资源作为显示。
 - `2026-08-10` 已完成侧边栏版本的实际落盘，并于 `2026-08-11` 修正为参考图对应的右侧布局：`Canvas/Btn_FlowerPlacement` 位于右下角，`Canvas/FlowerPlacementPanel` 锚定右侧并保留 `UIBoard.png` 原始 `498 x 899` 尺寸；`FlowerSidebarViewport`、`FlowerSidebarContent`、`FlowerList/FlowerOption_00...17`、`SynthesisHintBubble`、`WorldMapPlacedFlowers/FlowerPlacementGrid`、`FlowerPlacementPreview`、`PlacementSlot_00...31` 与 `FlowerPlacementBounds` 均存在于 `WorldMap_Main.unity`。旧底部库存节点不参与当前滚动列表，遗留顶层 `FlowerPlacementStatusBar` 已清理。
 - `2026-08-11` 侧栏展开已改为确定性的手风琴布局：`FlowerList` 直接作为 `ScrollRect.content` 并管理 18 个 `FlowerOption`；其 `VerticalLayoutGroup.childControlHeight` 已启用，因此每个条目预置的 `LayoutElement` 会以 `73 / 320` 的收起/展开高度真实控制下方条目位移。详情页位于选中标题下方，不会再被后续列表元素遮挡；控制器会保持被点击标题在视窗中的位置，避免从一个条目切换到另一个条目时出现不规则跳动。
-- `2026-08-12` 侧栏视窗已保存为左右 34、顶部 132、底部 56 的真实拉伸边距，列表起点固定在标题下方并受 `RectMask2D` 裁剪。可通过 `Tools/Gemini-Lab/WorldMap/Author Flower Placement` 单独重新作者化该系统，不触发其他 WorldMap 补丁。
+- `2026-08-12` 侧栏视窗已保存为左右 34、顶部 132、底部 56 的真实拉伸边距，列表起点固定在标题下方并受 `RectMask2D` 裁剪。选择单花/花丛后侧栏自动收起但保留当前选择和预览，玩家可直接点击场景；重新点击布置入口可更换花种。可通过 `Tools/Gemini-Lab/WorldMap/Author Flower Placement` 单独重新作者化该系统，不触发其他 WorldMap 补丁。
 - `2026-08-13` 摆放系统读取 `BaselineItem` 的实际基线与排序层：同层单格不可重叠，跨层可重叠；内部吸附在相邻层之间半格错位，但 `FlowerPlacementGrid` 运行时保持隐藏。作者化只收录摆放区域内的基线；花丛改为一花丛一格，尺寸取场景 `花丛 3` 的碰撞体基准（约 `3.99 x 2.22`），运行时不生成视觉节点，并清理槽位重复旧组件。
 - `2026-08-12` 摆放与每周培育共享 `EmotionGardenService` 内的持久化 `PlacementFlowerInventory`：开花增加单花，单花/花丛摆放消耗对应库存，3 个单花主动合成 1 个花丛；存档版本 3 会从旧档的已开花数据一次性迁移库存。版本 4 另存 `PlacedFlowers`，成功摆放立即 autosave，重启后恢复槽位/坐标且不重复扣库存；自由摆放单花和花丛均不添加土壤。若当前存档没有 `PlacedFlowers`，不会把仅有的开花记录臆测成历史坐标。
-- 侧栏 UI 绑定 `Assets/_Project/Art/WorldMap/arrange`；花种/单花/花丛绑定 `Assets/_Project/Art/WorldMap/花朵图鉴/花朵`、`花枝`、`花丛`，不是 `arrange.png` 裁剪图。网格材质为 `arrange/PlacementGrid.mat`，网格线仅作为作者化/调试资源保存，运行时不显示。
+- 侧栏 UI 绑定 `Assets/_Project/Art/WorldMap/arrange`；花种列表图标绑定 `Assets/_Project/Art/WorldMap/花朵图鉴/花朵`，放置系统单花绑定 `花朵图鉴/花朵放置`，花丛绑定 `花朵图鉴/花丛`，不是 `arrange.png` 裁剪图。网格材质为 `arrange/PlacementGrid.mat`，网格线仅作为作者化/调试资源保存，运行时不显示。单花目录包含 9 种情绪的天使/恶魔共 18 张 Sprite。
 - `FlowerPlacementBounds` 默认是 `36 x 8.96` 的禁用 BoxCollider2D，仅存放草地摆放区域数据，可在 Inspector 调整。运行时控制器只切换预置显示、移动空闲 `PlacementSlot` 并写入摆放元数据；不负责创建最终视觉对象。
+- `2026-08-23` `WorldMap_Main.unity` 另有 `WorldMapPlacedFlowers/FlowerPlacementRegion_Angel` 与 `FlowerPlacementRegion_Demon`，每个节点由 `WorldMapFlowerPlacementRegion` + 禁用的 BoxCollider2D 作者化 owner 和可调范围。重跑 `WorldMapFlowerPlacementAuthoring` 只在节点首次创建或尺寸为空时写入默认左右半区，保留后续 Scene/Inspector 手调；控制器按所选花种 owner 限制完整 footprint。区域列表非空时区域是唯一判定来源，缺失引用或 owner 不匹配会直接失败并输出诊断；只有未配置任何区域的旧场景才回退 `FlowerPlacementBounds`。
 - `2026-08-14` `WorldMapPlacementSlot` / `WorldMapPlacedFlower` 已拆为独立脚本并使用稳定 GUID；运行时会校验 32 个槽位和每槽 36 个 `PlacedVisual_*` 绑定。点击提交期间暂缓同步摆放恢复事件，避免事件重入清空刚显示的槽位；槽位以显式占用状态参与同层冲突判定。若要验收鼠标端到端，必须使用仍有单花或花丛库存的 Play 存档。
 - `2026-08-14` 花朵遮挡修正：`WorldMapFlowerPlacementController` 使用 `Default` Sorting Layer；预览、已摆放花朵和恢复路径与桌宠共享 `BaselineItem.SortingOrder` 主层级，并按基线 Y 二次排序，完全同线时桌宠提高 1 个排序单位。`WorldMapPlacementSlot` 会递归同步花丛显示树内的所有 SpriteRenderer。AutoSetup 版本 63 已给 WorldMap 的两个桌宠根对象保存 `BaselineItem`，基线取碰撞体底部、`solidCollider=true` 并排除出可种植层。
 
 ### 2026-08-05 WorldMap 昼夜切换
 - `Assets/_Project/Scripts/Modules/WorldMap/WorldMapDayNightController.cs`：WorldMap 按 `IGameClock.Now` 切换夜幕。
 - `Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapDayNightAuthoring.cs`：将现有夜幕 Sprite 作者化为 `WorldMapNightOverlay`，设置覆盖范围、排序和当前本地时间初始状态。
-- `WorldMap_Main.unity` 已保存 `WorldMapNightOverlay`，引用 `天气（最上层）/夜幕.png`，默认 06:00–18:00 为白天。
+- `WorldMap_Main.unity` 已保存 `WorldMapNightOverlay`，引用 `weather/夜幕.png`，默认 06:00–18:00 为白天；旧 `garden/天气（最上层）` 仅保留历史文件。
+- 2026-08-24 起，`WorldMapNightOverlay` 使用 `ProjectSettings/TagManager.asset` 中位于 `Default` 之后的专用 Sorting Layer；重新运行 `WorldMapDayNightAuthoring` 不会回退到 Default，夜幕可覆盖两名桌宠和花朵。
+
+### 2026-08-18 WorldMap 当地天气切换
+- 运行时入口：`Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherController.cs`、`WorldMapWeatherService.cs`、`OpenMeteoWeatherProvider.cs`；通过 `IWeatherProvider` 隔离网络请求，WMO weather code 归类为晴天或雨天。
+- Scene 作者化入口：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWeatherAuthoring.cs`；天气美术统一从 `Assets/_Project/Art/WorldMap/weather/` 获取，当前仅保存 `WorldMapWeatherRainOverlay` 的 `rain.png`，晴天在专用资源到位前使用场景底图，不再保留旧目录引用。
+- 默认配置为上海经纬度 `31.2304, 121.4737`、`timezone=auto`、30 分钟刷新；没有定位服务时这是可替换占位值。请求失败保留最近成功状态，首次失败使用晴天，避免断网时场景消失。
+- 运行时只切换已作者化 SpriteRenderer 的启用状态；不创建最终 GameObject、Sprite 或 UI。昼夜 `WorldMapNightOverlay` 仍由 `IGameClock` 独立控制。
 
 ### 2026-08-06 WorldMap 桌宠数字键动画调试
 - 运行时：`Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs`，挂在 `WorldMap_Main.unity/_SceneRoot`，只做当前联调用的数字键触发。
@@ -337,7 +369,13 @@ Updated: 2026-08-07
 - 点击入口：`Assets/_Project/Scripts/Modules/WorldMap/ClickableSceneObject.cs`；具体业务通过序列化 `UnityEvent` 后续接入。
 - 返回公寓入口：`Assets/_Project/Scripts/Modules/WorldMap/CabinReturnPortal.cs`，仍通过 `ISceneFlowService` 加载 `SceneId.Apartment`。
 - 场景作者化：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapInteractiveObjectAuthoring.cs`，由 `AutoSetup` 版本 31 调用。
-- 当前目标对象：`WorldMap_Main.unity` 中的 `室内`、`邮箱`、`大树 1`～`大树 5`；缩放参数和组件均应直接保存在 Scene 中。
+- 当前目标对象：`WorldMap_Main.unity` 中的 `室内`、`邮箱`、`大树 1`～`大树 5`；缩放参数和悬停组件均应直接保存在 Scene 中，点击入口暂不包含大树 1。
+
+#### 苹果树交互轮廓（2026-08-24）
+
+- `WorldMapInteractiveObjectAuthoring` 对 `大树 2`～`大树 5` 在编辑器阶段从 Sprite 透明度生成并保存 `PolygonCollider2D`，替换根节点旧 `BoxCollider2D`；透明区域不会再成为点击范围。
+- 轮廓只在作者化时生成，运行时不 `AddComponent` 或动态替换碰撞体；`WorldMapInteractiveObjectFeedback`、`ClickableSceneObject` 和 `AppleTreeInteractable` 继续读取同一个根节点碰撞体。
+- `大树 1` 仍保留原有 Scene 碰撞体用于悬停反馈，但没有苹果树或通用点击入口。若更换树 Sprite，需要重新运行作者化入口以重新保存轮廓。
 
 ### 2026-08-06 WorldMap 双宠动画调整场景
 - 专用场景：`Assets/_Project/Scenes/WorldMap/WorldMap_PetAnimationPreview.unity`。
@@ -345,3 +383,38 @@ Updated: 2026-08-07
 - 共享动画资源：`Assets/_Project/Animations/WorldMap/Pet/WorldMap_Angel.controller`、`WorldMap_Devil.controller` 及其引用的 `.anim`；预览场景和 `WorldMap_Main.unity` 直接引用同一份资源，不复制控制器或 Clip。
 - 作者化入口：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationPreviewAuthoring.cs`，菜单为 `Tools/Gemini-Lab/WorldMap/Create Pet Animation Preview Scene`。
 - 使用约束：应在共享 `.anim` / `.controller` 上调整动画以同步室外主场景；只调整预览场景的 Transform 或 SpriteRenderer 不会自动同步到 `WorldMap_Main`。
+
+### 2026-08-18 每日小结邮箱与自由行走
+- 每日小结数据与接口：`Assets/_Project/Scripts/Modules/EmotionGarden/EmotionFlowerModels.cs`、`IEmotionGardenService.cs`、`EmotionGardenService.cs`；存档字段为 `DailySummaries`，兼容旧存档缺失字段。
+- 提交后的即时保存由 `Assets/_Project/Scripts/Modules/Persistence/PersistenceBootstrap.cs` 监听 `EmotionFlowerSubmittedEvent` 并串行调用 `ISaveCoordinator.SaveAsync("autosave")`；`GeminiLab.Modules.Persistence.asmdef` 因此引用 EmotionGarden 模块。
+- 邮箱 UI 运行时脚本：`Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryMailboxPanel.cs`；Scene 作者化入口：`Assets/_Project/Scripts/Editor/SceneBootstrap/DailySummaryMailboxAuthoring.cs`；`WorldMap_Main.unity` Canvas 下保存 `Panel_DailySummaryMailbox`、`DailySummaryContent` 与隐藏 `WorldMapDailySummaryMailboxOpenTarget`。
+- `WorldMapDailySummaryMailboxOpenTarget.PanelOpenButton._panelId` 的实际序列化值必须是 `29`（`PanelId.DailySummaryMailbox`）；`Apartment_Main.unity` 的旧 `MailboxButton` 与同名面板保持 inactive，不再作为入口。
+- WorldMap 自由行走作者化入口：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorPetAnimationAuthoring.cs`；两个桌宠在 `WorldMap_Main.unity` 保存 `RandomWander`，动画仍复用 `Animations/WorldMap/Pet/WorldMap_Angel.controller` 与 `WorldMap_Devil.controller`。
+- `AutoSetup` 当前作者化版本为 66；运行时脚本不得创建最终 UI、Sprite 或 AnimatorController。
+### 2026-08-20 Apartment 遗留物系统
+- 业务模块：`Assets/_Project/Scripts/Modules/ApartmentKeepsake/`；UI Presenter 与视口输入桥在 `Assets/_Project/Scripts/Modules/HubUI/ApartmentKeepsakePresenter.cs`、`ApartmentViewportInputBridge.cs`。
+- Scene 作者化入口：`Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentKeepsakeAuthoring.cs`；目标场景 `Assets/_Project/Scenes/Apartment/Apartment_Main.unity`。
+- 关键 Scene 节点：`ArtGenerated/ApartmentKeepsakeWorldPresentation`、`UI_Sidebar/ApartmentKeepsakeOverlay`、`KeepsakeDetailPopup`、`KeepsakeGiftCollectionPanel`、`KeepsakeGiftCollectionButton`。详情弹窗使用 Canvas sorting order 103，避免被现有侧栏遮挡。
+- 规则与存档由 Service 负责；运行时 Presenter 不创建 GameObject、不写入最终 Sprite，仅切换作者化节点、填充 TMP 和更新按钮/槽位状态。
+### 2026-08-21 AI diary visual resources
+
+- `Assets/_Project/Art/WorldMap/AI_diary/` supplies the saved board, close button, tabs, notes, summary and character-card Sprites used by `WorldMap_Main.unity`.
+- `DailySummaryMailboxAuthoring` authors `DateButton`, `InputButton`, five target buttons and five matching preview views. `DailySummaryDetailPopup` only changes active state and text at runtime.
+- The outdoor mailbox remains the sole entry; the fixed `弹窗1.png` image is not used as popup content.
+### 2026-08-22 AI diary reference layout calibration
+
+- `DailySummaryMailboxAuthoring` now saves the reference-driven layout for `Title`, `DateButton`, `InputButton`, `AngelNoteButton`, `SummaryButton`, `DevilNoteButton`, `AngelCardButton`, `DevilCardButton` and `CloseButton` under `WorldMap_Main.unity/Canvas/Panel_DailySummaryMailbox/DailySummaryContent`.
+- The authored title is `AI每日小结`; the empty input state is the multi-line reminder to leave a sentence in the garden. Runtime still replaces these values with the persisted daily summary when data exists.
+- Button transition tint is disabled so the Sprite colors stay faithful to the AI diary art. The TMP font asset may gain glyph entries when Unity imports new Chinese text; this is expected and should remain serialized.
+
+### 2026-08-22 AI diary date list and popup
+
+- `Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryDateOption.cs` is the Scene-authored date-list item. Its Button, date TMP and selected/unselected visual references are serialized in `WorldMap_Main.unity`.
+- `DateListViewport`, `DateListContent`, `DateButton`, `InputButton` and `DateOption_03`~`DateOption_14` form the scrollable history list; the panel binds them through `_dateOptions`.
+- `PopupButton` uses `Assets/_Project/Art/WorldMap/AI_diary/弹窗.png`, while `DailySummaryDetailPopup.PopupView` uses `弹窗1.png`. `PopupContent` has no solid Image background.
+- `IEmotionGardenService.GetDailySummaryDates()` is a read-only query over persisted `DailySummaries`; selecting a date never changes the save model.
+
+### 2026-08-23 AI diary popup text overlay
+
+- `WorldMap_Main.unity/PopupContent/PopupBodyText` is a Scene-authored TMP overlay centered on the enlarged note resource. Keep it above `SummaryView`, `AngelNoteView` and `DevilNoteView` in the hierarchy.
+- `DailySummaryDetailPopup` hides the overlay for `DetailKind.Popup`, because `弹窗1.png` already contains its own text.

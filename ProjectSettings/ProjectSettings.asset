@@ -615,7 +615,7 @@ PlayerSettings:
     QNX: UNITY_MCP_READY
     Server: UNITY_MCP_READY
     Stadia: UNITY_MCP_READY
-    Standalone: 
+    Standalone: UNITY_MCP_READY
     VisionOS: UNITY_MCP_READY
     WebGL: UNITY_MCP_READY
     Windows Store Apps: UNITY_MCP_READY

@@ -69,6 +69,24 @@ namespace GeminiLab.Modules.EmotionGarden
         public float WorldY;
     }
 
+    /// <summary>
+    /// AI 每日小结的持久化结果。它与当天的情绪花绑定，但单独保存，
+    /// 这样邮箱展示不会依赖当前场景是否仍然打开。
+    /// </summary>
+    [Serializable]
+    public struct EmotionDailySummaryData
+    {
+        public string DateIso;
+        public string InputSentence;
+        public string EmotionType;
+        public string FlowerName;
+        public string FlowerDescription;
+        public string Summary;
+        public string AngelNote;
+        public string DevilNote;
+        public long GeneratedAtUtcTicks;
+    }
+
     /// <summary>情绪花提交成功。</summary>
     public readonly struct EmotionFlowerSubmittedEvent
     {

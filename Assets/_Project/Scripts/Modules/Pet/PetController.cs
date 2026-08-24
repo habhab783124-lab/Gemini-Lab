@@ -2676,6 +2676,7 @@ namespace GeminiLab.Modules.Pet
                    Mathf.Abs(previous.Mood - current.Mood) < 0.01f &&
                    Mathf.Abs(previous.Energy - current.Energy) < 0.01f &&
                    Mathf.Abs(previous.Satiety - current.Satiety) < 0.01f &&
+                   Mathf.Abs(previous.Relation - current.Relation) < 0.01f &&
                    previous.WorkRequested == current.WorkRequested &&
                    previous.TargetFurnitureId == current.TargetFurnitureId &&
                    previous.TargetFurnitureCategory == current.TargetFurnitureCategory &&

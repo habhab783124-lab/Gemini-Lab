@@ -12,6 +12,10 @@ namespace GeminiLab.Modules.Apple
         int Balance { get; }
         int InitialBalance { get; }
         int GenerationIntervalMinutes { get; }
+        int GenerationIntervalMinMinutes { get; }
+        int GenerationIntervalMaxMinutes { get; }
+        int MaxRoundsPerDay { get; }
+        /// <summary>兼容旧调用方的属性；新版需求不再限制未领取缓存上限。</summary>
         int MaxPendingPerTree { get; }
 
         void Add(int amount);

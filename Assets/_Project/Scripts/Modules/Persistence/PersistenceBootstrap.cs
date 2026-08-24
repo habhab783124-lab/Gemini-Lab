@@ -1,8 +1,12 @@
 #nullable enable
+using System;
+using System.Threading.Tasks;
 using GeminiLab.Core;
 using GeminiLab.Core.Events;
 using GeminiLab.Core.Persistence;
 using GeminiLab.Core.Time;
+using GeminiLab.Modules.ApartmentKeepsake;
+using GeminiLab.Modules.EmotionGarden;
 using UnityEngine;
 
 namespace GeminiLab.Modules.Persistence
@@ -15,6 +19,23 @@ namespace GeminiLab.Modules.Persistence
     /// </summary>
     public static class PersistenceBootstrap
     {
+        private const string AutoSlot = "autosave";
+        private static IDisposable? s_emotionSubmittedSubscription;
+        private static IDisposable? s_keepsakeChangedSubscription;
+        private static bool s_saveInProgress;
+        private static bool s_saveQueued;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            s_emotionSubmittedSubscription?.Dispose();
+            s_keepsakeChangedSubscription?.Dispose();
+            s_emotionSubmittedSubscription = null;
+            s_keepsakeChangedSubscription = null;
+            s_saveInProgress = false;
+            s_saveQueued = false;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Register()
         {
@@ -31,6 +52,11 @@ namespace GeminiLab.Modules.Persistence
 
             if (ServiceLocator.TryResolve(out ISaveCoordinator? _))
             {
+                if (ServiceLocator.TryResolve(out ISaveCoordinator? existingCoordinator) && existingCoordinator is not null)
+                {
+                    EnsureAutosaveSubscriptions(existingCoordinator);
+                }
+
                 return;
             }
 
@@ -48,14 +74,88 @@ namespace GeminiLab.Modules.Persistence
 
             ServiceLocator.TryResolve(out EventBus? eventBus);
 
-            ServiceLocator.Register<ISaveCoordinator>(new SaveCoordinator(saveSystem, registry, clock, eventBus));
+            var coordinator = new SaveCoordinator(saveSystem, registry, clock, eventBus);
+            ServiceLocator.Register<ISaveCoordinator>(coordinator);
+            EnsureAutosaveSubscriptions(coordinator);
             Debug.Log("[PersistenceBootstrap] SaveCoordinator registered.");
 
             // 创建自动存档/读档管理器
             var autoSaveGo = new GameObject("AutoSaveManager");
-            Object.DontDestroyOnLoad(autoSaveGo);
+            UnityEngine.Object.DontDestroyOnLoad(autoSaveGo);
             autoSaveGo.AddComponent<AutoSaveManager>();
             Debug.Log("[PersistenceBootstrap] AutoSaveManager created.");
+        }
+
+        internal static void EnsureAutosaveSubscriptions(ISaveCoordinator coordinator)
+        {
+            if (!ServiceLocator.TryResolve(out EventBus? eventBus) || eventBus is null)
+            {
+                return;
+            }
+
+            if (s_emotionSubmittedSubscription is null)
+            {
+                s_emotionSubmittedSubscription = eventBus.Subscribe<EmotionFlowerSubmittedEvent>(
+                    _ => QueueAutosave(coordinator));
+                Debug.Log("[PersistenceBootstrap] 已绑定情绪提交 autosave。");
+            }
+
+            if (s_keepsakeChangedSubscription is null)
+            {
+                s_keepsakeChangedSubscription = eventBus.Subscribe<ApartmentKeepsakeStateChangedEvent>(evt =>
+                {
+                    if (evt.RequestAutosave)
+                    {
+                        QueueAutosave(coordinator);
+                    }
+                });
+                Debug.Log("[PersistenceBootstrap] 已绑定遗留物状态 autosave。");
+            }
+        }
+
+        // 保留旧入口，避免已有调试调用失效。
+        internal static void EnsureEmotionAutosaveSubscription(ISaveCoordinator coordinator)
+        {
+            EnsureAutosaveSubscriptions(coordinator);
+        }
+
+        private static void QueueAutosave(ISaveCoordinator coordinator)
+        {
+            if (s_saveInProgress)
+            {
+                s_saveQueued = true;
+                return;
+            }
+
+            s_saveInProgress = true;
+            _ = FlushAutosaveAsync(coordinator);
+        }
+
+        private static async Task FlushAutosaveAsync(ISaveCoordinator coordinator)
+        {
+            try
+            {
+                do
+                {
+                    s_saveQueued = false;
+                    await coordinator.SaveAsync(AutoSlot);
+                }
+                while (s_saveQueued);
+
+                Debug.Log("[PersistenceBootstrap] 即时 autosave 已完成。");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[PersistenceBootstrap] 即时 autosave 失败: {exception.Message}");
+            }
+            finally
+            {
+                s_saveInProgress = false;
+                if (s_saveQueued)
+                {
+                    QueueAutosave(coordinator);
+                }
+            }
         }
     }
 }

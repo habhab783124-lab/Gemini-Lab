@@ -23,6 +23,15 @@ namespace GeminiLab.Modules.EmotionGarden
         /// <summary>获取今天的情绪花（已提交则返回，否则 null）。</summary>
         EmotionFlowerData? GetTodayFlower();
 
+        /// <summary>获取指定日期的 AI 每日小结；没有记录时返回 null。</summary>
+        EmotionDailySummaryData? GetDailySummary(string dateIso);
+
+        /// <summary>获取已有 AI 每日小结的日期，按日期倒序排列。</summary>
+        IReadOnlyList<string> GetDailySummaryDates();
+
+        /// <summary>获取当前日期的 AI 每日小结；没有记录时返回 null。</summary>
+        EmotionDailySummaryData? GetTodayDailySummary();
+
         /// <summary>获取当前周编号（年份限定格式：年份*100+周号，如 202629）。</summary>
         int GetCurrentWeekId();
 

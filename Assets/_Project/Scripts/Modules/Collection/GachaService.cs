@@ -12,8 +12,8 @@ namespace GeminiLab.Modules.Collection
 {
     public sealed class GachaService : IGachaService, IPersistentService
     {
-        private const int SingleCost = 1;
-        private const int MultiCost = 5;
+        public const int SingleCost = 20;
+        public const int MultiCost = SingleCost * MultiCount;
         private const int MultiCount = 5;
         private const int DuplicateRefund = 30;
 
@@ -65,7 +65,7 @@ namespace GeminiLab.Modules.Collection
 
         public bool IsUnlocked(string collectibleId) => _unlocked.Contains(collectibleId);
 
-        public int CurrentCost(int count) => count switch { 1 => SingleCost, 5 => MultiCost, _ => count * SingleCost };
+        public int CurrentCost(int count) => count switch { 1 => SingleCost, 5 => MultiCost, _ => Mathf.Max(0, count) * SingleCost };
 
         public bool CanPull(int count)
         {

@@ -29,6 +29,7 @@ namespace GeminiLab.Modules.EmotionGarden
         private readonly Dictionary<string, ClusterProgress> _clusters = new(); // key: "emotionType|owner"
         private readonly Dictionary<string, PlacementFlowerInventory> _placementInventories = new();
         private readonly List<PlacedEmotionFlower> _placedFlowers = new();
+        private readonly List<EmotionDailySummaryData> _dailySummaries = new();
 
         string IPersistentService.Key => "emotion-garden";
 
@@ -77,6 +78,8 @@ namespace GeminiLab.Modules.EmotionGarden
             _lastSubmitDateIso = today;
             _flowers.Add(flower);
 
+            UpsertDailySummary(BuildDailySummary(flower));
+
             _eventBus?.Publish(new EmotionFlowerSubmittedEvent(flower));
 
             Debug.Log($"[EmotionGarden] 提交情绪: {flower.FlowerName} ({flower.EmotionType}/{flower.Owner})");
@@ -92,6 +95,43 @@ namespace GeminiLab.Modules.EmotionGarden
                 if (_flowers[i].DateIso == today) return _flowers[i];
             }
             return null;
+        }
+
+        public EmotionDailySummaryData? GetDailySummary(string dateIso)
+        {
+            if (string.IsNullOrWhiteSpace(dateIso)) return null;
+
+            for (int i = _dailySummaries.Count - 1; i >= 0; i--)
+            {
+                if (string.Equals(_dailySummaries[i].DateIso, dateIso, StringComparison.Ordinal))
+                {
+                    return _dailySummaries[i];
+                }
+            }
+
+            return null;
+        }
+
+        public IReadOnlyList<string> GetDailySummaryDates()
+        {
+            var dates = new List<string>(_dailySummaries.Count);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var summary in _dailySummaries)
+            {
+                if (!string.IsNullOrWhiteSpace(summary.DateIso) && seen.Add(summary.DateIso))
+                {
+                    dates.Add(summary.DateIso);
+                }
+            }
+
+            dates.Sort(StringComparer.Ordinal);
+            dates.Reverse();
+            return dates;
+        }
+
+        public EmotionDailySummaryData? GetTodayDailySummary()
+        {
+            return _clock == null ? null : GetDailySummary(_clock.TodayIso);
         }
 
         public int GetCurrentWeekId()
@@ -181,7 +221,7 @@ namespace GeminiLab.Modules.EmotionGarden
             _placementInventories[PlacementInventoryKey(f.EmotionType, f.Owner)] = inventory;
             if (ServiceLocator.TryResolve(out IAppleService? apples) && apples is not null)
             {
-                apples.Add(1);
+                apples.Add(12);
             }
             _eventBus?.Publish(new EmotionFlowerBloomedEvent(f.FlowerId));
             PublishPlacementInventoryChanged(inventory);
@@ -329,6 +369,7 @@ namespace GeminiLab.Modules.EmotionGarden
             _clusters.Clear();
             _placementInventories.Clear();
             _placedFlowers.Clear();
+            _dailySummaries.Clear();
             _lastSubmitDateIso = string.Empty;
             _eventBus?.Publish(new EmotionFlowerPlacementInventoryChangedEvent(default));
             _eventBus?.Publish(new EmotionFlowerPlacementsChangedEvent());
@@ -347,7 +388,8 @@ namespace GeminiLab.Modules.EmotionGarden
                 Flowers = new List<EmotionFlowerData>(_flowers),
                 Clusters = new List<ClusterProgress>(_clusters.Values),
                 PlacementInventories = new List<PlacementFlowerInventory>(_placementInventories.Values),
-                PlacedFlowers = new List<PlacedEmotionFlower>(_placedFlowers)
+                PlacedFlowers = new List<PlacedEmotionFlower>(_placedFlowers),
+                DailySummaries = new List<EmotionDailySummaryData>(_dailySummaries)
             };
             return JsonUtility.ToJson(save);
         }
@@ -429,6 +471,33 @@ namespace GeminiLab.Modules.EmotionGarden
                         _placedFlowers.Add(normalized);
                         occupiedSlots.Add(normalized.SlotIndex);
                     }
+                }
+
+                _dailySummaries.Clear();
+                if (save.DailySummaries != null)
+                {
+                    var seenDates = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var summary in save.DailySummaries)
+                    {
+                        if (string.IsNullOrWhiteSpace(summary.DateIso) || !seenDates.Add(summary.DateIso))
+                        {
+                            continue;
+                        }
+
+                        _dailySummaries.Add(summary);
+                    }
+                }
+
+                // 兼容在每日小结功能加入前已经存在的情绪花：下次打开邮箱时也能看到可读的小结。
+                for (int i = 0; i < _flowers.Count; i++)
+                {
+                    EmotionFlowerData flower = _flowers[i];
+                    if (string.IsNullOrWhiteSpace(flower.DateIso) || GetDailySummary(flower.DateIso).HasValue)
+                    {
+                        continue;
+                    }
+
+                    UpsertDailySummary(BuildDailySummary(flower));
                 }
 
                 _eventBus?.Publish(new EmotionFlowerPlacementInventoryChangedEvent(default));
@@ -542,6 +611,57 @@ namespace GeminiLab.Modules.EmotionGarden
             _eventBus?.Publish(new EmotionFlowerPlacementInventoryChangedEvent(inventory));
         }
 
+        private void UpsertDailySummary(EmotionDailySummaryData summary)
+        {
+            for (int i = 0; i < _dailySummaries.Count; i++)
+            {
+                if (!string.Equals(_dailySummaries[i].DateIso, summary.DateIso, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                _dailySummaries[i] = summary;
+                return;
+            }
+
+            _dailySummaries.Add(summary);
+        }
+
+        private EmotionDailySummaryData BuildDailySummary(EmotionFlowerData flower)
+        {
+            string input = string.IsNullOrWhiteSpace(flower.EmotionDetail)
+                ? "今天还没有写下具体心情。"
+                : flower.EmotionDetail.Trim();
+            string emotion = EmotionFlowerCatalog.ResolveEmotionDisplayName(flower.EmotionType);
+            string flowerName = string.IsNullOrWhiteSpace(flower.FlowerName)
+                ? EmotionFlowerCatalog.ResolveFlowerName(flower.EmotionType, flower.Owner)
+                : flower.FlowerName;
+            string description = $"这是一朵记录{emotion}的{flowerName}，把今天的心情留在花园里。";
+
+            return new EmotionDailySummaryData
+            {
+                DateIso = flower.DateIso,
+                InputSentence = TrimSummary(input, 120),
+                EmotionType = emotion,
+                FlowerName = flowerName,
+                FlowerDescription = TrimSummary(description, 80),
+                Summary = TrimSummary($"今天的{emotion}从“{input}”开始，最后在{flowerName}里留下了温柔的回声。", 60),
+                AngelNote = TrimSummary($"天使日记：我看见你认真照顾自己的情绪。{flowerName}替你收好这份心意，明天也可以慢慢来。", 80),
+                DevilNote = TrimSummary($"恶魔日记：别急着给今天下结论。你已经把“{input}”说出来了，这就足够让{flowerName}替你守住一点勇气。", 80),
+                GeneratedAtUtcTicks = _clock?.UtcNow.Ticks ?? DateTime.UtcNow.Ticks
+            };
+        }
+
+        private static string TrimSummary(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+            {
+                return value;
+            }
+
+            return value.Substring(0, Math.Max(1, maxLength - 1)) + "…";
+        }
+
         private static string ClusterKey(string emotionType, string owner) => $"{emotionType}|{owner}";
         private static string PlacementInventoryKey(string emotionType, string owner) => $"{emotionType}|{owner}";
 
@@ -556,6 +676,7 @@ namespace GeminiLab.Modules.EmotionGarden
             public List<ClusterProgress> Clusters = new();
             public List<PlacementFlowerInventory> PlacementInventories = new();
             public List<PlacedEmotionFlower> PlacedFlowers = new();
+            public List<EmotionDailySummaryData> DailySummaries = new();
         }
     }
 }

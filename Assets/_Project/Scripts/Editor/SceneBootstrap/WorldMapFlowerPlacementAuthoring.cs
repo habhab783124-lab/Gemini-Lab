@@ -24,6 +24,7 @@ namespace GeminiLab.Editor.SceneBootstrap
         private const string ScenePath = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
         private const string ArrangeArtDir = "Assets/_Project/Art/WorldMap/arrange";
         private const string FlowerCodexArtDir = "Assets/_Project/Art/WorldMap/花朵图鉴";
+        private const string PlacementSingleArtDir = FlowerCodexArtDir + "/花朵放置";
         private const string GridMaterialPath = ArrangeArtDir + "/PlacementGrid.mat";
         private const string GridReferencePath = "Assets/_Project/Art/WorldMap/garden/中景/花丛.png";
         private const int PlacementSlotCount = 32;
@@ -105,6 +106,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             }
 
             var surface = EnsurePlacementBounds();
+            var regions = EnsurePlacementRegions(root.transform, surface);
             var grid = EnsurePlacementGrid(root.transform);
             var material = EnsureGridMaterial();
             ConfigureGrid(grid, surface, material);
@@ -122,6 +124,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             SetObject(so, "_previewRoot", previewRoot);
             SetObject(so, "_placementRoot", root.transform);
             SetObject(so, "_placementSurface", surface);
+            ConfigurePlacementRegions(so, regions);
             SetObject(so, "_statusText", statusText);
             SetObject(so, "_hintBubble", hintBubble);
             so.FindProperty("_gridOrigin")!.vector2Value = Vector2.zero;
@@ -272,7 +275,7 @@ namespace GeminiLab.Editor.SceneBootstrap
 
                 var entry = EnsureFlowerEntry(list, layer, i, displayName,
                     LoadSprite(FlowerCodexArtDir + "/花朵/" + ownerDisplay + "-" + emotion + ".PNG"),
-                    LoadSprite(FlowerCodexArtDir + "/花枝/" + ownerDisplay + "-" + emotion + "（完整）.PNG"),
+                    LoadSprite(PlacementSingleArtDir + "/" + ownerDisplay + "-" + emotion + ".PNG"),
                     LoadSprite(FlowerCodexArtDir + "/花丛/" + ownerDisplay + "-" + emotion + "（花丛）.PNG"));
 
                 var option = options.GetArrayElementAtIndex(i);
@@ -766,18 +769,113 @@ namespace GeminiLab.Editor.SceneBootstrap
         private static BoxCollider2D EnsurePlacementBounds()
         {
             var boundsGo = GameObject.Find("FlowerPlacementBounds");
+            bool createdObject = boundsGo == null;
             if (boundsGo == null)
             {
                 boundsGo = new GameObject("FlowerPlacementBounds");
                 boundsGo.transform.position = new Vector3(0f, -3f, 0f);
             }
 
-            var box = GetOrAdd<BoxCollider2D>(boundsGo);
-            box.size = new Vector2(36f, 8.96f);
-            box.offset = Vector2.zero;
+            BoxCollider2D? existingBox = boundsGo.GetComponent<BoxCollider2D>();
+            bool initializeShape = createdObject || existingBox == null;
+            var box = existingBox ?? boundsGo.AddComponent<BoxCollider2D>();
+            if (initializeShape || box.size.sqrMagnitude <= 0.0001f)
+            {
+                box.size = new Vector2(36f, 8.96f);
+                box.offset = Vector2.zero;
+            }
             box.isTrigger = true;
             box.enabled = false;
             return box;
+        }
+
+        private static List<WorldMapFlowerPlacementRegion> EnsurePlacementRegions(
+            Transform parent,
+            Collider2D fallbackSurface)
+        {
+            Bounds fallbackBounds = GetAuthoringBounds(fallbackSurface);
+            float halfWidth = Mathf.Max(0.5f, fallbackBounds.size.x * 0.5f);
+            var regions = new List<WorldMapFlowerPlacementRegion>(2)
+            {
+                EnsurePlacementRegion(parent, "FlowerPlacementRegion_Angel",
+                    EmotionFlowerCatalog.OwnerAngel,
+                    new Vector2(fallbackBounds.min.x + halfWidth * 0.5f, fallbackBounds.center.y),
+                    new Vector2(halfWidth, fallbackBounds.size.y)),
+                EnsurePlacementRegion(parent, "FlowerPlacementRegion_Demon",
+                    EmotionFlowerCatalog.OwnerDemon,
+                    new Vector2(fallbackBounds.min.x + halfWidth + halfWidth * 0.5f, fallbackBounds.center.y),
+                    new Vector2(halfWidth, fallbackBounds.size.y))
+            };
+
+            return regions;
+        }
+
+        private static WorldMapFlowerPlacementRegion EnsurePlacementRegion(
+            Transform parent,
+            string name,
+            string owner,
+            Vector2 defaultCenter,
+            Vector2 defaultSize)
+        {
+            Transform? existing = parent.Find(name);
+            bool createdObject = existing == null;
+            GameObject regionObject = existing != null
+                ? existing.gameObject
+                : EnsureChild(parent, name, 0);
+            WorldMapFlowerPlacementRegion? existingRegion =
+                regionObject.GetComponent<WorldMapFlowerPlacementRegion>();
+            var region = existingRegion ?? GetOrAdd<WorldMapFlowerPlacementRegion>(regionObject);
+            BoxCollider2D? existingBox = regionObject.GetComponent<BoxCollider2D>();
+            var box = existingBox ?? regionObject.AddComponent<BoxCollider2D>();
+
+            Vector3 serializedPosition = regionObject.transform.localPosition;
+            if (regionObject.transform is RectTransform existingRectTransform)
+                serializedPosition = existingRectTransform.anchoredPosition;
+            bool isLegacyZeroOffset = existingRegion != null &&
+                                      existingRegion.DefaultsInitialized &&
+                                      box.offset.sqrMagnitude <= 0.0001f &&
+                                      serializedPosition.sqrMagnitude > 0.0001f;
+            bool initializeShape = createdObject || existingRegion == null ||
+                                   !existingRegion.DefaultsInitialized || isLegacyZeroOffset;
+
+            if (initializeShape || box.size.sqrMagnitude <= 0.0001f)
+            {
+                regionObject.transform.localPosition = Vector3.zero;
+                if (regionObject.transform is RectTransform rectTransform)
+                {
+                    rectTransform.anchorMin = Vector2.zero;
+                    rectTransform.anchorMax = Vector2.zero;
+                    rectTransform.pivot = Vector2.zero;
+                    rectTransform.anchoredPosition = Vector2.zero;
+                }
+                regionObject.transform.rotation = Quaternion.identity;
+                regionObject.transform.localScale = Vector3.one;
+                box.size = defaultSize;
+                Vector3 localCenter = regionObject.transform.InverseTransformPoint(
+                    new Vector3(defaultCenter.x, defaultCenter.y, 0f));
+                box.offset = new Vector2(localCenter.x, localCenter.y);
+            }
+
+            box.isTrigger = true;
+            box.enabled = false;
+            var serialized = new SerializedObject(region);
+            serialized.FindProperty("_owner")!.stringValue = EmotionFlowerCatalog.NormalizeOwner(owner);
+            serialized.FindProperty("_boundsCollider")!.objectReferenceValue = box;
+            serialized.FindProperty("_defaultsInitialized")!.boolValue = true;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(region);
+            EditorUtility.SetDirty(box);
+            return region;
+        }
+
+        private static void ConfigurePlacementRegions(
+            SerializedObject controller,
+            List<WorldMapFlowerPlacementRegion> regions)
+        {
+            var property = controller.FindProperty("_placementRegions")!;
+            property.arraySize = regions.Count;
+            for (int i = 0; i < regions.Count; i++)
+                property.GetArrayElementAtIndex(i)!.objectReferenceValue = regions[i];
         }
 
         private static Material? EnsureGridMaterial()
@@ -816,8 +914,8 @@ namespace GeminiLab.Editor.SceneBootstrap
                     definitions.Add(new FlowerDefinition
                     {
                         Id = owner + "|" + emotion,
-                        SingleSprite = LoadSprite(FlowerCodexArtDir + "/花枝/" +
-                                                   ownerDisplay + "-" + emotion + "（完整）.PNG"),
+                        SingleSprite = LoadSprite(PlacementSingleArtDir + "/" +
+                                                   ownerDisplay + "-" + emotion + ".PNG"),
                         ClusterSprite = LoadSprite(FlowerCodexArtDir + "/花丛/" +
                                                     ownerDisplay + "-" + emotion + "（花丛）.PNG")
                     });

@@ -9,6 +9,9 @@ namespace GeminiLab.Modules.Apple
     {
         public string TreeId;
         public long LastGeneratedUtcTicks;
+        public long NextGenerationUtcTicks;
+        public string GenerationDayKey;
+        public int GeneratedRoundsToday;
         public int PendingCount;
         public int TotalCollected;
     }

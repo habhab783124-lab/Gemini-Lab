@@ -1,19 +1,34 @@
 # Gemini-Lab 人工验证清单
 
-Updated: 2026-08-07
+## 室内家具选中反馈（任务 2）
 
-## B18. 苹果资源系统（2026-08-14）
+| 验收项 | 状态 | 说明 |
+|---|---|---|
+| 点击现有家具显示其外轮廓描边和对应句子；切换家具只保留一个选中状态 | 待 Play 验证 | 通过 `ApartmentViewportInputBridge` 与 `ClickOcclusionUtility` 路由 |
+| 点击视口空白清除描边和句子 | 待 Play 验证 | 运行时只切换 Scene 中已作者化节点 |
+| 场景中存在 `ApartmentFurnitureSelection`、`FurnitureSelectionHighlight`、`FurnitureSelectionMessage` | 已通过静态契约 | 原 9 个目标加现有 `家具_装饰_储物的家具_恶魔_01` 共 10 个目标已落盘；仍需 Play 目视确认点击反馈 |
+
+Updated: 2026-08-22
+
+## B18 Play verification addendum (2026-08-18)
+
+- Unity MCP Play verification confirmed outdoor `WorldMap_Main/室外背景/邮箱` routes through the serialized `WorldMapDailySummaryMailboxOpenTarget` to `Panel_DailySummaryMailbox`; the Apartment legacy entry is inactive.
+- Both WorldMap pets have serialized `RandomWander` bounds X -18..18 and horizontal baseline Y -1.75. Their transforms changed during Play; `Pet_Angel` reported `IsMoving=true`, `MoveX=1`, `MoveDir=2` while moving.
+- Daily-summary submission/autosave and restore remain covered by `EmotionGardenPlacementPersistenceTests` (5/5). The runtime probe was non-destructive and did not submit test data.
+
+## B18. 苹果资源系统（2026-08-18 按新版需求修正）
 
 | 检查项 | 结果 | 备注 |
 | :--- | :--- | :--- |
 | 新档进入游戏后苹果余额为 20，Apartment 四个资源栏复用原有 `BalanceLabel` 显示 `20` | 脚本与场景通过，Play 待目视 | `AppleRuntimeBootstrap` 已保存到 `Boot/BootstrapRoot`，不再新增 `AppleBalanceLabel` |
-| 等待或用开发者时钟快进 6 小时后点击「大树 1」～「大树 5」，树缓存苹果转入余额 | 未验证 | 每棵树每 6 小时 1 个、单树最多缓存 3 个；需在 WorldMap PlayMode 逐棵点击 |
-| 同一棵树重复点击不会重复领取；退出并重启后未领取缓存仍保留 | 未验证 | 检查 `apple` 存档中的 TreeId、LastGeneratedUtcTicks、PendingCount |
-| 花朵首次成熟奖励 1 个苹果，重复成熟不重复奖励 | 脚本通过 | `EmotionGardenService.BloomAt` 只在状态首次转为 Bloomed 时调用 `IAppleService.Add(1)` |
-| 扭蛋单抽/五连分别消耗 1/5 个苹果；余额不足按钮不可用且服务不扣余额 | 脚本通过，Play 待目视 | 四个页面资源栏和 GachaPanel 都读取苹果余额，文本只显示数字；金币服务不再驱动该资源栏 |
-| 塔罗开始抽牌消耗 1 个苹果；余额不足不进入选牌；解读完成后不会自动再扣一枚苹果 | 脚本通过，Play 待目视 | `TarotService.CreateSession` 扣费，面板回到 Idle 等待下一次明确点击 |
-| AppleService Capture/Restore 往返后余额、树缓存和时间戳一致 | 通过 | `AppleResourceServiceTests` 覆盖 |
-| Scene 与 Play 视图未新增运行时树/苹果/UI 视觉对象 | 脚本与场景通过 | 运行时只更新 Scene 中已有 `BalanceLabel` 文本和树交互状态 |
+| 按开发者时钟快进 45–90 分钟后点击「大树 2」～「大树 5」，树缓存苹果转入余额 | 脚本通过，Play 待目视 | 苹果树每轮 45–90 分钟、每天最多 5 轮、每轮 70% 为 1 个/30% 为 2 个；大树 1 不参与苹果逻辑 |
+| 同一棵树重复点击不会重复领取；退出并重启后未领取缓存仍保留 | 脚本通过，Play 待目视 | 检查 `apple` 存档中的 TreeId、NextGenerationUtcTicks、GenerationDayKey、GeneratedRoundsToday、PendingCount |
+| 花朵首次成熟奖励 12 个苹果，重复成熟不重复奖励 | 脚本通过 | `EmotionGardenService.BloomAt` 只在状态首次转为 Bloomed 时调用 `IAppleService.Add(12)` |
+| 扭蛋单抽/五连分别消耗 20/100 个苹果；余额不足按钮不可用且服务不扣余额 | 脚本通过，Play 待目视 | 四个页面资源栏和 GachaPanel 都读取苹果余额，文本只显示数字；金币服务不再驱动该资源栏 |
+| 塔罗开始抽牌消耗 8 个苹果；余额不足不进入选牌；解读完成后不会自动再扣一枚苹果 | 脚本通过，Play 待目视 | `TarotService.CreateSession` 扣费，面板回到 Idle 等待下一次明确点击 |
+| 大树 2～5 无可领取苹果时显示“还没成熟哦”并播放两片落叶；有缓存时一次领取全部 | 场景与脚本通过，Play 待目视 | `AppleTreeFeedback` 的文本和两片落叶节点由 WorldMap Scene 作者化，运行时只切换显示和位移动画；大树 1 无该反馈 |
+| AppleService Capture/Restore 往返后余额、树缓存、轮次和时间戳一致 | 通过 | `AppleResourceServiceTests` 覆盖新版存档字段及旧版迁移 |
+| Scene 与 Play 视图未新增运行时树/苹果/UI 视觉对象 | 脚本与场景通过 | 运行时只更新 Scene 中已有 `BalanceLabel` 和苹果树反馈节点状态 |
 
 ## 使用方式
 - 人工验证后直接在“结果”列填写：`通过` / `不通过` / `未验证`
@@ -135,7 +150,7 @@ Updated: 2026-08-07
 | 悬停邮箱和 5 棵大树时出现缩放反馈，移出后恢复原始大小 | 未验证 | 需要 Unity PlayMode 人工移动鼠标确认 |
 | UI 覆盖对象时不触发错误缩放，其他场景碰撞体不会阻断目标悬停 | 未验证 | 需要 Unity PlayMode 与 Canvas / 花丛重叠区域人工确认 |
 | 点击 `室内` 可以加载 `Apartment_Main` | 未验证 | 需要从 WorldMap PlayMode 点击室内确认 |
-| 点击邮箱和 5 棵大树能看到 `[ClickableSceneObject]` 占位日志 | 未验证 | 具体业务交互尚未由策划确定 |
+| 点击邮箱和大树 2～5 能看到 `[ClickableSceneObject]` 占位日志，大树 1 不触发点击入口 | 未验证 | 大树 1 的交互尚未由策划确定，暂不绑定苹果或通用点击逻辑 |
 
 ## B3. 塔罗垂直切片（B1 2026-05-10 新增）
 | 检查项 | 结果 | 备注 |
@@ -264,7 +279,7 @@ Updated: 2026-08-07
 适用范围：
 - 本节只验证非美术技术链路，不验证 `profile`、`spacesystem`、`tarot` 美术资源落图。
 - 当前脚本级静态检查已执行：`git diff --check` 通过。
-- 当前未能在本机调用 Unity Editor / `unity-mcp-cli` 实跑 Unity Test Runner，EditMode / PlayMode 结果需在 Unity 内补验。
+- 当前已可通过 Unity MCP / `unity-mcp-cli` 实跑 Unity Test Runner；EditMode 定向结果已记录，PlayMode 仍需在 Unity 内补验。
 
 | 检查项 | 结果 | 备注 |
 | :--- | :--- | :--- |
@@ -455,11 +470,15 @@ Updated: 2026-08-07
 | 同种单花数量不少于 3 时，点击合成只生成 1 个花丛并即时刷新数量 | 脚本通过，Play 待验证 | 合成直接调用共享服务，原子扣除 3 个单花并增加 1 个花丛；不再只改当前会话本地变量 |
 | 摆放单花/花丛后对应共享库存减 1，退出并重新进入后数量保持 | 脚本通过，Play 待验证 | 成功摆放原子扣库存并串行 autosave；应用重启后应恢复原槽位和世界坐标，且不二次扣库存 |
 | 同种单花不足 3 朵时显示 `组 5.png` 规则提示气泡 | 未验证 | 需在 PlayMode 用不足库存触发 |
+| 选择单花或花丛后右侧库存侧栏自动收起，半透明预览和当前选中状态保留 | 代码修复，需有库存的 Play 存档复测 | 对应新版需求“选择形态后底栏自动收起”；重新点击“布置”可更换花种 |
 | 选择单花或花丛后显示半透明 Scene 预览 | 未验证 | 预览变体已作者化在 `FlowerPlacementPreview`，运行时只切换显隐和颜色透明度 |
 | 预览位置按花丛 Sprite 完整尺寸在 X/Y 两轴网格吸附 | 脚本与场景通过，Play 待目视 | `PlacementGrid.mat`、10 条竖线、5 条横线已保存；单元尺寸为 `4.01 x 2.24` |
 | 点击有效草地后使用预置槽显示正式花卉 | 代码修复，需有库存的 Play 存档复测 | 启动日志已确认 `32/32` 槽位、`1152` 个绑定；`WorldMapPlacementSlot` 直接验证可进入占用状态；不使用运行时 Instantiate |
-| 点击无效区域不会落位或残留预览 | 未验证 | 有效区域由独立 `FlowerPlacementBounds` 提供，不复用宠物移动边界 |
-| 放置模式显示覆盖区域的完整二维网格线 | 脚本与场景通过，Play 待目视 | `FlowerPlacementGrid` 下已保存 10 条竖线和 5 条横线 |
+| 点击无效区域不会落位或残留预览 | 未验证 | 配置区域列表时只使用匹配 owner 的 `FlowerPlacementRegion_Angel` / `FlowerPlacementRegion_Demon`；仅无区域旧场景回退 `FlowerPlacementBounds`，不复用宠物移动边界 |
+| Scene 中可以直接调整 `FlowerPlacementBounds`、`FlowerPlacementRegion_Angel`、`FlowerPlacementRegion_Demon` 的 Transform/BoxCollider2D，重跑作者化不覆盖手调尺寸 | 未验证 | 需在 Scene 调整尺寸后重新运行 WorldMap 花朵作者化并检查 Inspector |
+| 天使花只能落在 Angel 区、恶魔花只能落在 Demon 区，跨区或 footprint 越界均显示无效 | 未验证 | 需分别选天使/恶魔单花和花丛，在两区边界与角落拖动预览并点击 |
+| 放置系统的单花预览、侧栏单花卡和已摆放单花使用 `花朵图鉴/花朵放置` 下 18 张资源 | 脚本与场景通过，Play 待目视 | 已确认 9 种情绪 × 天使/恶魔的 18 个新 Sprite 均有 Scene 引用；花丛和花种列表图标保持原目录 |
+| 放置模式不显示抽象二维网格线，但预览仍按内部网格吸附 | 代码与场景通过，Play 待目视 | `FlowerPlacementGrid` 下的线条仅作为作者化/调试资源保存，运行时保持隐藏 |
 | 点击有效位置后保持摆放模式，可以连续放置 | 代码修复，需有库存的 Play 存档复测 | 提交期间忽略同步摆放恢复事件重入，需确认每次点击消耗对应库存、占用下一个预置槽并写入版本 4 `PlacedFlowers` |
 | 摆放层与 `BaselineItem` 对齐，相邻层网格半格错位；同层同格不可重叠，跨层可形成遮挡；花朵与桌宠按同一基线决定前后 | 代码与场景通过，Play 待目视 | `Pet_Angel`、`Pet_Devil` 根对象已挂 `BaselineItem` 且保持 `solidCollider=true`；花朵与桌宠使用 `Default` Sorting Layer，先按 `BaselineItem.SortingOrder`，同排序值内按基线 Y（Y 越低越靠前），完全同线时桌宠略优先；需在 PlayMode 选择单花和花丛确认不同基线层及同层不同 Y 的相对遮挡 |
 | 花丛按场景“花丛 3”尺寸占用一个网格 | 未验证 | 需确认花丛预览/正式节点均以约 `3.99 x 2.22` Sprite 尺寸落位 |
@@ -472,7 +491,7 @@ Updated: 2026-08-07
 适用范围：
 - 目标场景：`Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity`
 - 时间规则：本地时间 06:00–18:00 为白天，18:00–次日 06:00 为夜晚
-- 夜幕资源：`Assets/_Project/Art/WorldMap/garden/天气（最上层）/夜幕.png`
+- 夜幕资源：`Assets/_Project/Art/WorldMap/weather/夜幕.png`（旧 `garden/天气（最上层）` 资源不作为来源）
 
 | 检查项 | 结果 | 备注 |
 | :--- | :--- | :--- |
@@ -482,6 +501,24 @@ Updated: 2026-08-07
 | 夜幕位于室外场景和桌宠上方、UI 下方 | 未验证 | SpriteRenderer sorting order 为 2000，UI 使用独立 Canvas |
 | 夜幕不阻挡宠物、场景物和花朵交互 | 未验证 | 夜幕 BoxCollider2D 已禁用 |
 | 跨越昼夜边界后运行时自动切换 | 未验证 | `WorldMapDayNightController` 每 5 秒检查 `IGameClock.Now` |
+
+## B15.1. WorldMap 当地天气切换（2026-08-18）
+
+适用范围：
+- 目标场景：`Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity`
+- 天气节点：`WorldMapWeatherRainOverlay`；晴天使用场景底图
+- 逻辑入口：`WorldMapWeatherController`、`WorldMapWeatherService`、`OpenMeteoWeatherProvider`
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| Scene 中仅存在雨天覆盖节点，且引用 `Assets/_Project/Art/WorldMap/weather/rain.png`；晴天不引用旧天气目录 | 已通过 | `WorldMapWeatherSunnyOverlay` 已移除，晴天由室外场景底图承担 |
+| Scene 中不存在旧 `garden/天气（最上层）/圖層 28.png` 的 Sprite GUID 引用 | 已通过 | 旧 GUID 扫描结果为 0 |
+| 控制器通过 Inspector 经纬度和 `timezone` 请求 Open-Meteo，默认刷新间隔为 30 分钟 | 已通过 | 默认上海 `31.2304, 121.4737` 是未接入定位服务前的占位配置 |
+| WMO 晴朗/多云/雾归类为 Sunny，降雨/雷暴归类为 Rainy | 已通过 | `WorldMapWeatherTests` 覆盖分类边界与 JSON 解析 |
+| 网络刷新成功时只启用对应天气 SpriteRenderer，另一层关闭 | 已通过 | Play 冒烟：默认 API 返回 code 3，晴天启用、雨天关闭 |
+| 网络失败时保留最近成功状态；首次失败回退 Sunny，不清空场景 | 已通过 | EditMode 服务缓存/失败测试覆盖 |
+| 天气覆盖与昼夜夜幕独立，Scene 与 Play 的节点结构一致 | 已通过 | 运行时只切换已作者化节点，不创建最终视觉对象 |
+| 天气美术统一从 `Assets/_Project/Art/WorldMap/weather/` 接入，且替换资源不需修改天气逻辑 | 已通过 | 当前雨天使用 `weather/rain.png`；新增天气资源后只需在 Scene/Inspector 更新对应覆盖节点引用 |
 
 ## B16. WorldMap 桌宠数字键动画调试（2026-08-06）
 适用范围：
@@ -522,3 +559,76 @@ Updated: 2026-08-07
 | 在 Animation 窗口编辑共享 `.anim` / `.controller` 后，室外主场景显示相同动画资源 | 未验证 | 需在 Unity 中修改后切换 `WorldMap_Main` 检查 |
 | Apartment 场景的宠物 Sprite / AnimatorController 未被预览场景新增引用 | 通过 | 预览场景只引用 `Art/WorldMap/pets` 与 `Animations/WorldMap/Pet` |
 | 预览场景 Play 视图和 Scene 视图均显示相同室外桌宠资源 | 未验证 | 需打开预览场景并进入 PlayMode 目视确认 |
+
+## B18. AI 每日小结邮箱与 WorldMap 自由行走（2026-08-18）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| WorldMap Scene 的 `室外背景/邮箱` 存在 `ClickableSceneObject`，且 UnityEvent 绑定到 `WorldMapDailySummaryMailboxOpenTarget.OnClick` | 通过 | WorldMap 场景 YAML 已保存 1 个持久化监听器；Play 中直接触发后 `DailySummaryContent` 为 active |
+| WorldMap Canvas 保存 `Panel_DailySummaryMailbox`、`DailySummaryContent` 和隐藏入口对象，入口 `PanelId` 为 `29` | 通过 | Scene/Play 视觉契约与运行时编译检查通过；Apartment 同名旧入口为 inactive |
+| 提交一条情绪后打开邮箱，显示当天输入、Summary、AngelNote、DevilNote | 已通过 MCP Play 路由/空状态验证；提交持久化由 5/5 定向测试覆盖 | 运行时仅填充已作者化 TMP 节点；未在用户存档中写入测试情绪 |
+| 情绪提交后立即写入 `autosave`，重启后邮箱仍显示同一天的小结，旧存档缺少小结字段时不报错 | 代码/定向测试通过；完整重启由用户最终验收 | `PersistenceBootstrap` 已绑定提交事件；`DailySummaries` 写入存档，旧花朵记录可生成兼容摘要 |
+| WorldMap 两只桌宠在无控制/无交互时于作者化边界内自由行走 | 已通过 MCP Play | 两只桌宠均在 X -18～18、Y -1.95～-1.65 内移动，水平基线为 Y -1.75 |
+| 桌宠移动时切换现有 Move 方向状态，停下时回到 Idle；点击控制后暂停漫游 | 已通过 MCP Play/Animator 参数 | 移动时实测 `IsMoving=true`、`MoveDir=2`；使用现有 `PetController` Animator 参数，不新增运行时视觉节点 |
+| Scene/Play 视觉契约、Unity 编译与任务闸门 | 已通过 | Scene/运行时契约、Unity 非编译状态、MCP 定向 EditMode 5/5 和闸门均通过；全量 EditMode 仍有既有 Furniture/MovingState 失败 |
+## B19. Apartment 遗留物系统首轮（2026-08-20）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| Apartment Scene 保存 `ApartmentKeepsakeWorldPresentation`、4 个纸条点位、6 个纪念物点位及 `ApartmentKeepsakeOverlay` | 待最终人工验收 | Scene/Inspector 中应能直接替换 Sprite 与位置 |
+| 首次进入室内当天只进行一次纸条判定，50% 出现且方向/文本随机，同日再次进入不重复抽取 | 定向 EditMode 已通过 | `ApartmentKeepsakeServiceTests` 覆盖日界线与刷新 |
+| Relation 44/45/79/80 边界、纪念物首保底与后续 50% 刷新 | 定向 EditMode 已通过 | 低于 45 不解锁，达到 80 转赠礼规则 |
+| 赠礼首次保底、后续每日 15% 且只抽未拥有项，重启后仍去重 | 定向 EditMode 已通过 | 收藏面板只显示已拥有槽位 |
+| RenderTexture 视口点击纸条/纪念物可打开详情弹窗，关闭按钮可用 | 待最终人工验收 | 输入统一经过 `ApartmentViewportInputBridge` |
+| Scene 与 Play 视觉契约、Unity 编译和 Play 启动 | 已通过自动检查 | Play smoke 已注册服务且无本任务异常；全量 EditMode 的 22 个旧 Furniture/MovingState 失败不属于本任务 |
+## B20. AI diary resource-specific enlarged previews (2026-08-21)
+
+| Check | Result | Notes |
+| :--- | :--- | :--- |
+| Outdoor mailbox opens the WorldMap daily-summary board using the `AI_diary` background and authored close/tabs | Pending final Play smoke | Scene contract checks that the Sprite references are saved in `WorldMap_Main.unity`. |
+| Clicking each note, summary or character card opens its own matching enlarged resource | Pending final Play smoke | Verify `angel_note`, `summary`, `devil_note`, `angel_card` and `devil_card` one-to-one; do not show fixed `弹窗1.png`. |
+| Popup close button and backdrop close return to the board without changing summary data | Pending final Play smoke | Runtime only toggles Scene-authored nodes and TMP text. |
+| Main board matches the reference composition: title, left tabs, three notes, two character cards and close button | Pending final Play smoke | Scene YAML contains the calibrated positions/sizes; open the mailbox in Scene and Play to compare against the reference image. |
+| Empty-state copy and selected tab read `今日小结` / `今天还没有写下心情，去花园留下一句话吧。` without duplicate legacy text | Pending final Play smoke | Runtime data still replaces the authored defaults when a persisted daily summary exists. |
+| AI diary buttons keep their imported colors while hovered or pressed | Passed by Scene authoring | `DailySummaryMailboxAuthoring` sets `Selectable.Transition.None`; verify once in Play. |
+
+## B21. AI diary date history and popup resource (2026-08-22)
+
+| Check | Result | Notes |
+| :--- | :--- | :--- |
+| Left panel shows a scrollable list of saved summary dates | Pending final Play smoke | Wheel over `DateListViewport`; items are Scene-authored and use `unselected.png` when not selected. |
+| Selected date uses `selected.png` and still shows its date | Pending final Play smoke | Click a second date after scrolling; selected state must move without creating a new item. |
+| SummaryView displays the AI summary for the selected date | Pending final Play smoke | Verify visible text changes to the selected `GetDailySummary(dateIso)` record. |
+| `PopupButton` opens the enlarged `弹窗1.png` resource | Pending final Play smoke | The button art is `弹窗.png`; the enlarged view is `PopupView`, not a fixed global popup image. |
+| Detail popup has no pure-color PopupContent background | Passed by Scene contract | `PopupContent` Image is disabled/transparent; only the authored resource and modal backdrop remain. |
+
+## B24. WorldMap 夜幕覆盖桌宠（2026-08-24）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| `WorldMapNightOverlay` 使用位于 `Default` 之后的专用 Sorting Layer | 已作者化，待 Play 目视 | Sorting Layer 与场景 SpriteRenderer 引用均已保存 |
+| 夜间夜幕覆盖背景、两名桌宠和已摆放花朵 | 待 Unity Play 验证 | 不能只确认背景变暗，需确认两名桌宠也被半透明夜幕着色 |
+| 白天夜幕隐藏、夜幕碰撞体禁用 | 待 Unity Play 验证 | `WorldMapDayNightController` 仍按 `IGameClock` 切换，夜幕不参与点击 |
+
+## B22. AI diary popup text overlay (2026-08-23)
+
+| Check | Result | Notes |
+| :--- | :--- | :--- |
+| SummaryView detail shows the selected date's summary on the enlarged paper | Pending final Play smoke | Text must be inside the `summary.png` paper, not below the popup. |
+| AngelNoteView and DevilNoteView show their corresponding note text on the paper | Pending final Play smoke | Text is the selected date's persisted AngelNote/DevilNote. |
+| `弹窗1.png` keeps only its baked-in message without duplicate dynamic text | Pending final Play smoke | The shared PopupBodyText is hidden for `DetailKind.Popup`. |
+
+## B23. WorldMap 苹果树轮廓点击范围（2026-08-24）
+
+适用范围：
+
+- 目标场景：`Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity`
+- 目标对象：`大树 2`、`大树 3`、`大树 4`、`大树 5`
+- 当前规则：点击和悬停都必须使用各自 Sprite 可见轮廓的 `PolygonCollider2D`；透明区域不应响应。
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 四棵苹果树根节点各有一个有效 `PolygonCollider2D`，不再有旧 `BoxCollider2D` | 已作者化，待 Play 目视 | 轮廓在编辑器阶段生成并保存到 Scene；静态扫描需确认四棵树各自只有一个 Collider2D |
+| 鼠标悬停在树的可见边缘时触发平滑放大，移出透明区域后恢复 | 未验证 | 需 Unity PlayMode 逐棵移动鼠标确认边缘覆盖 |
+| 点击四棵树的可见轮廓能进入现有苹果树点击入口，透明区域不触发 | 未验证 | 需使用有苹果树交互入口的 Play 存档验证；不改变苹果生成/领取规则 |
+| 大树 1 仍无苹果领取和通用点击入口 | 已静态确认 | 本轮只保留其既有悬停反馈 |

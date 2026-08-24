@@ -15,8 +15,9 @@ namespace GeminiLab.Editor.SceneBootstrap
     public static class WorldMapDayNightAuthoring
     {
         private const string ScenePath = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
-        private const string NightSpritePath = "Assets/_Project/Art/WorldMap/garden/天气（最上层）/夜幕.png";
+        private const string NightSpritePath = "Assets/_Project/Art/WorldMap/weather/夜幕.png";
         private const string OverlayName = "WorldMapNightOverlay";
+        private const string NightSortingLayerName = "WorldMapNightOverlay";
         private const float DayStartHour = 6f;
         private const float NightStartHour = 18f;
         private const int OverlaySortingOrder = 2000;
@@ -55,7 +56,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             PositionOverlay(overlayGo.transform);
 
             renderer.sprite = nightSprite;
-            renderer.sortingLayerName = "Default";
+            renderer.sortingLayerName = NightSortingLayerName;
             renderer.sortingOrder = OverlaySortingOrder;
 
             foreach (Collider2D collider in overlayGo.GetComponents<Collider2D>())

@@ -1,7 +1,10 @@
 # Gemini-Lab AI memory index
-# Updated: 2026-08-11
+# Updated: 2026-08-24
 
 AGENTS.md
+Assets/_Project/Scripts/Modules/HubUI/ApartmentFurnitureSelectionPresenter.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentFurnitureSelectionAuthoring.cs
+Assets/_Project/Scenes/Apartment/Apartment_Main.unity
 docs/current-task-card.md
 docs/current-task-card.json
 docs/workflow-context-packages.md
@@ -106,6 +109,7 @@ Assets/_Project/Scripts/Modules/WorldMap/WorldMapInteractiveObjectFeedback.cs
 Assets/_Project/Scripts/Modules/Apple/AppleService.cs
 Assets/_Project/Scripts/Modules/Apple/IAppleService.cs
 Assets/_Project/Scripts/Modules/Apple/AppleTreeInteractable.cs
+Assets/_Project/Scripts/Modules/Apple/AppleTreeFeedback.cs
 Assets/_Project/Scripts/Modules/Collection/AppleBalanceDisplay.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/BootAppleBootstrapAuthoring.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAppleTreeAuthoring.cs
@@ -127,12 +131,22 @@ Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapEmotionGardenUIPatch.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapFlowerPlacementAuthoring.cs
 Assets/_Project/Scripts/Editor/Tools/WorldMapFlowerSoilLayoutWindow.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapFlowerPlacementController.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapFlowerPlacementRegion.cs
 Assets/_Project/Tests/EditMode/EmotionGardenPlacementPersistenceTests.cs
+Assets/_Project/Tests/EditMode/WorldMapFlowerPlacementRegionTests.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapDayNightController.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapDayNightAuthoring.cs
-Assets/_Project/Art/WorldMap/garden/天气（最上层）/夜幕.png
+Assets/_Project/Art/WorldMap/weather/夜幕.png
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationTriggerAuthoring.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherModels.cs
+Assets/_Project/Scripts/Modules/WorldMap/IWeatherProvider.cs
+Assets/_Project/Scripts/Modules/WorldMap/OpenMeteoWeatherProvider.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherService.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherController.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWeatherAuthoring.cs
+Assets/_Project/Art/WorldMap/weather/rain.png
+Assets/_Project/Tests/EditMode/WorldMapWeatherTests.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapInteractiveObjectAuthoring.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationPreviewAuthoring.cs
 Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity#_SceneRoot
@@ -172,7 +186,35 @@ PackageBackups/NuGet-disabled-2026-06-02/README.md
 PackageBackups/NuGet-disabled-2026-06-02/NuGet.meta
 ProjectSettings/ProjectVersion.txt
 .cursor/mcp.json
+UserSettings/AI-Game-Developer-Config.json
+Packages/manifest.json (com.ivanmurzak.unity.mcp 0.88.0)
 tools/check-task-gate.ps1
+tools/task-card-utils.ps1
+tools/check-task-scope.ps1
+tools/verify-task.ps1
 tools/check-scene-visual-contract.ps1
 tools/check-runtime-visual-contract.ps1
+Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryMailboxPanel.cs
+Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryDetailPopup.cs
+Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryDateOption.cs
+Assets/_Project/Tests/EditMode/EmotionGardenDailySummaryTests.cs
+Assets/_Project/Scripts/Modules/EmotionGarden/IEmotionGardenService.cs (GetDailySummaryDates)
+Assets/_Project/Scripts/Modules/EmotionGarden/EmotionGardenService.cs (daily summary date query)
+Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryDetailPopup.cs.meta
+Assets/_Project/Art/WorldMap/AI_diary/
+Assets/TextMesh Pro/Resources/Fonts & Materials/LXGWWenKai SDF.asset (AI diary Chinese glyphs)
+Assets/_Project/Scripts/Modules/HubUI/PanelOpenButton.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/DailySummaryMailboxAuthoring.cs
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (WorldMap mailbox -> daily summary routing)
+Assets/_Project/Scripts/Editor/SceneBootstrap/AutoSetup.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorPetAnimationAuthoring.cs
+Assets/_Project/Scripts/Modules/Pet/PetPlayerInputController.cs
+Assets/_Project/Scripts/Modules/Persistence/PersistenceBootstrap.cs
+Assets/_Project/Scripts/Modules/Persistence/AutoSaveManager.cs
 tools/run-unity-editor-method.ps1
+Assets/_Project/Scripts/Modules/ApartmentKeepsake/ApartmentKeepsakeService.cs
+Assets/_Project/Scripts/Modules/ApartmentKeepsake/IApartmentKeepsakeService.cs
+Assets/_Project/Scripts/Modules/HubUI/ApartmentKeepsakePresenter.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentKeepsakeAuthoring.cs
+Assets/_Project/Scenes/Apartment/Apartment_Main.unity (ApartmentKeepsakeWorldPresentation / ApartmentKeepsakeOverlay)
+Assets/_Project/Art/WorldMap/ui1.0/

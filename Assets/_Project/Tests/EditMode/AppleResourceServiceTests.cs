@@ -23,7 +23,7 @@ namespace GeminiLab.Tests.EditMode
                 Now = new DateTime(2026, 8, 14, 8, 0, 0, DateTimeKind.Local),
                 UtcNow = new DateTime(2026, 8, 14, 0, 0, 0, DateTimeKind.Utc)
             };
-            _service = new AppleService(_clock, new EventBus());
+            _service = new AppleService(_clock, new EventBus(), randomSeed: 17);
         }
 
         [TearDown]
@@ -39,32 +39,40 @@ namespace GeminiLab.Tests.EditMode
         }
 
         [Test]
-        public void TreeGeneration_IsTimeBasedAndSurvivesSaveRestoreWithoutDuplication()
+        public void TreeGeneration_UsesFortyFiveToNinetyMinuteRoundsAndSurvivesRestore()
         {
             _service.EnsureTree("world_tree_1");
-            _clock.Advance(TimeSpan.FromHours(12));
+            _clock.Advance(TimeSpan.FromMinutes(91));
 
-            Assert.AreEqual(2, _service.GetPendingCount("world_tree_1"));
+            int generated = _service.GetPendingCount("world_tree_1");
+            Assert.That(generated, Is.InRange(1, 2));
+            AppleTreeState state = _service.GetTreeStates()[0];
+            long intervalMinutes = (state.NextGenerationUtcTicks - state.LastGeneratedUtcTicks) / TimeSpan.TicksPerMinute;
+            Assert.That(intervalMinutes, Is.InRange(45, 90));
             string saved = _service.CaptureJson();
 
-            var restored = new AppleService(_clock, new EventBus());
+            var restored = new AppleService(_clock, new EventBus(), randomSeed: 17);
             Assert.IsTrue(restored.RestoreJson(saved));
-            Assert.AreEqual(2, restored.GetPendingCount("world_tree_1"));
-            Assert.AreEqual(0, restored.ShakeTree("world_tree_1") - 2);
-            Assert.AreEqual(22, restored.Balance);
+            Assert.AreEqual(generated, restored.GetPendingCount("world_tree_1"));
+            Assert.AreEqual(generated, restored.ShakeTree("world_tree_1"));
+            Assert.AreEqual(20 + generated, restored.Balance);
             Assert.AreEqual(0, restored.ShakeTree("world_tree_1"));
         }
 
         [Test]
-        public void TreeGeneration_IsCappedAndOnlyShakeTransfersCachedApples()
+        public void TreeGeneration_IsCappedAtFiveRoundsPerDayAndUnclaimedApplesAccumulate()
         {
             _service.EnsureTree("world_tree_3");
-            _clock.Advance(TimeSpan.FromDays(10));
+            _clock.Advance(TimeSpan.FromDays(2).Add(TimeSpan.FromHours(18)));
 
-            Assert.AreEqual(3, _service.GetPendingCount("world_tree_3"));
+            int pending = _service.GetPendingCount("world_tree_3");
+            AppleTreeState state = _service.GetTreeStates()[0];
+            Assert.AreEqual(5, state.GeneratedRoundsToday);
+            Assert.That(pending, Is.GreaterThanOrEqualTo(5));
             Assert.AreEqual(20, _service.Balance);
-            Assert.AreEqual(3, _service.ShakeTree("world_tree_3"));
-            Assert.AreEqual(23, _service.Balance);
+            Assert.AreEqual(pending, _service.ShakeTree("world_tree_3"));
+            Assert.AreEqual(20 + pending, _service.Balance);
+            Assert.AreEqual(0, _service.ShakeTree("world_tree_3"));
         }
 
         [Test]
@@ -77,7 +85,7 @@ namespace GeminiLab.Tests.EditMode
         }
 
         [Test]
-        public void BloomingAFlowerRewardsOneAppleOnlyOnce()
+        public void BloomingAFlowerRewardsTwelveApplesOnlyOnce()
         {
             ServiceLocator.Register<IAppleService>(_service);
             var eventBus = new EventBus();
@@ -90,14 +98,22 @@ namespace GeminiLab.Tests.EditMode
                 EmotionFlowerData? flower = garden.SubmitEmotion("喜悦", "开心", "angel");
                 Assert.IsTrue(flower.HasValue);
                 Assert.IsTrue(garden.SetBloomed(flower!.Value.FlowerId));
-                Assert.AreEqual(21, _service.Balance);
+                Assert.AreEqual(32, _service.Balance);
                 Assert.IsFalse(garden.SetBloomed(flower.Value.FlowerId));
-                Assert.AreEqual(21, _service.Balance);
+                Assert.AreEqual(32, _service.Balance);
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(host);
             }
+        }
+
+        [Test]
+        public void ConsumerCosts_MatchAppleEconomyRequirements()
+        {
+            Assert.AreEqual(20, GeminiLab.Modules.Collection.GachaService.SingleCost);
+            Assert.AreEqual(100, GeminiLab.Modules.Collection.GachaService.MultiCost);
+            Assert.AreEqual(8, GeminiLab.Modules.Tarot.TarotService.DefaultSessionCost);
         }
     }
 }

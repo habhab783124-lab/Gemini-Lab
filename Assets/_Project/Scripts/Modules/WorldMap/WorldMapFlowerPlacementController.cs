@@ -147,6 +147,7 @@ namespace GeminiLab.Modules.WorldMap
         [SerializeField] private GameObject? _previewRoot;
         [SerializeField] private Transform? _placementRoot;
         [SerializeField] private Collider2D? _placementSurface;
+        [SerializeField] private List<WorldMapFlowerPlacementRegion> _placementRegions = new();
         [SerializeField] private Component? _statusText;
         [SerializeField] private GameObject? _hintBubble;
         [SerializeField] private List<WorldMapPlacementSlot> _placementSlots = new();
@@ -208,13 +209,16 @@ namespace GeminiLab.Modules.WorldMap
 
         public Vector2 CellSize => _cellSize;
         public bool IsSelecting => _isSelecting;
+        public bool UsesAuthoredPlacementRegions => HasPlacementRegionBindings;
 
         private void Awake()
         {
             _camera = Camera.main;
-            ValidateSceneBindings();
             ResolveSharedInventoryDependencies();
+            ResolvePlacementRegionsFallback();
             ResolvePlacementSurfaceFallback();
+            ValidateSceneBindings();
+            ValidatePlacementRegionBindings();
 
             _cellSize = new Vector2(Mathf.Max(0.05f, _cellSize.x), Mathf.Max(0.05f, _cellSize.y));
             for (int i = 0; i < _options.Count; i++)
@@ -267,6 +271,33 @@ namespace GeminiLab.Modules.WorldMap
                     ResolvePetSortingOrder(baseline.SortingOrder, baseline.EffectiveBaselineY),
                     _flowerSortingLayerName);
             }
+        }
+
+        private void ValidatePlacementRegionBindings()
+        {
+            if (!HasPlacementRegionBindings)
+            {
+                Debug.LogWarning("[WorldMapFlowerPlacement] Legacy placement fallback active: no authored placement regions are configured; FlowerPlacementBounds is used.");
+                return;
+            }
+
+            int validRegionCount = 0;
+            for (int i = 0; i < _placementRegions.Count; i++)
+            {
+                WorldMapFlowerPlacementRegion? region = _placementRegions[i];
+                if (region != null && region.BoundsCollider != null)
+                    validRegionCount++;
+            }
+
+            bool angelReady = ResolvePlacementRegion(EmotionFlowerCatalog.OwnerAngel) != null;
+            bool demonReady = ResolvePlacementRegion(EmotionFlowerCatalog.OwnerDemon) != null;
+            if (validRegionCount != _placementRegions.Count || !angelReady || !demonReady)
+            {
+                Debug.LogError($"[WorldMapFlowerPlacement] Placement region configuration invalid: {validRegionCount}/{_placementRegions.Count} references are valid, angel={angelReady}, demon={demonReady}. FlowerPlacementBounds will not be used as a fallback.");
+                return;
+            }
+
+            Debug.Log($"[WorldMapFlowerPlacement] Authored placement regions active: {_placementRegions.Count} regions. FlowerPlacementBounds is fallback-only.");
         }
 
         private void ValidateSceneBindings()
@@ -424,6 +455,9 @@ namespace GeminiLab.Modules.WorldMap
             SetHintVisible(false);
             SetPlacementMode(true);
             SetPlacementVisuals(true, option.Id + "|" + visualType);
+            // 需求流程要求选定单花/花丛后底部库存栏自动收起，
+            // 但当前选择和预览必须保留，玩家才能直接点击场景落位。
+            SetSidebarVisible(false);
             SetStatus("已选择 " + option.DisplayName + "·" +
                       (visualType == PlacementVisualType.Single ? "单花" : "花丛") +
                       "，点击草地区域摆放，按 Esc 退出");
@@ -469,6 +503,13 @@ namespace GeminiLab.Modules.WorldMap
         private void CommitPlacement(Vector2 position)
         {
             if (_selectedOption == null || !_selectedVisualType.HasValue) return;
+
+            if (!IsValidPlacement(position, _selectedFootprint))
+            {
+                SetHintVisible(true);
+                SetStatus("当前位置不属于该培育者的花园区域。 ");
+                return;
+            }
 
             ResolveSharedInventoryDependencies();
 
@@ -948,17 +989,28 @@ namespace GeminiLab.Modules.WorldMap
 
         private bool IsValidPlacement(Vector2 center, Vector2Int footprint)
         {
-            if (_placementSurface == null || _placementLayers.Count == 0) return false;
+            if (_placementLayers.Count == 0) return false;
 
             Vector2 size = Vector2.Scale((Vector2)footprint,
                 ResolveCellSize(_selectedVisualType ?? PlacementVisualType.Single));
-            Bounds bounds = GetPlacementBounds();
             Rect placement = new(new Vector2(center.x - size.x * 0.5f, center.y), size);
-            Rect surface = new(bounds.min, bounds.size);
             PlacementLayer layer = ResolvePlacementLayer(center.y);
-            if (placement.xMin < surface.xMin || placement.xMax > surface.xMax ||
-                center.y < surface.yMin || center.y > surface.yMax ||
-                center.x < layer.XMin || center.x > layer.XMax) return false;
+
+            if (HasPlacementRegionBindings)
+            {
+                WorldMapFlowerPlacementRegion? selectedRegion = ResolveSelectedPlacementRegion();
+                if (selectedRegion == null || !selectedRegion.Contains(placement)) return false;
+            }
+            else
+            {
+                if (_placementSurface == null) return false;
+
+                Bounds bounds = GetPlacementBounds();
+                Rect surface = new(bounds.min, bounds.size);
+                if (placement.xMin < surface.xMin || placement.xMax > surface.xMax ||
+                    center.y < surface.yMin || center.y > surface.yMax ||
+                    center.x < layer.XMin || center.x > layer.XMax) return false;
+            }
 
             for (int i = 0; i < _placementSlots.Count; i++)
             {
@@ -973,6 +1025,12 @@ namespace GeminiLab.Modules.WorldMap
 
         private Vector2 ResolveGridOrigin()
         {
+            if (HasPlacementRegionBindings)
+            {
+                WorldMapFlowerPlacementRegion? selectedRegion = ResolveSelectedPlacementRegion();
+                return selectedRegion != null ? selectedRegion.WorldBounds.min : _gridOrigin;
+            }
+
             if (_useSurfaceBoundsAsGridOrigin && _placementSurface != null)
                 return GetPlacementBounds().min;
             return _gridOrigin;
@@ -987,9 +1045,71 @@ namespace GeminiLab.Modules.WorldMap
                 _placementSurface = boundsObject.GetComponent<Collider2D>();
         }
 
+        private void ResolvePlacementRegionsFallback()
+        {
+            if (_placementRoot == null) return;
+
+            WorldMapFlowerPlacementRegion[] discovered =
+                _placementRoot.GetComponentsInChildren<WorldMapFlowerPlacementRegion>(true);
+            if (discovered.Length == 0) return;
+
+            if (_placementRegions.Count == discovered.Length)
+            {
+                bool complete = true;
+                for (int i = 0; i < _placementRegions.Count; i++)
+                {
+                    if (_placementRegions[i] == null)
+                    {
+                        complete = false;
+                        break;
+                    }
+                }
+
+                if (complete) return;
+            }
+
+            Array.Sort(discovered, (left, right) => string.CompareOrdinal(left.name, right.name));
+            _placementRegions.Clear();
+            _placementRegions.AddRange(discovered);
+        }
+
+        private bool HasPlacementRegionBindings
+        {
+            get
+            {
+                return _placementRegions != null && _placementRegions.Count > 0;
+            }
+        }
+
+        private WorldMapFlowerPlacementRegion? ResolveSelectedPlacementRegion()
+        {
+            if (_selectedOption == null ||
+                !_selectedOption.TryGetInventoryKey(out _, out string owner))
+                return null;
+
+            return ResolvePlacementRegion(owner);
+        }
+
+        private WorldMapFlowerPlacementRegion? ResolvePlacementRegion(string owner)
+        {
+            for (int i = 0; i < _placementRegions.Count; i++)
+            {
+                WorldMapFlowerPlacementRegion? region = _placementRegions[i];
+                if (region != null && region.MatchesOwner(owner))
+                    return region;
+            }
+
+            return null;
+        }
+
         private Bounds GetPlacementBounds()
         {
-            if (_placementSurface is BoxCollider2D box)
+            return GetPlacementBounds(_placementSurface);
+        }
+
+        private static Bounds GetPlacementBounds(Collider2D? surface)
+        {
+            if (surface is BoxCollider2D box)
             {
                 Vector3 scale = box.transform.lossyScale;
                 Vector2 absoluteScale = new(Mathf.Abs(scale.x), Mathf.Abs(scale.y));
@@ -999,7 +1119,7 @@ namespace GeminiLab.Modules.WorldMap
                 return new Bounds(center, size);
             }
 
-            return _placementSurface != null ? _placementSurface.bounds : new Bounds();
+            return surface != null ? surface.bounds : new Bounds();
         }
 
         private bool IsPointerOverPlacementUi()
@@ -1011,9 +1131,20 @@ namespace GeminiLab.Modules.WorldMap
             for (int i = 0; i < results.Count; i++)
             {
                 Transform target = results[i].gameObject.transform;
-                if (_sidebarPanel != null && target.IsChildOf(_sidebarPanel.transform)) return true;
+                if (IsWithin(target, _sidebarPanel?.transform) ||
+                    IsWithin(target, _openButton?.transform) ||
+                    IsWithin(target, _closeButton?.transform) ||
+                    IsWithin(target, _hintBubble?.transform))
+                {
+                    return true;
+                }
             }
             return false;
+        }
+
+        private static bool IsWithin(Transform target, Transform? root)
+        {
+            return root != null && (target == root || target.IsChildOf(root));
         }
 
         [Serializable]

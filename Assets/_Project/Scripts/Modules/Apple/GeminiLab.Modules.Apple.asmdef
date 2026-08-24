@@ -2,7 +2,8 @@
   "name": "GeminiLab.Modules.Apple",
   "rootNamespace": "GeminiLab.Modules.Apple",
   "references": [
-    "GeminiLab.Core"
+    "GeminiLab.Core",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

@@ -12,6 +12,7 @@ namespace GeminiLab.Modules.Apple
     public sealed class AppleTreeInteractable : MonoBehaviour
     {
         [SerializeField] private string _treeId = string.Empty;
+        [SerializeField] private AppleTreeFeedback? _feedback;
         private Collider2D? _collider;
 
         public string TreeId => _treeId;
@@ -30,10 +31,12 @@ namespace GeminiLab.Modules.Apple
             int collected = EnsureService()?.ShakeTree(_treeId) ?? 0;
             if (collected > 0)
             {
+                _feedback?.ShowCollected(collected);
                 Debug.Log($"[AppleTree] {_treeId} 晃树领取 {collected} 个苹果");
             }
             else
             {
+                _feedback?.ShowNotReady();
                 Debug.Log($"[AppleTree] {_treeId} 当前没有可领取的苹果");
             }
         }
