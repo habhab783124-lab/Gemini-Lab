@@ -418,3 +418,9 @@ Updated: 2026-08-22
 
 - `WorldMap_Main.unity/PopupContent/PopupBodyText` is a Scene-authored TMP overlay centered on the enlarged note resource. Keep it above `SummaryView`, `AngelNoteView` and `DevilNoteView` in the hierarchy.
 - `DailySummaryDetailPopup` hides the overlay for `DetailKind.Popup`, because `弹窗1.png` already contains its own text.
+
+### 2026-08-24 Pet runtime save merge
+
+- Runtime pet persistence is implemented by `Assets/_Project/Scripts/Modules/Pet/PetRuntimeSaveService.cs` and registered through the existing pet persistence bootstrap.
+- The v2 JSON schema contains pet mood, energy, satiety, relation, runtime fields, and `savedAtUtcTicks`. Restore applies the offline Mood regression rule while preserving Energy/Satiety and restoring Relation.
+- Legacy v1 JSON remains supported. It does not apply offline regression and does not overwrite the current Relation when the field is absent.

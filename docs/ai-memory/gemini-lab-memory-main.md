@@ -538,3 +538,10 @@ Updated: 2026-08-22
 
 - `DailySummaryMailboxAuthoring` now authors `PopupBodyText` at the center of the enlarged paper resource (`PopupContent` local position `(0,-30)`, size `400x260`) and places it above the preview image in sibling order.
 - Summary, angel-note and devil-note previews therefore display the selected date's dynamic text on the paper itself; `PopupView` for `弹窗1.png` keeps its own baked-in message and hides the dynamic text.
+
+### 2026-08-24 Pet runtime save conflict resolution
+
+- `Assets/_Project/Scripts/Modules/Pet/PetRuntimeSaveService.cs` now combines the branch's `PetRuntimeData.Relation` persistence with the upstream v2 offline-mood timestamp rules.
+- v2 payloads save `relation` and `savedAtUtcTicks`. On restore, Mood moves toward 50 by one point per five offline minutes, capped at six points; Energy and Satiety restore unchanged. Relation is restored for v2 payloads.
+- v1 payloads remain compatible: missing `savedAtUtcTicks` skips offline regression, and missing `relation` leaves the current runtime Relation unchanged.
+- The branch was rebased onto `upstream/main`; `PetController` behavior-weight changes and upstream-deleted assets were not reintroduced.

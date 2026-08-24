@@ -618,6 +618,15 @@ Updated: 2026-08-22
 | AngelNoteView and DevilNoteView show their corresponding note text on the paper | Pending final Play smoke | Text is the selected date's persisted AngelNote/DevilNote. |
 | `弹窗1.png` keeps only its baked-in message without duplicate dynamic text | Pending final Play smoke | The shared PopupBodyText is hidden for `DetailKind.Popup`. |
 
+## B25. Pet runtime save conflict resolution (2026-08-24)
+
+| Check | Result | Notes |
+| :--- | :--- | :--- |
+| v2 `pet_runtime` capture contains `relation` and `savedAtUtcTicks` | Automated EditMode/static checks | Relation persistence and the offline timestamp are serialized together. |
+| Restoring after two offline hours moves Mood from 80 to 74 at most, without changing Energy/Satiety | Automated EditMode | Offline regression is one point per five minutes, capped at six points. |
+| Restoring a v2 payload restores Relation; restoring a v1 payload preserves the current Relation and skips offline regression | Automated EditMode | Covers backward compatibility for old saves. |
+| Branch is rebased onto `upstream/main` with no unmerged paths | Passed | Only `PetRuntimeSaveService.cs` required manual conflict resolution; upstream deletions remain deleted. |
+
 ## B23. WorldMap 苹果树轮廓点击范围（2026-08-24）
 
 适用范围：
