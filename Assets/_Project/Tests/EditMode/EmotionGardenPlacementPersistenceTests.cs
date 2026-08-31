@@ -33,7 +33,7 @@ namespace GeminiLab.Tests.EditMode
         {
             Restore(@"{""Version"":3,""LastSubmitDateIso"":""2026-08-11"",""Flowers"":[],""Clusters"":[],""PlacementInventories"":[{""EmotionType"":""喜悦"",""Owner"":""angel"",""SingleCount"":2,""ClusterCount"":0}]}");
 
-            Assert.True(_service.TryPlaceFlower("喜悦", "angel", false, 4, 1.25f, -2.5f));
+            Assert.True(_service.TryPlaceFlower("喜悦", "angel", false, 4, 1.25f, -2.5f, "Layer_A"));
             Assert.AreEqual(1, _service.GetPlacementInventory("喜悦", "angel").SingleCount);
 
             string captured = ((IPersistentService)_service).CaptureJson();
@@ -51,6 +51,16 @@ namespace GeminiLab.Tests.EditMode
             Assert.False(placed.IsCluster);
             Assert.AreEqual(1.25f, placed.WorldX);
             Assert.AreEqual(-2.5f, placed.WorldY);
+            Assert.AreEqual("Layer_A", placed.PlacementLayerId);
+        }
+
+        [Test]
+        public void RestoreLegacyPlacedFlower_WithoutLayerIdUsesEmptyCompatibilityValue()
+        {
+            Restore(@"{""Version"":4,""Flowers"":[],""Clusters"":[],""PlacementInventories"":[],""PlacedFlowers"":[{""SlotIndex"":2,""EmotionType"":""喜悦"",""Owner"":""angel"",""IsCluster"":false,""WorldX"":1,""WorldY"":-3}]}");
+
+            Assert.AreEqual(1, _service.GetPlacedFlowers().Count);
+            Assert.AreEqual(string.Empty, _service.GetPlacedFlowers()[0].PlacementLayerId);
         }
 
         [Test]

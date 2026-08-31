@@ -66,7 +66,7 @@ namespace GeminiLab.Modules.EmotionGarden
         IReadOnlyList<PlacedEmotionFlower> GetPlacedFlowers();
 
         /// <summary>
-        /// 原子完成一次摆放：校验稳定槽位、扣减单花/花丛库存并记录世界坐标。
+        /// 原子完成一次摆放：校验稳定槽位、扣减单花/花丛库存并记录世界坐标与基准层 ID。
         /// 失败时库存和摆放记录都保持不变。
         /// </summary>
         bool TryPlaceFlower(
@@ -75,7 +75,8 @@ namespace GeminiLab.Modules.EmotionGarden
             bool isCluster,
             int slotIndex,
             float worldX,
-            float worldY);
+            float worldY,
+            string placementLayerId = "");
 
         /// <summary>检查所有 Growing 状态的花，跨天则自动开花（幂等）。</summary>
         void RefreshBlooming();

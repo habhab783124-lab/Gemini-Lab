@@ -299,7 +299,8 @@ namespace GeminiLab.Modules.EmotionGarden
             bool isCluster,
             int slotIndex,
             float worldX,
-            float worldY)
+            float worldY,
+            string placementLayerId = "")
         {
             if (slotIndex < 0 || float.IsNaN(worldX) || float.IsInfinity(worldX) ||
                 float.IsNaN(worldY) || float.IsInfinity(worldY))
@@ -334,7 +335,8 @@ namespace GeminiLab.Modules.EmotionGarden
                 Owner = inventory.Owner,
                 IsCluster = isCluster,
                 WorldX = worldX,
-                WorldY = worldY
+                WorldY = worldY,
+                PlacementLayerId = placementLayerId ?? string.Empty
             };
 
             _placementInventories[PlacementInventoryKey(inventory.EmotionType, inventory.Owner)] = inventory;
@@ -602,6 +604,7 @@ namespace GeminiLab.Modules.EmotionGarden
 
             placed.EmotionType = EmotionFlowerCatalog.NormalizeEmotionType(placed.EmotionType);
             placed.Owner = EmotionFlowerCatalog.NormalizeOwner(placed.Owner);
+            placed.PlacementLayerId ??= string.Empty;
             normalized = placed;
             return true;
         }

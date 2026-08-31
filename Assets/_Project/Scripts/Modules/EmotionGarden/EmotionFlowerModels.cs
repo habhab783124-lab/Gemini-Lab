@@ -55,7 +55,8 @@ namespace GeminiLab.Modules.EmotionGarden
 
     /// <summary>
     /// 一朵已经摆放到 WorldMap 的花卉记录。
-    /// SlotIndex 对应 Scene 中稳定作者化的 PlacementSlot；世界坐标只保存运行态布局，
+    /// SlotIndex 对应 Scene 中稳定作者化的 PlacementSlot；PlacementLayerId 记录 BaselineItem 层，
+    /// 世界坐标只保存运行态布局，
     /// 不写回 Scene 或 ScriptableObject。
     /// </summary>
     [Serializable]
@@ -67,6 +68,7 @@ namespace GeminiLab.Modules.EmotionGarden
         public bool IsCluster;
         public float WorldX;
         public float WorldY;
+        public string PlacementLayerId;
     }
 
     /// <summary>
