@@ -424,3 +424,10 @@ Updated: 2026-08-22
 - Runtime pet persistence is implemented by `Assets/_Project/Scripts/Modules/Pet/PetRuntimeSaveService.cs` and registered through the existing pet persistence bootstrap.
 - The v2 JSON schema contains pet mood, energy, satiety, relation, runtime fields, and `savedAtUtcTicks`. Restore applies the offline Mood regression rule while preserving Energy/Satiety and restoring Relation.
 - Legacy v1 JSON remains supported. It does not apply offline regression and does not overwrite the current Relation when the field is absent.
+
+### WorldMap 固定基线（2026-08-31）
+
+- 基线定义脚本：`Assets/_Project/Scripts/Modules/WorldMap/WorldMapBaselineDefinition.cs`。
+- `WorldMap_Main.unity/WorldMapPlacedFlowers/FlowerPlacementGrid` 固定保存七条 `BaselineLine_*`，颜色/顺序为蓝、蓝、白、白、红、白、白；定义节点独立于树木、花丛和桌宠。
+- 花朵放置层仅引用四条白线；作者化脚本不再遍历全部 `BaselineItem` 创建基线。
+- Scene 调整工具：`Assets/_Project/Scripts/Editor/Tools/WorldMapFlowerBaselineToolWindow.cs`，菜单 `Tools/Gemini-Lab/WorldMap/场景基线`。

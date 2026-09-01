@@ -198,13 +198,21 @@ namespace GeminiLab.Modules.WorldMap
             [SerializeField] private float _xMin;
             [SerializeField] private float _xMax;
             [SerializeField] private float _xOffset;
+            [SerializeField] private WorldMapBaselineDefinition? _sourceBaselineDefinition;
+            [SerializeField] private BaselineItem? _sourceBaseline;
 
             public string Id => _id;
-            public float BaselineY => _baselineY;
-            public int SortingOrder => _sortingOrder;
-            public float XMin => _xMin;
-            public float XMax => _xMax;
-            public float XOffset => _xOffset;
+            public WorldMapBaselineDefinition? SourceBaselineDefinition => _sourceBaselineDefinition;
+            public BaselineItem? SourceBaseline => _sourceBaseline;
+            public float BaselineY => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.BaselineY :
+                _sourceBaseline != null ? _sourceBaseline.EffectiveBaselineY : _baselineY;
+            public int SortingOrder => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.SortingOrder :
+                _sourceBaseline != null ? _sourceBaseline.SortingOrder : _sortingOrder;
+            public float XMin => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.MinX :
+                _sourceBaseline != null ? _sourceBaseline.MinX : _xMin;
+            public float XMax => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.MaxX :
+                _sourceBaseline != null ? _sourceBaseline.MaxX : _xMax;
+            public float XOffset => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.XOffset : _xOffset;
         }
 
         public Vector2 CellSize => _cellSize;
@@ -876,6 +884,10 @@ namespace GeminiLab.Modules.WorldMap
 
         private int ResolveSharedSortingOrder(int baselineSortingOrder, float baselineY, bool petTieBreak)
         {
+            if (baselineSortingOrder >= 0 && baselineSortingOrder < 7)
+                return SharedSortingBase + _flowerSortingOrderOffset +
+                       baselineSortingOrder * SortingOrderStride + (petTieBreak ? 1 : 0);
+
             // SortingOrder 是主层级；同一主层级内，基线 Y 越低代表越靠近镜头，应该越靠前。
             int baselineYKey = Mathf.Clamp(Mathf.RoundToInt(-baselineY * BaselineYPrecision), 0, SortingOrderStride - 2);
             return SharedSortingBase + _flowerSortingOrderOffset + baselineSortingOrder * SortingOrderStride +

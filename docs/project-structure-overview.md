@@ -308,4 +308,11 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 
 - `DailySummaryMailboxAuthoring` keeps the board background and all individual AI diary resources as editable Scene nodes, while aligning the title, left tabs, notes, summary and character cards with the reference composition.
 - `DailySummaryDetailPopup` continues to display the resource that was clicked, enlarged through a pre-authored preview node; no fixed `弹窗1.png` content is substituted.
+
+## WorldMap 固定基线（2026-08-31）
+
+- `WorldMapPlacedFlowers/FlowerPlacementGrid` 是室外基线的唯一作者化容器，固定保存七条基线定义，不随绑定物体生命周期变化。
+- 七条固定槽位按渲染顺序为：蓝色环境后排、蓝色环境前排、白色花朵后排、白色花朵中后排、红色人物层、白色花朵中前排、白色花朵前排。
+- 花朵放置控制器只使用四条白色槽位；基线 Y、X 范围、错位量和排序槽位均由 Scene/Inspector 调整。
+- 编辑器工具 `WorldMapFlowerBaselineToolWindow` 在 Scene 视图绘制七条线并提供垂直拖拽；绑定 `BaselineItem` 会随线同步移动。
 - The saved `WorldMap_Main` scene and the TMP font asset contain the final visual references. Runtime code only switches authored nodes, fills text and controls visibility.

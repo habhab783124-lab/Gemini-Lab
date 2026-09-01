@@ -15,6 +15,7 @@ namespace GeminiLab.Modules.WorldMap
     {
         [Header("基准线")]
         [SerializeField] private float _baselineY;
+        [SerializeField] private WorldMapBaselineDefinition? _baselineDefinition;
 
         [Header("X 移动范围")]
         [SerializeField] private float _minX = -10f;
@@ -33,17 +34,23 @@ namespace GeminiLab.Modules.WorldMap
         private Collider2D? _collider;
         private Vector3 _dragOffset;
         private bool _isDragging;
+        private float _baselineTransformOffset;
 
-        public float BaselineY => _baselineY;
-        public float EffectiveBaselineY => Mathf.Abs(_baselineY) > 0.0001f ? _baselineY : transform.position.y;
-        public float MinX => _minX;
-        public float MaxX => _maxX;
-        public int SortingOrder => _sortingOrder;
+        public WorldMapBaselineDefinition? BaselineDefinition => _baselineDefinition;
+        public float BaselineY => _baselineDefinition != null ? _baselineDefinition.BaselineY : _baselineY;
+        public float EffectiveBaselineY => Mathf.Abs(BaselineY) > 0.0001f ? BaselineY : transform.position.y;
+        public float MinX => _baselineDefinition != null ? _baselineDefinition.MinX : _minX;
+        public float MaxX => _baselineDefinition != null ? _baselineDefinition.MaxX : _maxX;
+        public int SortingOrder => _baselineDefinition != null ? _baselineDefinition.SortingOrder : _sortingOrder;
 
         private void Awake()
         {
             _collider = GetComponent<Collider2D>();
             if (_collider != null && !_solidCollider) _collider.isTrigger = true;
+            _baselineTransformOffset = _baselineDefinition != null
+                ? transform.position.y - BaselineY
+                : 0f;
+            ApplySortingOrder();
         }
 
         private SpriteRenderer Sprite
@@ -57,7 +64,12 @@ namespace GeminiLab.Modules.WorldMap
 
         private void ApplySortingOrder()
         {
-            if (Sprite != null) Sprite.sortingOrder = _sortingOrder;
+            if (Sprite != null)
+            {
+                Sprite.sortingOrder = _baselineDefinition != null
+                    ? WorldMapBaselineDefinition.ToRendererSortingOrder(_baselineDefinition.SlotIndex)
+                    : _sortingOrder;
+            }
         }
 
         private void OnMouseDown()
@@ -73,9 +85,9 @@ namespace GeminiLab.Modules.WorldMap
         {
             if (!_allowDrag || !_isDragging) return;
             Vector3 target = GetMouseWorldPoint() + _dragOffset;
-            target.y = _baselineY;
+            target.y = BaselineY + _baselineTransformOffset;
             target.z = transform.position.z;
-            target.x = Mathf.Clamp(target.x, _minX, _maxX);
+            target.x = Mathf.Clamp(target.x, MinX, MaxX);
             transform.position = target;
         }
 

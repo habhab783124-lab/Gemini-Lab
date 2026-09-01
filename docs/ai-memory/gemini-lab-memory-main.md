@@ -509,6 +509,13 @@ Updated: 2026-08-22
 - `WorldMap_Main.unity` 的 Canvas 已作者化 `Panel_DailySummaryMailbox`；室外邮箱通过序列化 UnityEvent 打开该面板。Apartment 中同名 `MailboxButton` 与面板已停用，避免错误入口。`DailySummaryMailboxPanel` 只填充 Scene 中已有的 TMP 节点，不在运行时创建 UI。当前网关没有结构化“每日小结”接口，因此使用离线确定性 AI 风格兜底文本，后续可替换生成提供器而不改变邮箱和存档结构。
 - `WorldMap_Main.unity` 的 `Pet_Angel`、`Pet_Devil` 均保存 `RandomWander` 和 `PetPlayerInputController`，默认不抢占玩家控制；无控制/交互时在作者化边界内漫游，`PetController` 继续驱动现有 `IsMoving`、方向参数和 Idle/Move Animator 状态，点击后可取得控制权。
 - `AutoSetup` 版本提升到 66；Scene 与 Play 的最终 UI、Sprite、Animator 和边界均来自已保存场景/组件，运行时仅更新状态和文本。
+
+### 2026-08-31 WorldMap 七条固定基线
+
+- `WorldMap_Main.unity/WorldMapPlacedFlowers/FlowerPlacementGrid` 由七个独立 `WorldMapBaselineDefinition` 节点承载固定基线，顺序和颜色严格为蓝、蓝、白、白、红、白、白。
+- `BaselineItem` 通过序列化定义引用读取基线 Y、X 范围和排序槽位；删除绑定物体不会删除基线，拖动绑定物体只沿 X 移动并保留相对基线偏移。
+- 花朵放置控制器只序列化四个白色花朵层，不再从每个 `BaselineItem` 动态推导层数。
+- `Tools/Gemini-Lab/WorldMap/场景基线` 提供 Scene 视图基线手柄，移动基线会同步移动同一基线上的绑定物体。
 ### 2026-08-20 Apartment 遗留物系统首轮
 - 新增 `ApartmentKeepsake` 模块：`ApartmentKeepsakeService` 实现纸条、Relation 45–79 随机纪念物、Relation≥80 永久赠礼的每日首次室内判定与 JSON 存档；判定日期防重复，状态变更经 `PersistenceBootstrap` 立即写入 autosave。
 - `PetRuntimeData.Relation` 已纳入 Pet 存档与快照等价比较；ApartmentKeepsake 模块使用自有 `ApartmentKeepsakeOwner` 枚举，避免依赖循环，Presenter 仅在边界层映射 Angel/Devil。

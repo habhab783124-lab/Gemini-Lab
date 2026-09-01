@@ -627,6 +627,16 @@ Updated: 2026-08-22
 | Restoring a v2 payload restores Relation; restoring a v1 payload preserves the current Relation and skips offline regression | Automated EditMode | Covers backward compatibility for old saves. |
 | Branch is rebased onto `upstream/main` with no unmerged paths | Passed | Only `PetRuntimeSaveService.cs` required manual conflict resolution; upstream deletions remain deleted. |
 
+## B26. WorldMap 七条固定基线（2026-08-31）
+
+| Check | Result | Notes |
+| :--- | :--- | :--- |
+| `FlowerPlacementGrid` 下恰好存在七条 `BaselineLine_*`，顺序为蓝蓝白白红白白 | Automated static check | 仅检查该容器，不能以 `BaselineItem` 数量推断基线数量。 |
+| `WorldMap_Main` 的室外根对象、树木、建筑、桌宠、花朵容器和两块区域仍存在 | Automated static check | 本轮只定向移除旧基线线节点，不重建或覆盖场景。 |
+| 花朵放置层只引用四条白色固定基线 | Automated static check | `Flower_Back`、`Flower_MidBack`、`Flower_MidFront`、`Flower_Front`。 |
+| Scene 工具拖动基线时绑定物体跟随，物体保持基线相对偏移 | Pending Unity Scene validation | 打开 `Tools/Gemini-Lab/WorldMap/场景基线`，逐条拖动手柄并保存场景。 |
+| Scene 与 Play 视觉层级一致，桌宠和花朵按固定槽位遮挡 | Pending Unity Play smoke | 需要 Unity 可用时在 Play 视图确认；静态脚本不生成最终视觉节点。 |
+
 ## B23. WorldMap 苹果树轮廓点击范围（2026-08-24）
 
 适用范围：
