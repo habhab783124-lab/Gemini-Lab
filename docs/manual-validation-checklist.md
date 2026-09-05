@@ -520,6 +520,24 @@ Updated: 2026-08-22
 | 天气覆盖与昼夜夜幕独立，Scene 与 Play 的节点结构一致 | 已通过 | 运行时只切换已作者化节点，不创建最终视觉对象 |
 | 天气美术统一从 `Assets/_Project/Art/WorldMap/weather/` 接入，且替换资源不需修改天气逻辑 | 已通过 | 当前雨天使用 `weather/rain.png`；新增天气资源后只需在 Scene/Inspector 更新对应覆盖节点引用 |
 
+### B15.2. WorldMap 云层与夜晚星星
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| Scene 中存在 `WorldMapWeatherClouds`，引用 `weather/云层.jpg` 并绑定 `Environment_Clouds` | 已作者化，待 Play 目视 | `WorldMapCloudColorKey.mat` 去除 JPG 白底 |
+| Scene 中存在 `WorldMapWeatherStars`，引用 `weather/星星.PNG` 并绑定 `Environment_Stars` | 已作者化，待 Play 目视 | 节点由 `WorldMapDayNightController` 控制显隐 |
+| 06:00–18:00 星星隐藏，18:00–06:00 星星显示 | 待 Unity Play 验证 | 使用项目 `IGameClock` 或调试时间跨越边界验证 |
+| 云层、星星与室外背景保持 Scene/Play 相同取景和排序 | 待 Unity Play 验证 | 两个节点均为 Scene 中已保存的 SpriteRenderer，不运行时创建 |
+
+### B15.3. WorldMap 环境动画
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| `_SceneRoot` 保存 `WorldMapAmbientAnimationController`，并绑定云层、花朵根节点和 5 棵树 | 已通过 | 作者化日志：cloud=True，single visuals=594，trees=5 |
+| 云层只沿 X 轴平滑移动，Y 不变且保持 `Environment_Clouds` 基线 | 已通过 | Play 运行时采样确认 X 变化、Y=2.337166 |
+| 单朵花轻微旋转且相位不同，花丛保持静止 | 已通过 | Play 采样确认单花角度变化，Cluster 角度保持 0 |
+| 许愿树和大树 2～5 以底部根点摆动 | 已通过 | 控制器绑定 5 个树目标，运行时不创建节点 |
+
 ## B16. WorldMap 桌宠数字键动画调试（2026-08-06）
 适用范围：
 - 目标场景：`Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity`
@@ -627,14 +645,17 @@ Updated: 2026-08-22
 | Restoring a v2 payload restores Relation; restoring a v1 payload preserves the current Relation and skips offline regression | Automated EditMode | Covers backward compatibility for old saves. |
 | Branch is rebased onto `upstream/main` with no unmerged paths | Passed | Only `PetRuntimeSaveService.cs` required manual conflict resolution; upstream deletions remain deleted. |
 
-## B26. WorldMap 七条固定基线（2026-08-31）
+## B26. WorldMap 固定基线与环境层（2026-09-01）
 
 | Check | Result | Notes |
 | :--- | :--- | :--- |
-| `FlowerPlacementGrid` 下恰好存在七条 `BaselineLine_*`，顺序为蓝蓝白白红白白 | Automated static check | 仅检查该容器，不能以 `BaselineItem` 数量推断基线数量。 |
+| `FlowerPlacementGrid` 下恰好存在十一条 `BaselineLine_*`，包含天空、星星、云、树木、地面、花丛和人物层 | Automated static check | 仅检查该容器，不能以 `BaselineItem` 数量推断基线数量；云和星星本轮允许没有绑定美术对象。 |
 | `WorldMap_Main` 的室外根对象、树木、建筑、桌宠、花朵容器和两块区域仍存在 | Automated static check | 本轮只定向移除旧基线线节点，不重建或覆盖场景。 |
 | 花朵放置层只引用四条白色固定基线 | Automated static check | `Flower_Back`、`Flower_MidBack`、`Flower_MidFront`、`Flower_Front`。 |
 | Scene 工具拖动基线时绑定物体跟随，物体保持基线相对偏移 | Pending Unity Scene validation | 打开 `Tools/Gemini-Lab/WorldMap/场景基线`，逐条拖动手柄并保存场景。 |
+| Scene 工具按相对渲染顺序显示基线，并通过点击式前移/后移交换相邻层 | Pending Unity Scene validation | 列表按 `RenderOrder` 从大到小；数值越大越靠前但不代表基线条数；修改后应刷新该基线上的全部 `BaselineItem` 与花朵渲染器。 |
+| `BaselineItem` Inspector 与基线工具显示并编辑同一份基线参数 | Pending Unity Scene validation | 绑定对象只保存 `WorldMapBaselineDefinition` 引用；Y、X 范围、放置许可和 RenderOrder 修改后应同步到同线物体与渲染器，不存在本地覆盖参数。 |
+| 已绑定 `BaselineItem` 的物体锁定 Y 轴 | Pending Unity Scene validation | WorldMap 场景保留每个物体原有偏移；直接拖动物体或修改 Transform 的 Y 应恢复到 `BaselineY + 原偏移`，沿 X 拖动仍有效；移动基线手柄时同线物体 Y 应同步。 |
 | Scene 与 Play 视觉层级一致，桌宠和花朵按固定槽位遮挡 | Pending Unity Play smoke | 需要 Unity 可用时在 Play 视图确认；静态脚本不生成最终视觉节点。 |
 
 ## B23. WorldMap 苹果树轮廓点击范围（2026-08-24）
@@ -651,3 +672,66 @@ Updated: 2026-08-22
 | 鼠标悬停在树的可见边缘时触发平滑放大，移出透明区域后恢复 | 未验证 | 需 Unity PlayMode 逐棵移动鼠标确认边缘覆盖 |
 | 点击四棵树的可见轮廓能进入现有苹果树点击入口，透明区域不触发 | 未验证 | 需使用有苹果树交互入口的 Play 存档验证；不改变苹果生成/领取规则 |
 | 大树 1 仍无苹果领取和通用点击入口 | 已静态确认 | 本轮只保留其既有悬停反馈 |
+
+## B27. WorldMap PSD 相对位置与草地取景（2026-09-03）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| Scene 视图中天空、地面、建筑、桌宠与花朵保持 PSD 的相对位置 | 待 Unity Scene/Play 验证 | 本轮通过世界坐标偏移修复，未改变 PSD 子节点布局 |
+| 活动相机完整覆盖天空和地面且无额外空白 | 待 Unity Play 验证 | 相机按天空与地面包围范围校准 |
+| 已保存花朵重启后落在草地，并遵守基线 Y | 待 Unity Play 验证 | 旧存档恢复时改用解析出的基线 Y |
+| 新花放置锚点位于 `FlowerPlacementBounds` 草地区域 | 待 Unity Play 验证 | 以锚点和花朵 footprint 同时检查 |
+
+## B28. WorldMap PSD 局部坐标回归（2026-09-03）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| `WorldMap_Main` 的天空、地面、桥、树、花丛和桌宠局部 Transform 与基线修复前的 PSD 作者化值一致 | 已静态核对 | 16 个误写的局部 Y 已恢复，未整体覆盖场景 |
+| 活动相机使用原始取景且不显示下方大块空白蓝区 | 已通过 Unity Play 验证 | 2026-09-03 通过 Unity MCP Game View 截图确认 |
+| 已保存花朵仍显示在草地并保持基线层级 | 已通过 Unity Play 验证 | 未清空存档，花朵恢复在草地带并遵守共享基线 Y |
+
+## B29. WorldMap 许愿系统（2026-09-04）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| `许愿树` 绑定 `WorldMapWishTreeInteractable` 且不绑定苹果领取逻辑 | 已作者化 | 点击入口显式绑定 `WorldMapWishSystemController` |
+| 主界面、输入、详情、记忆列表和 12 个星位均存在于 Scene | 已作者化 | 面板位于 `Canvas/WorldMapWishSystemPanel`，活动星位位于主面板左上角插画许愿树区域 |
+| 新增愿望随机占用一个槽位，超过 12 个时归档最旧记录 | 已通过代码检查 | 服务层维护 Active/Fulfilled/Archived |
+| 愿望跨重启持久化 | 已通过 Unity Play 验证 | 已提交测试愿望，停止并重新进入 Play 后 `VisibleWishCount=1`，随后清理测试存档 |
+| 点击 `item_button.png` 查看详情，支持实现、删除和全部列表 | 已通过 Unity Play 验证 | 星星仅作展示；详情页显示选中愿望并支持实现、删除与“全部”列表 |
+
+## B30. WorldMap 愿望 UI 流程修正（2026-09-05）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 主面板星星范围 | 已通过 Play 验证 | 活动星星只出现在左上角插画许愿树区域，旧世界空间星位隐藏 |
+| 星星点击行为 | 已通过 Play 验证 | 点击星星不会切换到详情页 |
+| `item_button.png` 入口 | 已通过 Play 验证 | 打开唯一的详情/手册页面 |
+| 详情列表与内容 | 已通过 Play 验证 | 右侧列表可纵向滚动，选中行显示 `item_selected.png`，左侧内容随选中行更新 |
+
+## B31. WorldMap 云层与单花环境动画（2026-09-05）
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| Scene 与 Play 中云层轮廓完整，未误删白色云朵 | 已通过 Play 验证 | `WorldMapWeatherClouds` 使用 `WorldMapClouds_Alpha.png` 与 `Sprites-Default`；两块云朵均可见 |
+| 云层沿 X 轴缓慢移动 | 已通过运行态检查 | 由 `WorldMapAmbientAnimationController` 驱动已有 Scene 节点 |
+| 至少两朵单花的 Z 角度随时间变化且相位不同 | 已通过运行态检查 | 默认幅度 3.2°、速度 0.9、相位由层级路径稳定生成 |
+| 花丛不发生单花旋转 | 已通过运行态检查 | `_Cluster` 视觉节点不加入旋转列表 |
+## B32. WorldMap 双宠动画触发状态机（2026-09-05）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 无特殊动作时，两个桌宠都按实际移动状态保持 Idle；移动时保持 Move | 待 Play 验证 | 基础状态仍由各自 `PetController` 驱动 |
+| 天使漫游进入苹果树附近可随机坐地，进入许愿树附近可随机祈祷 | 待 Play 验证 | 只在进入范围时掷概率，离开后重置 |
+| 天使移动到天使区域已摆放单花/花丛附近播放浇水 | 待 Play 验证 | 仅筛选 `Owner=angel` 的持久化摆放记录 |
+| 恶魔漫游进入苹果树附近可随机睡觉，进入恶魔标牌附近可随机施法 | 待 Play 验证 | 标牌需有 Scene 引用；缺失时不创建占位物体 |
+| 玩家控制天使/恶魔时按 F 在对应目标附近触发坐地/祈祷/睡觉/施法 | 待 Play 验证 | F 只路由到当前 `IsPlayerControlEnabled` 桌宠 |
+| 天使区域摆花后播放开心，恶魔区域摆花后播放得意 | 待 Play 验证 | 首次从存档读取不触发，新增记录才触发 |
+| 特殊动作结束后恢复对应桌宠 Idle/Move，另一只桌宠不受阻塞 | 待 Play 验证 | 两只宠物独立计时和移动锁 |
+| 现有 `WorldMap_Angel/Devil.controller` 的 `Outdoor_*` Clip 实际被播放 | 待 Play 验证 | 本轮不修改 Clip/Controller 资产 |
+## B33. WorldMap 苹果树掉落交互（2026-09-05）
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 点击大树 2/3/5 后树快速晃动并出现 1–3 个苹果 | 待 Play 验证 | 苹果使用 Scene 中保存的 apple.png 引用 |
+| 掉落苹果的分配值总和等于本轮固定总量 | 已通过 EditMode/代码检查 | 服务层保留批次总量，逐个领取 |
+| 点击地面苹果后余额增加并显示“收获 +N”约 2 秒 | 待 Play 验证 | 槽位碰撞体经过点击遮挡判定 |
+| 许愿树不触发苹果掉落 | 已通过作者化/代码检查 | 大树 1 与许愿树均排除 |

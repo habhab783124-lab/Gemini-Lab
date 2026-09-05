@@ -5,24 +5,16 @@ using UnityEngine;
 namespace GeminiLab.Modules.WorldMap
 {
     /// <summary>
-    /// 基准线物品：锁死 Y 坐标在指定基准线上，仅允许水平拖动，X 受限在 [minX, maxX] 范围内。
-    /// 自动管理 SpriteRenderer.sortingOrder，确保同一基准线上的物体深度一致。
+    /// 基准线物品：锁死 Y 坐标在绑定的 WorldMapBaselineDefinition 上，仅允许水平拖动。
+    /// 基线的 Y、X 范围和渲染顺序全部来自同一个场景定义，确保同一基准线上的物体深度一致。
     /// 挂到场景中每个基准线上的可移动物体（花圃装饰、邮箱、草丛等）。
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
     [RequireComponent(typeof(SpriteRenderer))]
     public sealed class BaselineItem : MonoBehaviour
     {
-        [Header("基准线")]
-        [SerializeField] private float _baselineY;
+        [Header("基准线（唯一共享参数源）")]
         [SerializeField] private WorldMapBaselineDefinition? _baselineDefinition;
-
-        [Header("X 移动范围")]
-        [SerializeField] private float _minX = -10f;
-        [SerializeField] private float _maxX = 10f;
-
-        [Header("深度排序")]
-        [SerializeField] private int _sortingOrder;
 
         [Header("拖拽")]
         [SerializeField] private bool _allowDrag;
@@ -34,22 +26,35 @@ namespace GeminiLab.Modules.WorldMap
         private Collider2D? _collider;
         private Vector3 _dragOffset;
         private bool _isDragging;
-        private float _baselineTransformOffset;
+        // 物体轴心与基线的相对偏移作为兼容/保护参数保留；
+        // 现有 PSD 场景继续使用各物体原本的世界坐标相对位置。
+        [SerializeField, HideInInspector] private float _baselineTransformOffset;
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// 基线工具批量移动物体时暂时放行 Y 轴同步，普通物体编辑不应设置此标记。
+        /// </summary>
+        public static bool IsEditorBaselineMoveInProgress { get; set; }
+#endif
 
         public WorldMapBaselineDefinition? BaselineDefinition => _baselineDefinition;
-        public float BaselineY => _baselineDefinition != null ? _baselineDefinition.BaselineY : _baselineY;
-        public float EffectiveBaselineY => Mathf.Abs(BaselineY) > 0.0001f ? BaselineY : transform.position.y;
-        public float MinX => _baselineDefinition != null ? _baselineDefinition.MinX : _minX;
-        public float MaxX => _baselineDefinition != null ? _baselineDefinition.MaxX : _maxX;
-        public int SortingOrder => _baselineDefinition != null ? _baselineDefinition.SortingOrder : _sortingOrder;
+        public bool HasBaselineDefinition => _baselineDefinition != null;
+        public float BaselineY => _baselineDefinition!.BaselineY;
+        public float EffectiveBaselineY => BaselineY;
+        public float MinX => _baselineDefinition!.MinX;
+        public float MaxX => _baselineDefinition!.MaxX;
+        public int SortingOrder => _baselineDefinition!.SortingOrder;
+        public float BaselineTransformOffset => _baselineTransformOffset;
 
         private void Awake()
         {
             _collider = GetComponent<Collider2D>();
             if (_collider != null && !_solidCollider) _collider.isTrigger = true;
-            _baselineTransformOffset = _baselineDefinition != null
-                ? transform.position.y - BaselineY
-                : 0f;
+            if (_baselineDefinition == null)
+            {
+                Debug.LogError($"[BaselineItem] {name} 未绑定 WorldMapBaselineDefinition，无法参与基线移动和排序。", this);
+                return;
+            }
             ApplySortingOrder();
         }
 
@@ -66,15 +71,46 @@ namespace GeminiLab.Modules.WorldMap
         {
             if (Sprite != null)
             {
-                Sprite.sortingOrder = _baselineDefinition != null
-                    ? WorldMapBaselineDefinition.ToRendererSortingOrder(_baselineDefinition.SlotIndex)
-                    : _sortingOrder;
+                Sprite.sortingOrder = WorldMapBaselineDefinition.ToRendererSortingOrder(SortingOrder);
             }
+        }
+
+        /// <summary>
+        /// 供 Scene 基线工具在修改基线渲染优先级后刷新已存在的场景物体。
+        /// 只更新现有 SpriteRenderer，不创建运行时视觉节点。
+        /// </summary>
+        public void RefreshSortingOrder()
+        {
+            if (_baselineDefinition == null) return;
+            ApplySortingOrder();
+        }
+
+        /// <summary>
+        /// 绑定定义变化后将物体重新对齐到共享基线，同时保留当前世界坐标相对偏移。
+        /// </summary>
+        public void RefreshBaselineBinding()
+        {
+            if (_baselineDefinition == null) return;
+            // BaselineItem may be parented under the PSD background.  The
+            // baseline is a world-space line, so preserve the current world
+            // position when a binding changes instead of interpreting the
+            // parent's serialized local Y as a world Y value.
+            _baselineTransformOffset = transform.position.y - BaselineY;
+            AlignToBaselineY();
+            ApplySortingOrder();
+        }
+
+        private void AlignToBaselineY()
+        {
+            if (_baselineDefinition == null) return;
+            Vector3 position = transform.position;
+            position.y = BaselineY + _baselineTransformOffset;
+            transform.position = position;
         }
 
         private void OnMouseDown()
         {
-            if (!_allowDrag) return;
+            if (!_allowDrag || _baselineDefinition == null) return;
             if (ClickOcclusionUtility.IsPointerOverUI()) return;
             if (!ClickOcclusionUtility.IsTopmostColliderUnderMouse(_collider)) return;
             _dragOffset = transform.position - GetMouseWorldPoint();
@@ -83,7 +119,7 @@ namespace GeminiLab.Modules.WorldMap
 
         private void OnMouseDrag()
         {
-            if (!_allowDrag || !_isDragging) return;
+            if (!_allowDrag || !_isDragging || _baselineDefinition == null) return;
             Vector3 target = GetMouseWorldPoint() + _dragOffset;
             target.y = BaselineY + _baselineTransformOffset;
             target.z = transform.position.z;
@@ -107,6 +143,8 @@ namespace GeminiLab.Modules.WorldMap
         private void OnValidate()
         {
             if (Application.isPlaying) return;
+            if (_baselineDefinition == null) return;
+            if (!IsEditorBaselineMoveInProgress) AlignToBaselineY();
             ApplySortingOrder();
         }
 #endif

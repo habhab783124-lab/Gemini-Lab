@@ -73,6 +73,13 @@ namespace GeminiLab.Editor.SceneBootstrap
 
             var serialized = new SerializedObject(controller);
             serialized.FindProperty("_nightOverlay")!.objectReferenceValue = renderer;
+            SpriteRenderer? stars = FindStarsRenderer();
+            if (stars != null)
+            {
+                serialized.FindProperty("_starsRenderer")!.objectReferenceValue = stars;
+                stars.enabled = IsNight(DateTime.Now);
+                EditorUtility.SetDirty(stars);
+            }
             serialized.FindProperty("_dayStartHour")!.intValue = (int)DayStartHour;
             serialized.FindProperty("_nightStartHour")!.intValue = (int)NightStartHour;
             serialized.ApplyModifiedPropertiesWithoutUndo();
@@ -113,6 +120,14 @@ namespace GeminiLab.Editor.SceneBootstrap
         {
             TimeSpan time = localTime.TimeOfDay;
             return time < TimeSpan.FromHours(DayStartHour) || time >= TimeSpan.FromHours(NightStartHour);
+        }
+
+        private static SpriteRenderer? FindStarsRenderer()
+        {
+            return UnityEngine.Object.FindObjectsByType<SpriteRenderer>(
+                    FindObjectsInactive.Include,
+                    FindObjectsSortMode.None)
+                .FirstOrDefault(candidate => candidate.gameObject.name == "WorldMapWeatherStars");
         }
     }
 }

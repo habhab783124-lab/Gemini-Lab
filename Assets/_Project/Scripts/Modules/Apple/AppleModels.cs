@@ -13,6 +13,8 @@ namespace GeminiLab.Modules.Apple
         public string GenerationDayKey;
         public int GeneratedRoundsToday;
         public int PendingCount;
+        public int HarvestRemaining;
+        public int HarvestTotal;
         public int TotalCollected;
     }
 

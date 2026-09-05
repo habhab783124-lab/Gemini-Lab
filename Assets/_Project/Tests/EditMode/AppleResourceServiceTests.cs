@@ -76,6 +76,45 @@ namespace GeminiLab.Tests.EditMode
         }
 
         [Test]
+        public void HarvestSessionCollectsIncrementallyWithoutExceedingReservedTotal()
+        {
+            _service.EnsureTree("world_tree_2");
+            _clock.Advance(TimeSpan.FromMinutes(91));
+
+            Assert.IsTrue(_service.TryBeginHarvest("world_tree_2", out int total));
+            Assert.That(total, Is.InRange(1, 2));
+            Assert.AreEqual(0, _service.GetPendingCount("world_tree_2"));
+            Assert.AreEqual(total, _service.GetHarvestRemaining("world_tree_2"));
+
+            int first = total > 1 ? 1 : total;
+            Assert.IsTrue(_service.TryCollectHarvest("world_tree_2", first));
+            Assert.AreEqual(total - first, _service.GetHarvestRemaining("world_tree_2"));
+            Assert.IsFalse(_service.TryCollectHarvest("world_tree_2", total));
+            Assert.AreEqual(20 + total, _service.Balance);
+            Assert.AreEqual(0, _service.GetHarvestRemaining("world_tree_2"));
+        }
+
+        [Test]
+        public void ActiveHarvestSurvivesSaveRestore()
+        {
+            _service.EnsureTree("world_tree_5");
+            _clock.Advance(TimeSpan.FromMinutes(91));
+            Assert.IsTrue(_service.TryBeginHarvest("world_tree_5", out int total));
+
+            int collected = total > 1 ? 1 : 0;
+            if (collected > 0)
+            {
+                Assert.IsTrue(_service.TryCollectHarvest("world_tree_5", collected));
+            }
+
+            string saved = _service.CaptureJson();
+            var restored = new AppleService(_clock, new EventBus(), randomSeed: 17);
+            Assert.IsTrue(restored.RestoreJson(saved));
+            Assert.AreEqual(total - collected, restored.GetHarvestRemaining("world_tree_5"));
+            Assert.AreEqual(20 + collected, restored.Balance);
+        }
+
+        [Test]
         public void SpendRejectsInsufficientBalanceAndDoesNotGoNegative()
         {
             Assert.IsFalse(_service.TrySpend(21));

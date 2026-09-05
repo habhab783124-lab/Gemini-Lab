@@ -1,5 +1,5 @@
 # Gemini-Lab AI memory index
-# Updated: 2026-08-24
+# Updated: 2026-09-03
 
 AGENTS.md
 Assets/_Project/Scripts/Modules/HubUI/ApartmentFurnitureSelectionPresenter.cs
@@ -114,6 +114,8 @@ Assets/_Project/Scripts/Modules/Collection/AppleBalanceDisplay.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/BootAppleBootstrapAuthoring.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAppleTreeAuthoring.cs
 Assets/_Project/Tests/EditMode/AppleResourceServiceTests.cs
+Assets/_Project/Scripts/Modules/Apple/AppleTreeDropController.cs
+Assets/_Project/Scripts/Modules/Apple/AppleDropSlot.cs
 Assets/_Project/Scripts/Modules/WorldMap/BaselineItem.cs
 Assets/_Project/Scripts/Modules/Furniture/README.md
 Assets/_Project/Scripts/Modules/Navigation/README.md
@@ -146,6 +148,10 @@ Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherService.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherController.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWeatherAuthoring.cs
 Assets/_Project/Art/WorldMap/weather/rain.png
+Assets/_Project/Art/WorldMap/weather/云层.jpg
+Assets/_Project/Art/WorldMap/weather/星星.PNG
+Assets/_Project/Art/WorldMap/weather/WorldMapCloudColorKey.mat
+Assets/_Project/Shaders/WorldMap/WorldMapCloudColorKey.shader
 Assets/_Project/Tests/EditMode/WorldMapWeatherTests.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapInteractiveObjectAuthoring.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationPreviewAuthoring.cs
@@ -208,6 +214,8 @@ Assets/_Project/Scripts/Editor/SceneBootstrap/DailySummaryMailboxAuthoring.cs
 Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (WorldMap mailbox -> daily summary routing)
 Assets/_Project/Scripts/Editor/SceneBootstrap/AutoSetup.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorPetAnimationAuthoring.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAmbientAnimationAuthoring.cs
 Assets/_Project/Scripts/Modules/Pet/PetPlayerInputController.cs
 Assets/_Project/Scripts/Modules/Persistence/PersistenceBootstrap.cs
 Assets/_Project/Scripts/Modules/Persistence/AutoSaveManager.cs
@@ -218,3 +226,16 @@ Assets/_Project/Scripts/Modules/HubUI/ApartmentKeepsakePresenter.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentKeepsakeAuthoring.cs
 Assets/_Project/Scenes/Apartment/Apartment_Main.unity (ApartmentKeepsakeWorldPresentation / ApartmentKeepsakeOverlay)
 Assets/_Project/Art/WorldMap/ui1.0/
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (PSD local Transform restoration and Play visual check)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishService.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishSystemController.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishTreeInteractable.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWishSystemAuthoring.cs
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (许愿树入口与许愿系统作者化)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishSystemController.cs (主面板许愿树星位与单一滚动详情页)
+Assets/_Project/Art/WorldMap/weather/WorldMapClouds_Alpha.png (天气云层派生透明 Sprite)
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWeatherAuthoring.cs (天气云层/星星/雨层 Scene 作者化)
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAmbientAnimationAuthoring.cs (云层、单花和树绑定作者化)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs (云层移动与单花独立相位旋转)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (WorldMap 双宠特殊动画范围、F键和摆花事件触发)
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationTriggerAuthoring.cs (WorldMap 双宠动画触发对象作者化)

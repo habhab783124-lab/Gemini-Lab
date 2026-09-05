@@ -6,7 +6,8 @@
     "GeminiLab.Modules.Garden",
     "GeminiLab.Modules.Pet",
     "GeminiLab.Modules.EmotionGarden",
-    "GeminiLab.Modules.Persistence"
+    "GeminiLab.Modules.Persistence",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

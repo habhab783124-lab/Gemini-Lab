@@ -227,16 +227,21 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 ## WorldMap 昼夜结构
 
 - `WorldMapNightOverlay` 位于 `WorldMap_Main.unity`，直接引用 `weather/夜幕.png`，排序高于室外世界与桌宠、低于 UI；旧 `garden/天气（最上层）` 不作为运行时天气来源。
-- `WorldMapDayNightController` 只切换夜幕 SpriteRenderer 的启用状态，时间来源为 Core 的 `IGameClock`；白天 06:00–18:00，夜晚为其余时间。
+- `WorldMapDayNightController` 切换已作者化的夜幕与星星 SpriteRenderer 的启用状态，时间来源为 Core 的 `IGameClock`；白天 06:00–18:00，夜晚为其余时间。星星节点为 `WorldMapWeatherStars`，只在夜晚显示。
 - `WorldMapDayNightAuthoring` 负责 Scene / Inspector 中的夜幕位置、碰撞禁用、排序和作者化时刻初始状态。
 
 ## WorldMap 当地天气结构
 
 - `WorldMapWeatherController` 与 `WorldMapWeatherService` 位于 WorldMap 模块；控制器通过 `IWeatherProvider` 请求 Open-Meteo 当前天气，并把 WMO weather code 归类为 `Sunny` 或 `Rainy`。
-- `WorldMap_Main.unity` 仅保存 `WorldMapWeatherRainOverlay` 场景节点；天气美术统一来自 `Assets/_Project/Art/WorldMap/weather/`，雨天节点引用 `rain.png`，晴天在专用资源到位前使用场景底图，不再引用旧 `garden/天气（最上层）`。控制器只切换已作者化 SpriteRenderer 的启用状态，不在运行时创建 GameObject、Sprite 或 UI。
+- `WorldMap_Main.unity` 保存 `WorldMapWeatherRainOverlay`、`WorldMapWeatherClouds` 与 `WorldMapWeatherStars` 场景节点；天气美术统一来自 `Assets/_Project/Art/WorldMap/weather/`，雨天节点引用 `rain.png`，云层引用 `云层.jpg`，星星引用 `星星.PNG`，晴天在专用资源到位前使用场景底图，不再引用旧 `garden/天气（最上层）`。控制器只切换已作者化 SpriteRenderer 的启用状态，不在运行时创建 GameObject、Sprite 或 UI。
 - 默认 Inspector 坐标为上海 `31.2304, 121.4737`、时区 `auto`，刷新间隔 30 分钟；正式项目接入定位后只需替换 Scene 中的经纬度。网络失败时保留最近一次成功状态，首次失败回退晴天。
 - 天气覆盖层与昼夜夜幕是独立维度：昼夜仍由 `IGameClock` 按 06:00–18:00 切换，天气由远端当前 weather code 切换；两者均要求 Scene 与 Play 共享已保存的视觉节点。
 - `WorldMapNightOverlay` 使用 `ProjectSettings/TagManager.asset` 中位于 `Default` 之后的专用 Sorting Layer，确保运行时按 `BaselineItem` 重排的两名桌宠和花朵也会被夜幕覆盖；它仍由 Scene 作者化，运行时只切换启用状态。
+
+## WorldMap 环境动画结构
+
+- `_SceneRoot` 上的 `WorldMapAmbientAnimationController` 使用已保存的 `WorldMapWeatherClouds`、`WorldMapPlacedFlowers` 单花节点和许愿树/大树 2～5引用。
+- 云层仅沿 X 轴平滑移动；单朵花按确定性相位轻微旋转，花丛不旋转；树木以 Sprite 底部为根部轻微摆动。所有 Y 基线和资源引用仍由 Scene/Inspector 作者化，运行时不创建视觉节点。
 
 ## WorldMap 桌宠数字键动画调试结构
 
@@ -309,10 +314,55 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 - `DailySummaryMailboxAuthoring` keeps the board background and all individual AI diary resources as editable Scene nodes, while aligning the title, left tabs, notes, summary and character cards with the reference composition.
 - `DailySummaryDetailPopup` continues to display the resource that was clicked, enlarged through a pre-authored preview node; no fixed `弹窗1.png` content is substituted.
 
-## WorldMap 固定基线（2026-08-31）
+## WorldMap 固定基线（2026-09-01）
 
-- `WorldMapPlacedFlowers/FlowerPlacementGrid` 是室外基线的唯一作者化容器，固定保存七条基线定义，不随绑定物体生命周期变化。
-- 七条固定槽位按渲染顺序为：蓝色环境后排、蓝色环境前排、白色花朵后排、白色花朵中后排、红色人物层、白色花朵中前排、白色花朵前排。
+- `WorldMapPlacedFlowers/FlowerPlacementGrid` 是室外基线的唯一作者化容器，固定保存十一条基线定义，不随绑定物体生命周期变化。
+- 初始配置的相对渲染顺序（`RenderOrder` 从小到大）为：天空、星星、云、蓝色树木后排、蓝色树木前排、蓝色地面、白色花朵后排、白色花朵中后排、红色人物层、白色花朵中前排、白色花朵前排；工具显示时反向排列为前到后。
+- 云和星星现在有独立场景资源节点，分别直接绑定到 `Environment_Clouds` / `Environment_Stars`；云层使用颜色键材质去除 JPG 白底，星星由昼夜控制器在夜间显示。
 - 花朵放置控制器只使用四条白色槽位；基线 Y、X 范围、错位量和排序槽位均由 Scene/Inspector 调整。
-- 编辑器工具 `WorldMapFlowerBaselineToolWindow` 在 Scene 视图绘制七条线并提供垂直拖拽；绑定 `BaselineItem` 会随线同步移动。
+- 编辑器工具 `WorldMapFlowerBaselineToolWindow` 在 Scene 视图绘制所有固定线并提供垂直拖拽；绑定 `BaselineItem` 会随线同步移动。工具面板按 `RenderOrder` 相对值从大到小显示，可直接编辑该共享值，也可用固定点击式“前移/后移”交换相邻基线；数值只比较大小，不代表基线条数。
+- `WorldMapBaselineDefinition` 是基线身份、Y、X 范围、花朵放置许可和 RenderOrder 的唯一事实源；`BaselineItem` 保存对该定义的序列化引用及隐藏的偏移保护值，不保存本地 Y、范围或排序参数。Inspector 与基线工具编辑的是同一份定义。
+- 当前 WorldMap 保留所有已绑定物体原有的基线轴心偏移，物体自身只能沿 X 轴移动并锁定在 `BaselineY + 原偏移`；只有场景基线工具调整基线 Y 时，才会同步移动同线物体的 Y。
 - The saved `WorldMap_Main` scene and the TMP font asset contain the final visual references. Runtime code only switches authored nodes, fills text and controls visibility.
+
+## WorldMap PSD 相对位置与草地取景（2026-09-03）
+
+- 基线绑定不重写 PSD 子物体的相对布局；场景中保存的物体位置仍是最终视觉来源。
+- 花朵恢复和新放置均以解析出的基线 Y 为锚点，并以 `FlowerPlacementBounds` 的草地矩形限制可放置范围。
+- 活动相机覆盖已作者化的天空与地面范围，避免额外空白区域。
+
+## WorldMap PSD 相对位置复核（2026-09-03）
+
+- `WorldMap_Main.unity` 中 `室外背景` 的子物体局部坐标必须保持 PSD 作者化结果；基线同步只能通过世界坐标 API 正确换算，不能把世界 Y 当作局部 Y 写回。
+- 场景恢复后，天空、地面、树、桥、花丛和桌宠继续保持原有相对位置，活动相机使用原始取景，Play 画面不得出现由背景上移造成的空白蓝区。
+
+## WorldMap 许愿系统（2026-09-04）
+
+- 入口：场景对象 `许愿树` → `WorldMapWishTreeInteractable` → `WorldMapWishSystemController.OpenPanel()`。
+- UI：`Canvas/WorldMapWishSystemPanel` 下作者化 `MainView`、`InputView`、`DetailView`、`MemoryListView` 与 12 个 `WishStarSlot_00..11`。
+- 星位：`Canvas/WorldMapWishSystemPanel/Window/MainView/WishStarSlot_00..11` 作者化在主背景左上角插画许愿树区域；旧世界空间星位不渲染。
+- 数据：`WorldMapWishService` 保存 Active/Fulfilled/Archived，最多 12 个活动显示槽位，跨重启恢复。
+- `MemoryListView` 的“全部”列表包含三种状态的历史记录；归档只移出活动星位，不删除记录。
+- 许愿专用资源位于 `Assets/_Project/Art/WorldMap/许愿树/`；运行时只做状态切换、文字填充和交互，不替换 Sprite。
+
+## WorldMap 愿望 UI 流程修正（2026-09-05）
+
+- 主面板 `item_button.png` 打开单一详情页；右侧愿望列表支持滚轮，左侧显示所选愿望详情。
+- 愿望星星只显示在主面板左上角许愿树插画范围内，点击星星不打开详情页。
+
+## WorldMap 云层与单花环境动画（2026-09-05）
+
+- 天气资源从 `Assets/_Project/Art/WorldMap/weather/` 读取；云层显示使用作者化的 `WorldMapClouds_Alpha.png`，源 JPG 保持不变。
+- `WorldMapWeatherClouds` 保存在 WorldMap Scene 中并绑定 `Environment_Clouds` 基线；标准 Sprite 材质保证透明云朵在 Scene 与 Play 中一致显示。
+- `WorldMapAmbientAnimationController` 只对作者化单花视觉节点做独立相位的轻微 Z 轴旋转，花丛保持静止；最终节点、引用和参数仍可在 Scene/Inspector 中调整。
+## WorldMap 双宠动画触发状态机（2026-09-05）
+
+- `WorldMapPetAnimationTriggerController` 位于 `_SceneRoot`，只管理临时特殊动作；普通待机和走路仍由两个 `PetController` 的移动状态驱动。
+- 天使：漫游进入苹果树附近随机坐地、进入许愿树附近随机祈祷、进入天使区域摆放花朵/花丛附近浇水；玩家控制时 F 键在对应苹果树/许愿树附近触发坐地/祈祷；新增天使花朵触发开心。
+- 恶魔：漫游进入苹果树附近随机睡觉、进入恶魔标牌附近随机施法；玩家控制时 F 键在对应目标附近触发；新增恶魔花朵触发得意。
+- 触发对象通过作者化脚本序列化，缺失标牌引用不会生成临时物体；阈值、概率、冷却和每个动作持续时间可在 Inspector 调整。
+## WorldMap 苹果树掉落交互（2026-09-05）
+
+- `WorldMapAppleTreeAuthoring` 在 `WorldMap_Main.unity/_SceneRoot/WorldMapAppleDrops` 下作者化每棵苹果树的 3 个地面掉落槽位，槽位保存 `apple.png`、碰撞体和 TMP 收获文字。
+- 点击苹果树先锁定服务层批次总量，随机拆成 1–3 个正整数；点击地面苹果逐个领取，文字在苹果上方显示约 2 秒。
+- 「大树 1」/「许愿树」不挂苹果掉落逻辑；现有生成周期、每日轮数和消费价格保持不变。树连续摆动幅度与点击时的快速摆动参数均可在 Inspector 调整。

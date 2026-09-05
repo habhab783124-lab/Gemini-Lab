@@ -23,6 +23,9 @@ namespace GeminiLab.Modules.Apple
         void EnsureTree(string treeId);
         int GetPendingCount(string treeId);
         int ShakeTree(string treeId);
+        bool TryBeginHarvest(string treeId, out int total);
+        bool TryCollectHarvest(string treeId, int amount);
+        int GetHarvestRemaining(string treeId);
         IReadOnlyList<AppleTreeState> GetTreeStates();
     }
 }

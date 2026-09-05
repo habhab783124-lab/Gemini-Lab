@@ -26,7 +26,7 @@ namespace GeminiLab.Modules.Apple
         public const int DefaultGenerationIntervalMinutes = DefaultGenerationIntervalMinMinutes;
         public const int DefaultMaxPendingPerTree = int.MaxValue;
 
-        private const int SaveVersion = 2;
+        private const int SaveVersion = 3;
         private const int MaxGenerationCatchUpIterations = 4096;
 
         private readonly IGameClock _clock;
@@ -115,12 +115,102 @@ namespace GeminiLab.Modules.Apple
             return state.PendingCount;
         }
 
+        /// <summary>
+        /// Reserves the current cached amount for one visible tree-shake
+        /// interaction. The amount is not added to the balance until the
+        /// authored ground apples are collected one by one.
+        /// </summary>
+        public bool TryBeginHarvest(string treeId, out int total)
+        {
+            total = 0;
+            if (string.IsNullOrWhiteSpace(treeId)) return false;
+
+            EnsureTree(treeId);
+            string normalized = treeId.Trim();
+            var state = _trees[normalized];
+            GeneratePending(ref state);
+
+            if (state.HarvestRemaining > 0)
+            {
+                total = state.HarvestRemaining;
+                _trees[normalized] = state;
+                return true;
+            }
+
+            if (state.PendingCount <= 0)
+            {
+                _trees[normalized] = state;
+                _eventBus?.Publish(new AppleTreeChangedEvent(state));
+                return false;
+            }
+
+            total = state.PendingCount;
+            state.PendingCount = 0;
+            state.HarvestRemaining = total;
+            state.HarvestTotal = total;
+            _trees[normalized] = state;
+            _eventBus?.Publish(new AppleTreeChangedEvent(state));
+            return true;
+        }
+
+        /// <summary>
+        /// Collects at most one authored drop from the active harvest session.
+        /// The service is the single authority for the fixed batch total.
+        /// </summary>
+        public bool TryCollectHarvest(string treeId, int amount)
+        {
+            if (string.IsNullOrWhiteSpace(treeId) || amount <= 0) return false;
+
+            EnsureTree(treeId);
+            string normalized = treeId.Trim();
+            var state = _trees[normalized];
+            int collected = Mathf.Min(amount, state.HarvestRemaining);
+            if (collected <= 0) return false;
+
+            state.HarvestRemaining -= collected;
+            state.TotalCollected = SafeAdd(state.TotalCollected, collected);
+            if (state.HarvestRemaining == 0)
+            {
+                state.HarvestTotal = 0;
+            }
+
+            _trees[normalized] = state;
+            Add(collected);
+            _eventBus?.Publish(new AppleTreeChangedEvent(state));
+            return true;
+        }
+
+        public int GetHarvestRemaining(string treeId)
+        {
+            if (string.IsNullOrWhiteSpace(treeId)) return 0;
+            EnsureTree(treeId);
+            string normalized = treeId.Trim();
+            return _trees[normalized].HarvestRemaining;
+        }
+
         public int ShakeTree(string treeId)
         {
             if (string.IsNullOrWhiteSpace(treeId)) return 0;
             EnsureTree(treeId);
             string normalized = treeId.Trim();
             var state = _trees[normalized];
+
+            // Keep the legacy API safe for existing callers: if a new
+            // incremental harvest is already active, collect its remainder
+            // as one legacy operation instead of starting a second batch.
+            if (state.HarvestRemaining > 0)
+            {
+                int active = state.HarvestRemaining;
+                state.HarvestRemaining = 0;
+                state.HarvestTotal = 0;
+                state.TotalCollected = SafeAdd(state.TotalCollected, active);
+                _trees[normalized] = state;
+                Add(active);
+                _eventBus?.Publish(new AppleTreeChangedEvent(state));
+                _eventBus?.Publish(new AppleTreeShakenEvent(normalized, active));
+                return active;
+            }
+
             GeneratePending(ref state);
 
             int collected = state.PendingCount;
@@ -265,6 +355,8 @@ namespace GeminiLab.Modules.Apple
                 ? state.LastGeneratedUtcTicks
                 : now.Ticks;
             state.PendingCount = Mathf.Max(0, state.PendingCount);
+            state.HarvestRemaining = Mathf.Max(0, state.HarvestRemaining);
+            state.HarvestTotal = Mathf.Max(state.HarvestRemaining, state.HarvestTotal);
             state.TotalCollected = Mathf.Max(0, state.TotalCollected);
             state.GeneratedRoundsToday = Mathf.Clamp(state.GeneratedRoundsToday, 0, MaxRoundsPerDay);
 

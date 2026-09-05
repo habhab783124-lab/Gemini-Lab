@@ -1,15 +1,13 @@
 #nullable enable
 #if UNITY_EDITOR
-using System.Collections.Generic;
 using GeminiLab.Modules.WorldMap;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace GeminiLab.Editor.Tools
 {
     /// <summary>
-    /// Scene 视图中的七条固定基线调整工具。只绘制和编辑场景已有定义，
+    /// Scene 视图中的固定基线调整工具。只绘制和编辑场景已有定义，
     /// 不创建运行时对象；拖动基线时绑定的 BaselineItem 一起沿 Y 轴移动。
     /// </summary>
     public sealed class WorldMapFlowerBaselineToolWindow : EditorWindow
@@ -38,7 +36,8 @@ namespace GeminiLab.Editor.Tools
 
         private void OnGUI()
         {
-            EditorGUILayout.HelpBox("七条固定基线：蓝、蓝、白、白、红、白、白。拖动线上的手柄可调整高度，同线物体会跟随。", MessageType.Info);
+            EditorGUILayout.HelpBox("固定基线包含天空、星星、云、树木、地面、花丛和桌宠。拖动线上的手柄可调整高度，同线物体会跟随。", MessageType.Info);
+            EditorGUILayout.HelpBox("列表按渲染顺序从前到后显示，RenderOrder 数值越大越靠前；数值只用于相对比较，不代表基线条数。Inspector 与窗口编辑的是同一份基线定义，修改会刷新该基线上的所有物体。", MessageType.None);
             _showHandles = EditorGUILayout.ToggleLeft("显示可拖拽手柄", _showHandles);
             if (GUILayout.Button("选中 FlowerPlacementGrid"))
             {
@@ -46,15 +45,35 @@ namespace GeminiLab.Editor.Tools
                 if (grid != null) Selection.activeGameObject = grid;
             }
 
-            foreach (WorldMapBaselineDefinition definition in GetDefinitions())
+            int displayIndex = 0;
+            foreach (WorldMapBaselineDefinition definition in WorldMapBaselineEditorUtility.GetDefinitions())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     Rect swatch = GUILayoutUtility.GetRect(18f, 18f, GUILayout.Width(18f));
                     EditorGUI.DrawRect(swatch, definition.EditorColor);
-                    EditorGUILayout.LabelField($"{definition.SlotIndex + 1}. {definition.DisplayName}",
-                        $"Y {definition.BaselineY:0.###}");
+                    EditorGUILayout.LabelField($"{displayIndex + 1}. {definition.DisplayName}",
+                        GUILayout.MinWidth(130f));
+                    EditorGUILayout.LabelField($"Y {definition.BaselineY:0.###}",
+                        GUILayout.Width(82f));
+                    EditorGUI.BeginChangeCheck();
+                    int renderOrder = EditorGUILayout.IntField(
+                        new GUIContent("相对顺序", "只比较数值大小，数值越大越靠前，不代表基线条数。"),
+                        definition.RenderOrder, GUILayout.Width(102f));
+                    if (EditorGUI.EndChangeCheck())
+                        WorldMapBaselineEditorUtility.TrySetRenderOrder(
+                            definition, renderOrder, "修改基线渲染顺序");
+                    GUIStyle moveButtonStyle = EditorStyles.miniButton;
+                    if (GUILayout.Button(new GUIContent("前移 ↑", "点击将该基线移到相邻的更靠前层。"),
+                        moveButtonStyle, GUILayout.Width(60f), GUILayout.Height(22f)))
+                        WorldMapBaselineEditorUtility.TryMoveRenderOrder(
+                            definition, 1, "调整基线渲染顺序");
+                    if (GUILayout.Button(new GUIContent("后移 ↓", "点击将该基线移到相邻的更靠后层。"),
+                        moveButtonStyle, GUILayout.Width(60f), GUILayout.Height(22f)))
+                        WorldMapBaselineEditorUtility.TryMoveRenderOrder(
+                            definition, -1, "调整基线渲染顺序");
                 }
+                displayIndex++;
             }
             Repaint();
         }
@@ -62,7 +81,7 @@ namespace GeminiLab.Editor.Tools
         private static void OnSceneGUI(SceneView sceneView)
         {
             if (_instance == null || !_instance._showHandles) return;
-            foreach (WorldMapBaselineDefinition definition in GetDefinitions())
+            foreach (WorldMapBaselineDefinition definition in WorldMapBaselineEditorUtility.GetDefinitions())
             {
                 LineRenderer? line = definition.GetComponent<LineRenderer>();
                 if (line == null || line.positionCount < 2) continue;
@@ -71,6 +90,8 @@ namespace GeminiLab.Editor.Tools
                 Handles.color = definition.EditorColor;
                 Handles.DrawLine(start, end, 3f);
                 Vector3 midpoint = Vector3.Lerp(start, end, 0.5f);
+                Handles.Label(midpoint + Vector3.up * 0.08f,
+                    $"{definition.DisplayName}  顺序 {definition.RenderOrder}");
                 EditorGUI.BeginChangeCheck();
                 Vector3 moved = Handles.PositionHandle(midpoint, Quaternion.identity);
                 if (!EditorGUI.EndChangeCheck()) continue;
@@ -79,49 +100,9 @@ namespace GeminiLab.Editor.Tools
                 moved.z = midpoint.z;
                 float deltaY = moved.y - midpoint.y;
                 if (Mathf.Abs(deltaY) <= 0.0001f) continue;
-                Undo.RecordObject(definition, "移动 WorldMap 基线");
-                Undo.RecordObject(line, "移动 WorldMap 基线");
-                line.SetPosition(0, new Vector3(start.x, moved.y, start.z));
-                line.SetPosition(1, new Vector3(end.x, moved.y, end.z));
-                SerializedObject serialized = new SerializedObject(definition);
-                serialized.FindProperty("_baselineY")!.floatValue = moved.y;
-                serialized.ApplyModifiedPropertiesWithoutUndo();
-                MoveBoundItems(definition, deltaY);
-                EditorUtility.SetDirty(line);
-                EditorSceneManager.MarkSceneDirty(definition.gameObject.scene);
+                WorldMapBaselineEditorUtility.TrySetBaselineY(
+                    definition, moved.y, "移动 WorldMap 基线");
             }
-        }
-
-        private static void MoveBoundItems(WorldMapBaselineDefinition definition, float deltaY)
-        {
-            BaselineItem[] items = Object.FindObjectsByType<BaselineItem>(
-                FindObjectsInactive.Include, FindObjectsSortMode.None);
-            for (int i = 0; i < items.Length; i++)
-            {
-                BaselineItem item = items[i];
-                if (item.BaselineDefinition != definition) continue;
-                Undo.RecordObject(item.transform, "移动基线上的物体");
-                Vector3 position = item.transform.position;
-                position.y += deltaY;
-                item.transform.position = position;
-                EditorUtility.SetDirty(item);
-            }
-        }
-
-        private static List<WorldMapBaselineDefinition> GetDefinitions()
-        {
-            var definitions = new List<WorldMapBaselineDefinition>();
-            WorldMapBaselineDefinition[] all = Object.FindObjectsByType<WorldMapBaselineDefinition>(
-                FindObjectsInactive.Include, FindObjectsSortMode.None);
-            for (int i = 0; i < all.Length; i++)
-            {
-                WorldMapBaselineDefinition definition = all[i];
-                if (definition.transform.parent != null &&
-                    definition.transform.parent.name == "FlowerPlacementGrid")
-                    definitions.Add(definition);
-            }
-            definitions.Sort((left, right) => left.SlotIndex.CompareTo(right.SlotIndex));
-            return definitions;
         }
     }
 }

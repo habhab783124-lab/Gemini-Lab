@@ -11,7 +11,7 @@ namespace GeminiLab.Editor.SceneBootstrap
     public static class AutoSetup
     {
         private const string SetupDoneKey = "GeminiLab.AutoSetupDone";
-        private const int ExpectedVersion = 69;
+        private const int ExpectedVersion = 70;
 
         static AutoSetup()
         {
@@ -458,6 +458,11 @@ namespace GeminiLab.Editor.SceneBootstrap
                         ApartmentFurnitureSelectionAuthoring.Patch();
                     }
 
+                    if (currentVersion < 70)
+                    {
+                        WorldMapAppleTreeAuthoring.Patch();
+                    }
+
                     EditorPrefs.SetInt(SetupDoneKey, ExpectedVersion);
                     Debug.Log($"[AutoSetup] 升级到版本 {ExpectedVersion} 完成。");
                 }
@@ -558,7 +563,9 @@ namespace GeminiLab.Editor.SceneBootstrap
                 System.StringSplitOptions.None).Length - 1;
             return !apartmentText.Contains("MailboxButton", System.StringComparison.Ordinal) ||
                    !worldMapText.Contains("c24671ba6d25cb246bdc627378a8fa9e", System.StringComparison.Ordinal) ||
-                   freeControlCount < 2;
+                   freeControlCount < 2 ||
+                   !worldMapText.Contains("WorldMapAppleDrops", System.StringComparison.Ordinal) ||
+                   !worldMapText.Contains("AppleTreeDropController", System.StringComparison.Ordinal);
         }
 
         public static void Reset()

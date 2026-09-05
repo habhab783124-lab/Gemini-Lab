@@ -23,7 +23,6 @@ namespace GeminiLab.Modules.WorldMap
         private const string AutoSaveSlot = "autosave";
         private const int SharedSortingBase = 1000;
         private const int SortingOrderStride = 1000;
-        private const int BaselineYPrecision = 100;
 
         public enum PlacementVisualType
         {
@@ -192,27 +191,15 @@ namespace GeminiLab.Modules.WorldMap
         [Serializable]
         public sealed class PlacementLayer
         {
-            [SerializeField] private string _id = string.Empty;
-            [SerializeField] private float _baselineY;
-            [SerializeField] private int _sortingOrder;
-            [SerializeField] private float _xMin;
-            [SerializeField] private float _xMax;
-            [SerializeField] private float _xOffset;
             [SerializeField] private WorldMapBaselineDefinition? _sourceBaselineDefinition;
-            [SerializeField] private BaselineItem? _sourceBaseline;
 
-            public string Id => _id;
+            public string Id => _sourceBaselineDefinition!.Id;
             public WorldMapBaselineDefinition? SourceBaselineDefinition => _sourceBaselineDefinition;
-            public BaselineItem? SourceBaseline => _sourceBaseline;
-            public float BaselineY => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.BaselineY :
-                _sourceBaseline != null ? _sourceBaseline.EffectiveBaselineY : _baselineY;
-            public int SortingOrder => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.SortingOrder :
-                _sourceBaseline != null ? _sourceBaseline.SortingOrder : _sortingOrder;
-            public float XMin => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.MinX :
-                _sourceBaseline != null ? _sourceBaseline.MinX : _xMin;
-            public float XMax => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.MaxX :
-                _sourceBaseline != null ? _sourceBaseline.MaxX : _xMax;
-            public float XOffset => _sourceBaselineDefinition != null ? _sourceBaselineDefinition.XOffset : _xOffset;
+            public float BaselineY => _sourceBaselineDefinition!.BaselineY;
+            public int SortingOrder => _sourceBaselineDefinition!.SortingOrder;
+            public float XMin => _sourceBaselineDefinition!.MinX;
+            public float XMax => _sourceBaselineDefinition!.MaxX;
+            public float XOffset => _sourceBaselineDefinition!.XOffset;
         }
 
         public Vector2 CellSize => _cellSize;
@@ -272,7 +259,7 @@ namespace GeminiLab.Modules.WorldMap
                 if (pet == null || pet.gameObject.scene.name != "WorldMap_Main") continue;
 
                 BaselineItem? baseline = pet.GetComponent<BaselineItem>();
-                if (baseline == null) continue;
+                if (baseline == null || !baseline.HasBaselineDefinition) continue;
 
                 // Read the pet's authored BaselineItem directly. Same exact line: keep the pet slightly in front.
                 pet.ApplyWorldMapSortingOrder(
@@ -666,10 +653,14 @@ namespace GeminiLab.Modules.WorldMap
                     : PlacementVisualType.Single;
                 Vector2Int footprint = ResolveFootprint(flowerId, visualType);
                 PlacementLayer placementLayer = ResolvePlacementLayer(placed.WorldY);
+                // Older saves may contain a free-placement Y that predates
+                // the authored baseline rows.  Keep the saved X, but render
+                // the restored visual on its resolved shared baseline so it
+                // remains anchored to the grass and is stable after restart.
                 slot.Place(
                     flowerId,
                     visualType,
-                    new Vector2(placed.WorldX, placed.WorldY),
+                    new Vector2(placed.WorldX, placementLayer.BaselineY),
                     footprint,
                     ResolveCellSize(visualType),
                     placementLayer.Id,
@@ -884,14 +875,10 @@ namespace GeminiLab.Modules.WorldMap
 
         private int ResolveSharedSortingOrder(int baselineSortingOrder, float baselineY, bool petTieBreak)
         {
-            if (baselineSortingOrder >= 0 && baselineSortingOrder < 7)
-                return SharedSortingBase + _flowerSortingOrderOffset +
-                       baselineSortingOrder * SortingOrderStride + (petTieBreak ? 1 : 0);
-
-            // SortingOrder 是主层级；同一主层级内，基线 Y 越低代表越靠近镜头，应该越靠前。
-            int baselineYKey = Mathf.Clamp(Mathf.RoundToInt(-baselineY * BaselineYPrecision), 0, SortingOrderStride - 2);
+            // RenderOrder 是唯一的相对主层级；数值越大越靠前，不把数值解释为基线数量。
+            // baselineY 参数保留用于调用方兼容，基线之间不再按 Y 生成隐式排序层。
             return SharedSortingBase + _flowerSortingOrderOffset + baselineSortingOrder * SortingOrderStride +
-                   baselineYKey + (petTieBreak ? 1 : 0);
+                   (petTieBreak ? 1 : 0);
         }
 
         private Vector2 SnapToGrid(Vector2 worldPoint, Vector2Int footprint)
@@ -1007,6 +994,18 @@ namespace GeminiLab.Modules.WorldMap
                 ResolveCellSize(_selectedVisualType ?? PlacementVisualType.Single));
             Rect placement = new(new Vector2(center.x - size.x * 0.5f, center.y), size);
             PlacementLayer layer = ResolvePlacementLayer(center.y);
+
+            // FlowerPlacementBounds is the scene-authored grass anchor area.
+            // Region colliders additionally split the area between angel and
+            // demon; both checks must pass so a stale wide region cannot
+            // accept a flower above or below the grass.
+            if (_placementSurface != null)
+            {
+                Bounds surface = GetPlacementBounds();
+                if (placement.xMin < surface.min.x || placement.xMax > surface.max.x ||
+                    center.y < surface.min.y || center.y > surface.max.y)
+                    return false;
+            }
 
             if (HasPlacementRegionBindings)
             {

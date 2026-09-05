@@ -710,7 +710,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                     new Vector3(bounds.min.x, y, 0f), new Vector3(bounds.max.x, y, 0f), material);
             }
 
-            // 基线由 ConfigureFixedBaselineDefinitions 单独作者化为七个固定节点。
+            // 基线由 ConfigureFixedBaselineDefinitions 单独作者化为十一条固定节点。
             // 这里不能再遍历 BaselineItem 生成线，否则删除物体会错误地删除基线。
             grid.SetActive(false);
         }
@@ -981,25 +981,37 @@ namespace GeminiLab.Editor.SceneBootstrap
 
         private static readonly FixedBaselineSpec[] FixedBaselineSpecs =
         {
-            new("Environment_Back", "BaselineLine_天空", 0,
+            new("Environment_Sky", "BaselineLine_天空", 0,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), 5.97f, 0f, false),
+            new("Environment_Stars", "BaselineLine_星星", 1,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), 8.4f, 0f, false),
+            new("Environment_Clouds", "BaselineLine_云", 2,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), 6.8f, 0f, false),
+            new("Environment_Back", "BaselineLine_大树_后", 3,
                 WorldMapBaselineDefinition.BaselineGroup.Environment,
                 new Color(0.55f, 0.88f, 1f, 0.95f), 2.3371658f, 0f, false),
-            new("Environment_Front", "BaselineLine_大树 3", 1,
+            new("Environment_Front", "BaselineLine_大树_前", 4,
                 WorldMapBaselineDefinition.BaselineGroup.Environment,
                 new Color(0.55f, 0.88f, 1f, 0.95f), 1.5571656f, 0f, false),
-            new("Flower_Back", "BaselineLine_花丛 4", 2,
+            new("Environment_Ground", "BaselineLine_地面", 5,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), -3.6354f, 0f, false),
+            new("Flower_Back", "BaselineLine_花丛 4", 6,
                 WorldMapBaselineDefinition.BaselineGroup.Flower,
                 Color.white, -2.5628343f, 2.005f, true),
-            new("Flower_MidBack", "BaselineLine_花丛 1", 3,
+            new("Flower_MidBack", "BaselineLine_花丛 1", 7,
                 WorldMapBaselineDefinition.BaselineGroup.Flower,
                 Color.white, -2.5728343f, 2.005f, true),
-            new("Character", "BaselineLine_Pet_Angel", 4,
+            new("Character", "BaselineLine_Pet_Angel", 8,
                 WorldMapBaselineDefinition.BaselineGroup.Character,
                 new Color(1f, 0.18f, 0.18f, 0.95f), -3.752758f, 0f, false),
-            new("Flower_MidFront", "BaselineLine_花丛 2", 5,
+            new("Flower_MidFront", "BaselineLine_花丛 2", 9,
                 WorldMapBaselineDefinition.BaselineGroup.Flower,
                 Color.white, -3.7528343f, 0f, true),
-            new("Flower_Front", "BaselineLine_花丛 3", 6,
+            new("Flower_Front", "BaselineLine_花丛 3", 10,
                 WorldMapBaselineDefinition.BaselineGroup.Flower,
                 Color.white, -4.3128343f, 2.005f, true)
         };
@@ -1040,6 +1052,9 @@ namespace GeminiLab.Editor.SceneBootstrap
                 SerializedObject serialized = new SerializedObject(definition);
                 serialized.FindProperty("_id")!.stringValue = spec.Id;
                 serialized.FindProperty("_slotIndex")!.intValue = spec.Slot;
+                SerializedProperty renderOrder = serialized.FindProperty("_renderOrder")!;
+                if (renderOrder.intValue < 0)
+                    renderOrder.intValue = spec.Slot;
                 serialized.FindProperty("_group")!.enumValueIndex = (int)spec.Group;
                 serialized.FindProperty("_editorColor")!.colorValue = spec.Color;
                 serialized.FindProperty("_displayName")!.stringValue = spec.Id;
@@ -1051,7 +1066,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(definition);
 
-                BindBaselineItems(definition, spec, baselineY);
+                BindBaselineItems(definition, spec);
             }
 
             // 只清理 FlowerPlacementGrid 下旧的 BaselineLine 节点，绝不触碰场景根对象。
@@ -1065,7 +1080,7 @@ namespace GeminiLab.Editor.SceneBootstrap
         }
 
         private static void BindBaselineItems(
-            WorldMapBaselineDefinition definition, FixedBaselineSpec spec, float baselineY)
+            WorldMapBaselineDefinition definition, FixedBaselineSpec spec)
         {
             BaselineItem[] items = UnityEngine.Object.FindObjectsByType<BaselineItem>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -1078,12 +1093,8 @@ namespace GeminiLab.Editor.SceneBootstrap
 
                 SerializedObject serialized = new SerializedObject(item);
                 serialized.FindProperty("_baselineDefinition")!.objectReferenceValue = definition;
-                serialized.FindProperty("_baselineY")!.floatValue = baselineY;
-                serialized.FindProperty("_sortingOrder")!.intValue = spec.Slot;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
-                SpriteRenderer? sprite = item.GetComponent<SpriteRenderer>();
-                if (sprite != null)
-                    sprite.sortingOrder = WorldMapBaselineDefinition.ToRendererSortingOrder(spec.Slot);
+                item.RefreshBaselineBinding();
                 EditorUtility.SetDirty(item);
             }
         }
@@ -1091,13 +1102,15 @@ namespace GeminiLab.Editor.SceneBootstrap
         private static int ResolveBaselineSlot(string objectName)
         {
             string normalized = objectName.Replace(" ", string.Empty).Replace("_", string.Empty);
-            if (normalized == "天空" || normalized == "大树3" || normalized == "大树4" || normalized == "大树5") return 0;
-            if (normalized == "地面" || normalized == "大树1" || normalized == "大树2" || normalized == "邮箱" || normalized == "桥" || normalized == "室内") return 1;
-            if (normalized == "花丛4") return 2;
-            if (normalized == "花丛1") return 3;
-            if (normalized == "PetAngel" || normalized == "PetDevil" || normalized == "天使1" || normalized == "天使2" || normalized == "天使3") return 4;
-            if (normalized == "花丛2") return 5;
-            if (normalized == "花丛3") return 6;
+            if (normalized == "天空") return 0;
+            if (normalized == "大树3" || normalized == "大树4" || normalized == "大树5") return 3;
+            if (normalized == "大树1" || normalized == "大树2" || normalized == "邮箱" || normalized == "桥" || normalized == "室内") return 4;
+            if (normalized == "地面") return 5;
+            if (normalized == "花丛4") return 6;
+            if (normalized == "花丛1") return 7;
+            if (normalized == "PetAngel" || normalized == "PetDevil" || normalized == "天使1" || normalized == "天使2" || normalized == "天使3") return 8;
+            if (normalized == "花丛2") return 9;
+            if (normalized == "花丛3") return 10;
             return -1;
         }
 
@@ -1122,14 +1135,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             {
                 WorldMapBaselineDefinition definition = definitions[i];
                 SerializedProperty element = property.GetArrayElementAtIndex(i);
-                element.FindPropertyRelative("_id")!.stringValue = definition.Id;
-                element.FindPropertyRelative("_baselineY")!.floatValue = definition.BaselineY;
-                element.FindPropertyRelative("_sortingOrder")!.intValue = definition.SortingOrder;
-                element.FindPropertyRelative("_xMin")!.floatValue = definition.MinX;
-                element.FindPropertyRelative("_xMax")!.floatValue = definition.MaxX;
-                element.FindPropertyRelative("_xOffset")!.floatValue = definition.XOffset;
                 element.FindPropertyRelative("_sourceBaselineDefinition")!.objectReferenceValue = definition;
-                element.FindPropertyRelative("_sourceBaseline")!.objectReferenceValue = null;
             }
         }
 
@@ -1156,42 +1162,14 @@ namespace GeminiLab.Editor.SceneBootstrap
                 if (pet == null) continue;
 
                 BaselineItem baseline = GetOrAdd<BaselineItem>(pet);
-                float baselineY = characterDefinition != null
-                    ? characterDefinition.BaselineY
-                    : pet.transform.position.y;
-                int sortingOrder = characterDefinition != null
-                    ? characterDefinition.SortingOrder
-                    : ResolveNearestBaselineSortingOrder(baseline, baselineY);
-
                 var serialized = new SerializedObject(baseline);
                 serialized.FindProperty("_baselineDefinition")!.objectReferenceValue = characterDefinition;
-                serialized.FindProperty("_baselineY")!.floatValue = baselineY;
-                serialized.FindProperty("_minX")!.floatValue = -10f;
-                serialized.FindProperty("_maxX")!.floatValue = 10f;
-                serialized.FindProperty("_sortingOrder")!.intValue = sortingOrder;
                 serialized.FindProperty("_allowDrag")!.boolValue = false;
                 serialized.FindProperty("_solidCollider")!.boolValue = true;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
+                baseline.RefreshSortingOrder();
                 EditorUtility.SetDirty(baseline);
             }
-        }
-
-        private static int ResolveNearestBaselineSortingOrder(BaselineItem petBaseline, float baselineY)
-        {
-            int sortingOrder = 0;
-            float bestDistance = float.PositiveInfinity;
-            foreach (BaselineItem candidate in UnityEngine.Object.FindObjectsByType<BaselineItem>(FindObjectsSortMode.None))
-            {
-                if (candidate == petBaseline || candidate.GetComponent<PetController>() != null) continue;
-
-                float distance = Mathf.Abs(candidate.EffectiveBaselineY - baselineY);
-                if (distance >= bestDistance) continue;
-
-                bestDistance = distance;
-                sortingOrder = candidate.SortingOrder;
-            }
-
-            return sortingOrder;
         }
 
         private static Sprite? LoadSprite(string path)

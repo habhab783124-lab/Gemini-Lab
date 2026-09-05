@@ -19,6 +19,8 @@ namespace GeminiLab.Modules.WorldMap
 
         [SerializeField] private string _id = string.Empty;
         [SerializeField] private int _slotIndex = -1;
+        [Tooltip("基线渲染优先级相对值；只比较大小，数值越大越靠前。所有绑定物体和花朵放置层共享此值，不代表基线条数。")]
+        [SerializeField] private int _renderOrder;
         [SerializeField] private BaselineGroup _group;
         [SerializeField] private Color _editorColor = Color.white;
         [SerializeField] private string _displayName = string.Empty;
@@ -30,6 +32,7 @@ namespace GeminiLab.Modules.WorldMap
 
         public string Id => _id;
         public int SlotIndex => _slotIndex;
+        public int RenderOrder => _renderOrder;
         public BaselineGroup Group => _group;
         public Color EditorColor => _editorColor;
         public string DisplayName => string.IsNullOrEmpty(_displayName) ? _id : _displayName;
@@ -39,11 +42,15 @@ namespace GeminiLab.Modules.WorldMap
         public float MaxX => _maxX;
         public float BaselineY => _baselineY;
         public bool IsFixedSlot => _slotIndex >= 0;
-        public int SortingOrder => _slotIndex >= 0 ? _slotIndex : 0;
+        // 兼容现有调用方；新的单一事实源是 RenderOrder，它只参与相对大小比较。
+        public int SortingOrder => RenderOrder;
 
-        public static int ToRendererSortingOrder(int slotIndex)
+        public static int ToRendererSortingOrder(int renderOrder)
         {
-            return 1000 + Mathf.Max(0, slotIndex) * 1000;
+            long resolved = 1000L + renderOrder * 1000L;
+            if (resolved > int.MaxValue) return int.MaxValue;
+            if (resolved < int.MinValue) return int.MinValue;
+            return (int)resolved;
         }
     }
 }
