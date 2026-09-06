@@ -1,5 +1,5 @@
 # Gemini-Lab AI memory index
-# Updated: 2026-09-03
+# Updated: 2026-09-05
 
 AGENTS.md
 Assets/_Project/Scripts/Modules/HubUI/ApartmentFurnitureSelectionPresenter.cs
@@ -77,6 +77,8 @@ Assets/_Project/Scripts/Modules/EmotionGarden/EmotionFlowerModels.cs
 Assets/_Project/Scripts/Modules/EmotionGarden/EmotionGardenRuntimeBootstrap.cs
 Assets/_Project/Scripts/Modules/EmotionGarden/EmotionFlowerArtCatalog.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapEmotionGardenUIPatch.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWishSystemAuthoring.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapGardenZonePatch.cs
 Assets/_Project/Art/WorldMap/flower/EmotionFlowerArtCatalog.asset
 Assets/_Project/Art/WorldMap/arrange/PlacementGrid.mat
 Assets/_Project/Art/Sprites/Environment/ApartmentScene_Extracted/README.md
@@ -103,6 +105,7 @@ Assets/_Project/Scripts/Modules/Pet/PetClickResponseLibrary.cs
 Assets/_Project/Scripts/Core/DevMode.cs
 Assets/_Project/Scripts/Modules/WorldMap/CabinReturnPortal.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapGardenZone.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishSystemController.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapCameraController.cs
 Assets/_Project/Scripts/Modules/WorldMap/ClickableSceneObject.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapInteractiveObjectFeedback.cs
@@ -233,6 +236,20 @@ Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishTreeInteractable.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWishSystemAuthoring.cs
 Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (许愿树入口与许愿系统作者化)
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishSystemController.cs (主面板许愿树星位与单一滚动详情页)
+Assets/_Project/Scripts/Modules/EmotionGarden/EmotionGardenService.cs (AI 情绪提交、花朵与每日总结持久化)
+Assets/_Project/Scripts/Modules/EmotionGarden/IEmotionGardenAiProvider.cs
+Assets/_Project/Scripts/Modules/EmotionGarden/EmotionGardenAiModels.cs
+Assets/_Project/Scripts/Modules/AI/EmotionGardenAiProvider.cs (复用 Resources/LLMConfig 的 OpenAI 兼容 AI)
+Assets/_Project/Scripts/Modules/AI/EmotionGardenAiRuntimeBootstrap.cs
+Assets/_Project/Scripts/Modules/HubUI/Panels/EmotionInputPanelStub.cs (异步情绪提交)
+Assets/_Project/Scripts/Modules/HubUI/Panels/WeeklyGardenPanelStub.cs (关键词与花语展示)
+Assets/_Project/Tests/EditMode/EmotionGardenAiTests.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorTutorialAuthoring.cs (WorldMap 室外新手指引 Scene 作者化与占位入口)
+Assets/_Project/Scripts/Modules/HubUI/Panels/SceneAuthoredImageVariantView.cs (Scene 作者化页面显隐与翻页)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (Panel_OutdoorTutorial 七页新手指引)
+Assets/_Project/Art/新手引导/outdoor/ (intro、outdoor1-6、close 页面资源)
+Assets/_Project/Art/新手引导/left.png (新手指引上一页按钮)
+Assets/_Project/Art/新手引导/right.png (新手指引下一页按钮)
 Assets/_Project/Art/WorldMap/weather/WorldMapClouds_Alpha.png (天气云层派生透明 Sprite)
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWeatherAuthoring.cs (天气云层/星星/雨层 Scene 作者化)
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAmbientAnimationAuthoring.cs (云层、单花和树绑定作者化)

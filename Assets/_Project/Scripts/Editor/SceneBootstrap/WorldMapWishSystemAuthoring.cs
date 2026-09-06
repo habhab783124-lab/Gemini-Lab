@@ -99,6 +99,14 @@ namespace GeminiLab.Editor.SceneBootstrap
             TMP_InputField inputField = EnsureInputField(input.transform, uiLayer, "WishInputField");
             ApplyRect(inputField.gameObject, Vector2.zero, Vector2.zero, new Vector2(1310f, 400f), new Vector2(576f, 188f));
             ApplyInputArt(inputField, WishArtRoot + "input.png");
+            Image inputPromptImage = inputField.GetComponent<Image>()!;
+            GameObject inputFocusedVisual = EnsureImageChild(input.transform, "WishInputFocusedVisual",
+                "Assets/_Project/Art/WorldMap/UI输入框去字/wish_input.png", uiLayer, false);
+            ApplyRect(inputFocusedVisual, Vector2.zero, Vector2.zero, new Vector2(1310f, 400f), new Vector2(576f, 188f));
+            Image inputFocusedImage = inputFocusedVisual.GetComponent<Image>()!;
+            inputFocusedImage.raycastTarget = false;
+            inputFocusedVisual.SetActive(false);
+            PlaceBehind(inputFocusedVisual.transform, inputField.transform);
             Button submit = EnsureButton(input.transform, "Btn_SubmitWish", uiLayer, string.Empty,
                 Vector2.zero, Vector2.zero, new Vector2(1310f, 200f), new Vector2(214f, 62f));
             ApplyButtonArt(submit, WishArtRoot + "wish.png");
@@ -178,6 +186,8 @@ namespace GeminiLab.Editor.SceneBootstrap
             SetObject(controllerSo, "_fulfillButton", fulfill);
             SetObject(controllerSo, "_deleteButton", delete);
             SetObject(controllerSo, "_inputField", inputField);
+            SetObject(controllerSo, "_inputPromptImage", inputPromptImage);
+            SetObject(controllerSo, "_inputFocusedImage", inputFocusedImage);
             SetObject(controllerSo, "_dialogueText", dialogue);
             SetObject(controllerSo, "_detailContentText", detailContent);
             SetObject(controllerSo, "_detailCreatedText", detailCreated);
@@ -213,6 +223,42 @@ namespace GeminiLab.Editor.SceneBootstrap
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Debug.Log($"[WorldMapWishSystemAuthoring] Wish system authored. tree={(wishingTree != null)}, panelSlots={panelStars.Length}");
+        }
+
+        /// <summary>
+        /// Adds only the focused no-placeholder art to the existing wish input.
+        /// It intentionally does not rebuild the wish panel or its list slots.
+        /// </summary>
+        public static void PatchInputTaskMinimized()
+        {
+            Scene scene = EditorSceneManager.GetActiveScene().path == ScenePath
+                ? EditorSceneManager.GetActiveScene()
+                : EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject? panel = GameObject.Find(PanelName);
+            if (panel == null) return;
+            Transform? inputView = panel.transform.Find("Window/InputView");
+            TMP_InputField? inputField = inputView?.Find("WishInputField")?.GetComponent<TMP_InputField>();
+            WorldMapWishSystemController? controller = panel.GetComponent<WorldMapWishSystemController>();
+            if (inputView == null || inputField == null || controller == null) return;
+
+            int uiLayer = panel.layer;
+            GameObject focusedVisual = EnsureImageChild(inputView, "WishInputFocusedVisual",
+                "Assets/_Project/Art/WorldMap/UI输入框去字/wish_input.png", uiLayer, false);
+            ApplyRect(focusedVisual, Vector2.zero, Vector2.zero, new Vector2(1310f, 400f), new Vector2(576f, 188f));
+            Image focusedImage = focusedVisual.GetComponent<Image>()!;
+            focusedImage.raycastTarget = false;
+            focusedVisual.SetActive(false);
+            PlaceBehind(focusedVisual.transform, inputField.transform);
+
+            SerializedObject controllerSo = new(controller);
+            SetObject(controllerSo, "_inputField", inputField);
+            SetObject(controllerSo, "_inputPromptImage", inputField.GetComponent<Image>());
+            SetObject(controllerSo, "_inputFocusedImage", focusedImage);
+            controllerSo.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(controller);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[WorldMapWishSystemAuthoring] Minimal wish input visual authored");
         }
 
         private static void ConfigurePanelRoot(GameObject panel)

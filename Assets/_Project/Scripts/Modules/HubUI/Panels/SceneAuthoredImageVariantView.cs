@@ -24,6 +24,10 @@ namespace GeminiLab.Modules.HubUI
         [SerializeField] private string _previewKey = string.Empty;
         [SerializeField] private Variant[] _variants = Array.Empty<Variant>();
 
+        // Page state is only used by scene-authored paged panels. Existing
+        // flower/codex callers continue to use Show/Hide directly.
+        private int _activePageIndex = -1;
+
         public static string BuildFlowerKey(string emotionType, string owner, GrowthState state)
         {
             return BuildKey(
@@ -81,6 +85,7 @@ namespace GeminiLab.Modules.HubUI
                 return;
             }
 
+            _activePageIndex = ResolvePageIndex(key);
             gameObject.SetActive(true);
         }
 
@@ -103,7 +108,25 @@ namespace GeminiLab.Modules.HubUI
                 _previewImage.enabled = true;
             }
 
+            _activePageIndex = 0;
             gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        /// Shows the next scene-authored page. Page zero is the preview target;
+        /// serialized variants follow in their Inspector order.
+        /// </summary>
+        public void ShowNext()
+        {
+            ShowRelativePage(1);
+        }
+
+        /// <summary>
+        /// Shows the previous scene-authored page, clamped at the first page.
+        /// </summary>
+        public void ShowPrevious()
+        {
+            ShowRelativePage(-1);
         }
 
         public void Hide()
@@ -119,7 +142,53 @@ namespace GeminiLab.Modules.HubUI
             }
 
             SetAllVariantsActive(false);
+            _activePageIndex = -1;
             gameObject.SetActive(false);
+        }
+
+        private void ShowRelativePage(int delta)
+        {
+            int pageCount = (_previewTarget != null || _previewImage != null ? 1 : 0) + _variants.Length;
+            if (pageCount == 0)
+            {
+                return;
+            }
+
+            if (_activePageIndex < 0)
+            {
+                _activePageIndex = delta > 0 ? 0 : pageCount - 1;
+            }
+
+            int nextIndex = Mathf.Clamp(_activePageIndex + delta, 0, pageCount - 1);
+            if (nextIndex == 0)
+            {
+                ShowPreview();
+                return;
+            }
+
+            int variantIndex = nextIndex - 1;
+            if (variantIndex >= 0 && variantIndex < _variants.Length)
+            {
+                Show(_variants[variantIndex].Key);
+            }
+        }
+
+        private int ResolvePageIndex(string key)
+        {
+            if ((_previewTarget != null || _previewImage != null) && string.Equals(key, _previewKey, StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            for (int i = 0; i < _variants.Length; i++)
+            {
+                if (string.Equals(_variants[i].Key, key, StringComparison.Ordinal))
+                {
+                    return (_previewTarget != null || _previewImage != null ? 1 : 0) + i;
+                }
+            }
+
+            return -1;
         }
 
         private void SetAllVariantsActive(bool active)

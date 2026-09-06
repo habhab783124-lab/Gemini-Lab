@@ -479,3 +479,16 @@ Updated: 2026-08-22
 - `AppleService` 的 `TryBeginHarvest`/ `TryCollectHarvest` 将当前缓存总量保留为一个可持久化批次，逐个领取后才增加苹果余额；旧 `ShakeTree` API 保持兼容。
 - `AppleTreeDropController` 与 `AppleDropSlot` 只切换 Scene 中已作者化的 3 个掉落槽位，使用 `Assets/_Project/Art/WorldMap/苹果云背景补充/apple.png`；运行时不创建视觉对象。
 - `WorldMapAppleTreeAuthoring` 为「大树 2」～「大树 5」中实际存在的苹果树保存槽位、碰撞体、收获文字和根部快速晃动参数；「大树 1」与「许愿树」排除。
+
+### WorldMap AI 情绪花园（2026-09-05）
+
+- AI 契约位于 `Assets/_Project/Scripts/Modules/EmotionGarden/IEmotionGardenAiProvider.cs` 与 `EmotionGardenAiModels.cs`；实际 OpenAI 兼容实现位于 `Assets/_Project/Scripts/Modules/AI/EmotionGardenAiProvider.cs`，启动注册位于 `EmotionGardenAiRuntimeBootstrap.cs`。
+- `EmotionGardenService` 是 AI 结果与存档的唯一写入入口；面板只负责调用异步接口和显示文本，不直接处理网络或持久化。
+- `EmotionInputPanelStub` 提交情绪后生成 AI 花朵与每日总结；`WeeklyGardenPanelStub` 从花朵记录显示关键词、花语；`DailySummaryMailboxPanel` 按日期显示 summary、angelNote、devilNote。
+
+### WorldMap 室外新手指引（2026-09-06）
+
+- 场景：`Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity`，节点位于 `Canvas/Panel_OutdoorTutorial`。
+- 作者化脚本：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorTutorialAuthoring.cs`，菜单为 `Tools/Gemini-Lab/WorldMap/Author Outdoor Tutorial`。脚本只增量维护新手指引子树。
+- 页面资源：`Assets/_Project/Art/新手引导/outdoor/intro.png`、`outdoor1.png`～`outdoor6.png`；按钮资源：`Assets/_Project/Art/新手引导/left.png`、`right.png`、`outdoor/close.png`。
+- 运行时分页组件：`Assets/_Project/Scripts/Modules/HubUI/Panels/SceneAuthoredImageVariantView.cs`，只操作 Scene 中的页面节点和按钮事件。

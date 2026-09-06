@@ -735,3 +735,33 @@ Updated: 2026-08-22
 | 掉落苹果的分配值总和等于本轮固定总量 | 已通过 EditMode/代码检查 | 服务层保留批次总量，逐个领取 |
 | 点击地面苹果后余额增加并显示“收获 +N”约 2 秒 | 待 Play 验证 | 槽位碰撞体经过点击遮挡判定 |
 | 许愿树不触发苹果掉落 | 已通过作者化/代码检查 | 大树 1 与许愿树均排除 |
+
+## B34. WorldMap 输入框视觉状态与情绪入口（2026-09-05）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 天使标牌点击打开天使情绪输入，恶魔标牌点击打开恶魔情绪输入 | 待 Play 验证 | 入口来自真实 `天使标牌` / `恶魔标牌` 的 `WorldMapGardenZone`，旧 EmotionEntry 占位节点停用 |
+| 情绪输入框未聚焦显示带提示文字资源，点击后切换无字资源 | 待 Play 验证 | Scene 预置 `InputVisual` / `InputVisual_Focused`，运行时只切换显隐 |
+| 情绪输入结束编辑或提交后恢复带提示文字资源 | 待 Play 验证 | 由 `TMP_InputField.onEndEdit` 与提交成功路径复位 |
+| 许愿输入框未聚焦显示 `许愿树/input.png`，点击后切换 `UI输入框去字/wish_input.png` | 待 Play 验证 | 打开输入页不自动抢焦点 |
+| 图鉴列表卡片和详情花图下方无土壤 | 待 Play 验证 | `FlowerCollectionPanelStub` 强制关闭图鉴土壤节点 |
+| 每周培育面板仍显示土壤，右上 `Btn_EmotionInput` 不可见 | 待 Play 验证 | 每周节点未改动；旧按钮仅停用 |
+
+## B35. WorldMap AI 情绪花园接入（2026-09-05）
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 情绪提交调用共享 LLM 配置并生成花朵情绪 | 待 Play 验证 | 未配置/超时会显示本地兜底结果，不阻塞提交 |
+| AI 关键词和花语写入并在每周培育面板显示 | 待 Play 验证 | 由 `WeeklyGardenPanelStub` 读取持久化花朵字段 |
+| 每日总结显示选中日期的 summary、angelNote、devilNote | 待 Play 验证 | 由 `DailySummaryMailboxPanel` 读取持久化总结 |
+| 关闭并重启后 AI 生成字段仍存在 | 待 Play 验证 | 存档版本升级到 5，旧记录会补齐字段 |
+| 许愿面板保持原流程且未接入 AI | 已通过范围检查 | 本轮明确暂缓 |
+
+## B36. WorldMap 室外新手指引（2026-09-06）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 点击 `Btn_OutdoorTutorial` 后显示 `intro` 页面 | 待 Play 验证 | 当前为可替换占位入口 |
+| 点击下一页按 `intro`→`outdoor1`～`outdoor6` 顺序切换 | 待 Play 验证 | 首页/末页保持边界，不循环 |
+| 点击上一页按相反顺序切换，首末页不越界 | 待 Play 验证 | 使用点击按钮事件 |
+| 点击 `close.png` 关闭面板 | 待 Play 验证 | 面板关闭后入口仍可用 |
+| Scene 中七页 Sprite 引用与 Play 显示一致 | 待人工验证 | 页面和布局均已保存到 `WorldMap_Main.unity` |

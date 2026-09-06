@@ -129,13 +129,13 @@ AI 协作工具链目录。
 - `2026-08-10` 起，`Panel_WeeklyGarden/Content/UIbar` 是唯一的集中信息条，由 `DateText`、`EmotionText`、`FlowerLanguageText` 显示当前默认日期或选中日期的信息；面板根 Scene 缩放为 `0.85`，UIbar 根节点缩放为 `1.5`（实际显示约 `360×102`），UIbar 字号为 `18/16/18`，资源入口为 `Assets/_Project/Art/WorldMap/UI/garden_week/UIbar.png`。
 - `Day0`~`Day6/Bottle` 使用 `WeeklyGardenBottleInteraction`：悬浮缩放瓶子，选中激活使用 `SpriteAlphaOutline` 材质的 `SelectedHighlight` 外圈；`Content/BlankClickArea` 点击后清除选择。所有视觉节点、材质引用和默认状态由 Scene 作者化，运行时不生成最终视觉。
 - `2026-08-09` 起，成长阶段 icon 位于每个 `UIbar/Growth`，使用 `Assets/_Project/Art/WorldMap/花朵图鉴/花朵/` 下按培育者和情绪类型匹配的花头资源；有当天记录时显示，无记录时隐藏。运行时只切换 Scene 预置变体，不写入 Sprite。已开花时瓶内仍由 `FlowerImage` 显示带枝叶完整花图；`Panel_EmotionCollection` 图鉴只展示已开花收集项。
-- `2026-08-07` 起，每周种植、图鉴列表和图鉴详情的已显示花卉都按同一规则组合：对应情绪/培育者的带枝叶完整花图 + 下方 `Assets/_Project/Art/WorldMap/flower/土壤.PNG`；三处只保留各自显示尺寸差异。场景中的 `SoilImage` 由 `WorldMapEmotionGardenUIPatch` 作者化并绑定，运行时只按数据显隐；空白格、锁定卡片和未选中详情不显示土壤。
+- `2026-08-07` 起，每周种植面板的已显示花卉按“完整花图 + `Assets/_Project/Art/WorldMap/flower/土壤.PNG`”组合；图鉴列表卡片和图鉴详情只显示完整花图，不显示土壤。场景中的每周 `SoilImage` 由 `WorldMapEmotionGardenUIPatch` 作者化并绑定，图鉴土壤节点不再绑定。
 - `2026-08-07` 修正图鉴列表：卡片空 Sprite 的默认半透明颜色不再泄漏到已收集花图，运行时和 Scene 作者化都保持完整花图不透明；每周格子、图鉴卡片和详情页的土壤位置已收紧并保存到 `WorldMap_Main.unity`。
 - `2026-08-07` 新增 WorldMap 花卉布局复用工具 `Assets/_Project/Scripts/Editor/Tools/WorldMapFlowerSoilLayoutWindow.cs`，从 `Tools/Gemini-Lab/WorldMap 花卉布局复用` 打开。窗口有每周种植、图鉴列表、图鉴详情三个按钮，使用各自参考对象复制 `FlowerImage` / `SoilImage` 的 RectTransform 布局，并支持 Undo 与场景 dirty 标记。
 - `2026-08-09` 起，每周培育的 `Bottle` 是固定 Scene 美术节点，所有日期都使用 `UI/garden_week/bottle.png`；培育者和成长阶段只影响瓶内花朵与 UIbar，不影响瓶子。旧 `DayText` 默认关闭，星期只使用 `DaySprite`。
-- 同轮，图鉴卡片的锁定态也直接作者化在 Scene 中：未解锁卡片的 `LockedImage` 开启，`FlowerImage`、`SoilImage`、`UnlockedContent` 关闭；当前 Scene 默认保留前三张已收集卡的真实花枝与土壤预览，运行时只根据收集数据切换这些已有节点。
+- 同轮，图鉴卡片的锁定态也直接作者化在 Scene 中：未解锁卡片的 `LockedImage` 开启，`FlowerImage`、`UnlockedContent` 关闭；当前 Scene 默认保留前三张已收集卡的真实花枝预览，运行时只根据收集数据切换这些已有节点。
 - `2026-08-09` 起，`SceneAuthoredImageVariantView.cs` 是每周花图、成长花头、图鉴卡片和详情页的稳定序列化变体组件；每周无花状态的瓶内花、成长 icon、土壤和花朵预览均隐藏，三个 UIbar 信息区显示真实数据或 `---`。
-- 图鉴详情页改为每个 `Variant_00...` 独立包含 `FlowerArt` 与 `SoilImage`，土壤 Y 坐标按花型单独作者化；`WorldMapFlowerSoilLayoutWindow` 的详情复用入口也按同名 Variant 配对复制。
+- 图鉴详情页改为每个 `Variant_00...` 独立包含 `FlowerArt`；每周培育格仍保留独立 `SoilImage`，图鉴详情不再创建或显示土壤。`WorldMapFlowerSoilLayoutWindow` 的每周布局入口继续可用，图鉴目标只复制花图布局。
 - `2026-08-10` 起，WorldMap 花朵摆放入口已改为右侧 `FlowerPlacementPanel` 滚动侧边栏（`2026-08-11` 已按参考图修正锚点、条目内部图标/名称位置与原始资源尺寸，并重构为固定详情页手风琴）；`FlowerList/FlowerOption_00...17` 使用 `arrange` 正式 UI 资源，标题花头取 `花朵图鉴/花朵`，放置单花取 `花朵图鉴/花朵放置`，花丛取 `花朵图鉴/花丛`。`FlowerList` 已启用子项高度控制，展开时当前标题与上方条目位置固定，详情页显示在标题下方，所有下方条目统一下移固定高度且不遮挡详情。`WorldMapFlowerPlacementAuthoring` 将 18 组条目、36 个预览、32 个放置槽和 10×5 的完整二维网格直接保存到 `WorldMap_Main.unity`；旧原型按钮节点已清理，32 个槽位的正式视觉引用已重新保存。
 - 摆放层进一步以 `BaselineItem` 的基线/排序层为准：内部吸附在相邻层半格错位但不显示网格、同层单格占用、跨层可重叠；作者化只收录摆放区域内基线，花丛按场景 `花丛 3` 的实际碰撞体尺寸作为一格，并在点击合法草地区域时提交。
 - `WorldMapFlowerPlacementController` 只负责侧栏显隐、条目展开、共享库存显示/消耗、3 单花合成 1 花丛、不可见吸附计算、有效区域校验、预置槽位移动和 `Esc` 退出；选择单花/花丛后自动隐藏侧栏但保留当前选择和预览，点击场景 UI 不会被误判为落位；不在运行时创建 UI、Sprite、网格线或最终摆放物。`2026-08-12` 起库存由 `EmotionGardenService` 按“情绪类型 + 培育者”持久化，花朵开花、摆放与合成使用同一份数据；旧存档升级到版本 3 时一次性迁移。版本 4 保存 `PlacedFlowers` 并在成功摆放后立即 autosave，重启恢复槽位/坐标且不二次扣库存；自由摆放不添加土壤。旧顶层 `FlowerPlacementStatusBar` 已移除，提示文字归属侧栏内 `PlacementStatus`。`2026-08-14` 起，`WorldMapPlacementSlot` 使用独立稳定 GUID 与显式占用状态，提交期间忽略同步恢复事件重入，避免成功点击后槽位被清空；Play 启动校验应看到 `32/32` 槽位、`1152` 个绑定。花卉视觉排序使用 `Default` Sorting Layer，与桌宠共享 `BaselineItem.SortingOrder` 主层级，同层再按基线 Y 决定前后，完全同线时桌宠略优先；AutoSetup 63 已将 `Pet_Angel`、`Pet_Devil` 根对象作者化为 `BaselineItem` 并保持实体碰撞。
@@ -366,3 +366,22 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 - `WorldMapAppleTreeAuthoring` 在 `WorldMap_Main.unity/_SceneRoot/WorldMapAppleDrops` 下作者化每棵苹果树的 3 个地面掉落槽位，槽位保存 `apple.png`、碰撞体和 TMP 收获文字。
 - 点击苹果树先锁定服务层批次总量，随机拆成 1–3 个正整数；点击地面苹果逐个领取，文字在苹果上方显示约 2 秒。
 - 「大树 1」/「许愿树」不挂苹果掉落逻辑；现有生成周期、每日轮数和消费价格保持不变。树连续摆动幅度与点击时的快速摆动参数均可在 Inspector 调整。
+
+## WorldMap 输入框视觉状态与情绪入口（2026-09-05）
+
+- 情绪输入面板 `Panel_EmotionInput` 的 AngelTheme/DemonTheme 各保存提示图 `输入心情/*/input.png` 与 `UI输入框去字/angel_emotion_input.png`、`devil_emotion_input.png` 两个 Image 节点；`EmotionInputPanelStub` 只按焦点和结束编辑切换显隐。
+- 许愿系统 `WorldMapWishSystemPanel/InputView/WishInputField` 保存 `许愿树/input.png` 与 `WishInputFocusedVisual`（`UI输入框去字/wish_input.png`）两套 Image；输入页打开不自动聚焦，点击输入框后才切换无字资源。
+- 情绪入口由场景真实物体 `天使标牌`、`恶魔标牌` 上的 `WorldMapGardenZone` 提供；旧 `EmotionEntry_Angel/Demon` 节点停用，右上 `Btn_EmotionInput` 停用。图鉴卡片和详情花图不显示 `SoilImage`，每周培育仍保留土壤。
+
+## WorldMap AI 情绪花园（2026-09-05）
+
+- AI 服务复用室内聊天的 `Resources/LLMConfig.asset`；`EmotionGardenAiRuntimeBootstrap` 只注册服务，不创建场景视觉对象。
+- 情绪输入提交后由 `EmotionGardenService` 统一调用 AI 并保存结果；没有配置或请求失败时使用本地规则兜底。
+- 每周培育的集中信息栏显示 AI 关键词和花语；每日总结面板继续通过日期读取 AI 生成的 summary、天使短记和恶魔短记。
+- 许愿面板 AI 接入暂缓。
+
+## WorldMap 室外新手指引（2026-09-06）
+
+- `Canvas/Panel_OutdoorTutorial` 保存七张可替换的教程页面，以及上一页、下一页、关闭按钮；面板默认关闭。
+- `Canvas/Btn_OutdoorTutorial` 是当前的占位入口，后续可直接替换其 Sprite 或 UnityEvent，不需要改动分页代码。
+- 所有图片引用和 RectTransform 都保存在 Scene；`SceneAuthoredImageVariantView` 运行时只做页面显隐与首尾边界控制，符合 Scene/Play 视觉一致约束。

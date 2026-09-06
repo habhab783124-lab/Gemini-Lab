@@ -22,6 +22,9 @@ namespace GeminiLab.Modules.EmotionGarden
         public string EmotionType;
         public string FlowerName;
         public string EmotionDetail;
+        public string[] EmotionKeywords;
+        public string FlowerDescription;
+        public string FlowerLanguage;
         public string Owner;
         public GrowthState State;
         public bool IsCollected;

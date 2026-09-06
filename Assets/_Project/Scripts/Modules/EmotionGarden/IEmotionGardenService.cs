@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace GeminiLab.Modules.EmotionGarden
 {
@@ -16,9 +18,18 @@ namespace GeminiLab.Modules.EmotionGarden
         /// <summary>
         /// 提交今天的情绪，生成情绪花。同日重复提交返回 null。
         /// owner: "angel" / "demon"
-        /// 当前阶段 emotionType 固定为 "悲伤"（占位）。
+        /// emotionType 可传入标准情绪或留空；异步入口会交给 AI 判断。
         /// </summary>
         EmotionFlowerData? SubmitEmotion(string emotionType, string emotionDetail, string owner);
+
+        /// <summary>
+        /// 通过 AI 判断情绪并生成周培育/每日小结文本；请求失败时由服务内部回退到本地规则。
+        /// </summary>
+        Task<EmotionFlowerData?> SubmitEmotionAsync(
+            string emotionType,
+            string emotionDetail,
+            string owner,
+            CancellationToken cancellationToken = default);
 
         /// <summary>获取今天的情绪花（已提交则返回，否则 null）。</summary>
         EmotionFlowerData? GetTodayFlower();

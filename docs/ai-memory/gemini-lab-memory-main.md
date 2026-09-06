@@ -604,3 +604,24 @@ Updated: 2026-08-22
 ### 2026-09-05 苹果树掉落批次
 
 WorldMap 苹果树点击后由 `AppleTreeDropController` 播放快速晃动并启用 Scene 作者化苹果槽位；`AppleService` 保存批次剩余值，只有逐个点击 `AppleDropSlot` 才增加苹果余额。掉落 Sprite 固定来自 `Assets/_Project/Art/WorldMap/苹果云背景补充/apple.png`，许愿树不参与。
+
+### 2026-09-05 WorldMap 输入框视觉状态与情绪入口
+
+- `EmotionInputPanelStub` 的天使/恶魔主题各自保存提示图 `输入心情/*/input.png` 与无字图 `UI输入框去字/angel_emotion_input.png`、`devil_emotion_input.png`；运行时仅在输入框获得焦点和结束编辑时切换已作者化 Image 的显隐，提交成功后恢复提示图。
+- `WorldMapWishSystemController` 的 `WishInputField` 保存提示图 `许愿树/input.png` 与无字图 `UI输入框去字/wish_input.png`；打开输入页不自动抢焦点，点击输入框后切换无字图，结束编辑、取消或提交后恢复提示图。
+- WorldMap 情绪输入入口改为真实场景对象 `天使标牌` / `恶魔标牌` 上的 `WorldMapGardenZone`，分别传入 `angel` / `demon`；旧的 `EmotionEntry_Angel` / `EmotionEntry_Demon` 仅作为停用遗留节点，不再作为入口。Canvas 右上 `Btn_EmotionInput` 停用。
+- `FlowerCollectionPanelStub` 与 `WorldMapEmotionGardenUIPatch` 不再显示或绑定图鉴卡片、图鉴详情的 `SoilImage`；土壤仅保留在 `WeeklyGardenPanelStub` 的每周培育节点。
+
+### 2026-09-05 WorldMap AI 情绪花园接入
+
+- `EmotionGardenService.SubmitEmotionAsync` 复用室内 `Resources/LLMConfig.asset` 的 OpenAI 兼容配置；AI 负责从九种标准情绪中判定情绪、生成关键词、花朵基础描述、花语，以及每日 `summary`、`angelNote`、`devilNote`。
+- AI 结果写入 `EmotionFlowerData` 和 `EmotionDailySummaryData`，随情绪花园存档持久化；旧存档缺少新字段时由本地规则补齐。AI 超时、未配置或返回不合规内容时自动使用本地兜底，不阻塞提交。
+- `EmotionInputPanelStub` 使用异步提交并在等待时锁定按钮；`WeeklyGardenPanelStub` 显示 AI 关键词和花语；`DailySummaryMailboxPanel` 继续读取选中日期的持久化每日总结。
+- 许愿面板 AI 接入暂缓，当前不修改 `WorldMapWishSystemController` 的本地愿望流程。
+
+### 2026-09-06 WorldMap 室外新手指引
+
+- `WorldMap_Main.unity` 的 `Canvas/Panel_OutdoorTutorial` 已保存七个页面节点：`Page_Intro` 与 `Page_Outdoor1`～`Page_Outdoor6`，图片来自 `Assets/_Project/Art/新手引导/outdoor/`。
+- 面板保存 `left.png`、`right.png`、`outdoor/close.png` 三个按钮资源，并提供 `Btn_OutdoorTutorial` 占位入口。入口当前只负责打开第一页，后续可在 Inspector 中替换按钮 Sprite 或绑定正式入口。
+- `SceneAuthoredImageVariantView` 负责运行时切换已作者化页面，上一页/下一页在首尾边界停止；运行时不创建 GameObject、不加载路径资源，也不写入最终 Sprite。
+- `WorldMapOutdoorTutorialAuthoring` 是定向作者化工具（菜单 `Tools/Gemini-Lab/WorldMap/Author Outdoor Tutorial`），只维护自己的节点，不重建或清空 WorldMap 场景。当前没有绑定邮箱、标牌或首次进入等正式业务触发条件。

@@ -284,9 +284,9 @@ namespace GeminiLab.Modules.HubUI.Panels
 
             if (_detailSoilImage != null)
             {
-                bool showSoil = detailFlowerVariantKey != null;
-                _detailSoilImage.enabled = showSoil;
-                _detailSoilImage.gameObject.SetActive(showSoil);
+                // 土壤只属于每周培育面板；图鉴详情中的花朵不显示土壤。
+                _detailSoilImage.enabled = false;
+                _detailSoilImage.gameObject.SetActive(false);
             }
 
             if (_detailPreviousButton != null)
@@ -465,9 +465,9 @@ namespace GeminiLab.Modules.HubUI.Panels
                 }
                 if (_soilImage != null)
                 {
-                    bool showSoil = visible && unlocked && flowerVariantKey != null;
-                    _soilImage.enabled = showSoil;
-                    _soilImage.gameObject.SetActive(showSoil);
+                    // 图鉴卡片只展示花朵本身，土壤不属于图鉴视觉。
+                    _soilImage.enabled = false;
+                    _soilImage.gameObject.SetActive(false);
                 }
                 if (_unlockedContent != null) _unlockedContent.SetActive(visible && unlocked);
                 if (_numberText != null) _numberText.text = $"No. {number:000}";

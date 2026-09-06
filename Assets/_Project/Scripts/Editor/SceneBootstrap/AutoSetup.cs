@@ -11,7 +11,7 @@ namespace GeminiLab.Editor.SceneBootstrap
     public static class AutoSetup
     {
         private const string SetupDoneKey = "GeminiLab.AutoSetupDone";
-        private const int ExpectedVersion = 70;
+        private const int ExpectedVersion = 71;
 
         static AutoSetup()
         {
@@ -463,6 +463,12 @@ namespace GeminiLab.Editor.SceneBootstrap
                         WorldMapAppleTreeAuthoring.Patch();
                     }
 
+                    if (currentVersion < 71 || needsLatestAuthoring)
+                    {
+                        // 只应用本次 UI 增量，避免重建已有场景层级和花朵对象。
+                        WorldMapEmotionGardenUIPatch.PatchUiTaskMinimizedAll();
+                    }
+
                     EditorPrefs.SetInt(SetupDoneKey, ExpectedVersion);
                     Debug.Log($"[AutoSetup] 升级到版本 {ExpectedVersion} 完成。");
                 }
@@ -561,11 +567,29 @@ namespace GeminiLab.Editor.SceneBootstrap
             int freeControlCount = worldMapText.Split(
                 new[] { "_preferControlOnEnable: 0" },
                 System.StringSplitOptions.None).Length - 1;
+            int gardenZoneScriptCount = CountOccurrences(worldMapText, "guid: e808b994ed5a1844f8fd069d9c18ff9d");
             return !apartmentText.Contains("MailboxButton", System.StringComparison.Ordinal) ||
                    !worldMapText.Contains("c24671ba6d25cb246bdc627378a8fa9e", System.StringComparison.Ordinal) ||
                    freeControlCount < 2 ||
                    !worldMapText.Contains("WorldMapAppleDrops", System.StringComparison.Ordinal) ||
-                   !worldMapText.Contains("AppleTreeDropController", System.StringComparison.Ordinal);
+                   !worldMapText.Contains("AppleTreeDropController", System.StringComparison.Ordinal) ||
+                   !worldMapText.Contains("InputVisual_Focused", System.StringComparison.Ordinal) ||
+                   !worldMapText.Contains("WishInputFocusedVisual", System.StringComparison.Ordinal) ||
+                   gardenZoneScriptCount < 4;
+        }
+
+        private static int CountOccurrences(string text, string value)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(value)) return 0;
+            int count = 0;
+            int offset = 0;
+            while ((offset = text.IndexOf(value, offset, System.StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                offset += value.Length;
+            }
+
+            return count;
         }
 
         public static void Reset()

@@ -34,6 +34,8 @@ namespace GeminiLab.Modules.WorldMap
 
         [Header("Authored text")]
         [SerializeField] private TMP_InputField? _inputField;
+        [SerializeField] private Image? _inputPromptImage;
+        [SerializeField] private Image? _inputFocusedImage;
         [SerializeField] private TMP_Text? _dialogueText;
         [SerializeField] private TMP_Text? _detailContentText;
         [SerializeField] private TMP_Text? _detailCreatedText;
@@ -63,10 +65,15 @@ namespace GeminiLab.Modules.WorldMap
         {
             _service = new WorldMapWishService();
             BindControls();
+            BindInputVisuals();
             ClosePanel();
         }
 
-        private void OnDestroy() => UnbindControls();
+        private void OnDestroy()
+        {
+            UnbindInputVisuals();
+            UnbindControls();
+        }
 
         public void OpenPanel()
         {
@@ -78,6 +85,7 @@ namespace GeminiLab.Modules.WorldMap
         public void ClosePanel()
         {
             if (_panelRoot != null) _panelRoot.SetActive(false);
+            SetInputVisualFocused(false);
             _selectedWishId = string.Empty;
             HideAuxiliaryViews();
         }
@@ -114,13 +122,54 @@ namespace GeminiLab.Modules.WorldMap
             _bound = false;
         }
 
+        private void BindInputVisuals()
+        {
+            if (_inputField == null) return;
+            _inputField.onSelect.AddListener(OnInputSelected);
+            _inputField.onEndEdit.AddListener(OnInputEndEdit);
+            SetInputVisualFocused(false);
+        }
+
+        private void UnbindInputVisuals()
+        {
+            if (_inputField == null) return;
+            _inputField.onSelect.RemoveListener(OnInputSelected);
+            _inputField.onEndEdit.RemoveListener(OnInputEndEdit);
+        }
+
+        private void OnInputSelected(string _)
+        {
+            SetInputVisualFocused(true);
+        }
+
+        private void OnInputEndEdit(string _)
+        {
+            SetInputVisualFocused(false);
+        }
+
+        private void SetInputVisualFocused(bool focused)
+        {
+            if (_inputPromptImage != null)
+            {
+                _inputPromptImage.enabled = !focused;
+                // The prompt image is the TMP_InputField's own target graphic.
+                // Keep its GameObject active so the field remains clickable/editable
+                // while the no-text focused art is shown behind it.
+            }
+
+            if (_inputFocusedImage != null)
+            {
+                _inputFocusedImage.enabled = focused;
+                _inputFocusedImage.gameObject.SetActive(focused);
+            }
+        }
+
         private void BeginWishInput()
         {
             ShowInputView();
             if (_inputField == null) return;
             _inputField.text = string.Empty;
-            _inputField.Select();
-            _inputField.ActivateInputField();
+            SetInputVisualFocused(false);
         }
 
         private void SubmitWish()
@@ -134,6 +183,7 @@ namespace GeminiLab.Modules.WorldMap
             }
 
             SetText(_dialogueText, "Your wish has been placed on the tree.");
+            SetInputVisualFocused(false);
             ShowMainView();
         }
 
@@ -176,6 +226,7 @@ namespace GeminiLab.Modules.WorldMap
 
         private void ShowMainView()
         {
+            SetInputVisualFocused(false);
             if (_mainView != null) _mainView.SetActive(true);
             if (_inputView != null) _inputView.SetActive(false);
             if (_detailView != null) _detailView.SetActive(false);
