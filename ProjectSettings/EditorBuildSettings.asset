@@ -6,9 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/_Project/Scenes/Desktop/Desktop_Overlay.unity
-    guid: 416d138174ab8284b96e290fe4fba184
-  - enabled: 1
     path: Assets/_Project/Scenes/Boot.unity
     guid: a4d3d6d2ea6945f7865f8f7e2d9b3c11
   - enabled: 1
