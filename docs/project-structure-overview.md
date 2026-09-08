@@ -424,5 +424,10 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 ## WorldMap 云层范围与移速校正（2026-09-08）
 
 - 云朵节点仍为 `WorldMap_Main.unity/WorldMapWeatherClouds`，范围参考为同场景已有的 `天空` SpriteRenderer。
-- `WorldMapAmbientAnimationController` 使用天空与云层的真实渲染边界计算可移动区间，并保留旧版云层的实际移动速度；不回写天空或云层的尺寸和位置作者化参数。
+- `WorldMapAmbientAnimationController` 使用天空与云层的真实渲染边界计算中心点和半跨度，并保留旧版 `0.12` 正弦往返、端点折返方式；不回写天空或云层的尺寸和位置作者化参数。
 - 该改动只涉及 WorldMap 云层运行时辅助逻辑和序列化引用，不扩展到室内系统或其他交互。
+
+## WorldMap 云层速度再次校正（2026-09-08）
+
+- 云层仍使用天空宽度派生的移动范围和原有端点折返方式，仅把序列化速度参数从 `0.12` 降为 `0.06`。
+- 不修改天空、云层资源、场景布局、相机或其他 WorldMap 功能。

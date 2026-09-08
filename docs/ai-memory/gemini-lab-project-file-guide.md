@@ -556,5 +556,10 @@ Updated: 2026-08-22
 ### WorldMap 云层范围与移速校正（2026-09-08）
 
 - `WorldMapAmbientAnimationController._skyRenderer` 显式引用 `WorldMap_Main.unity` 中 `天空` 的 SpriteRenderer；云层范围不再依赖 `BaselineLine_云` 或手写最小/最大 X。
-- 控制器根据天空与云层的实际渲染边界换算云层父节点本地坐标，并保持旧版 `0.12` / `1.2` 运动组合对应的最大位移速度。
+- 控制器根据天空与云层的实际渲染边界换算中心点和半跨度，并使用旧版 `0.12` 参数保留中心加正弦、到端点折返的运动方式。
 - `WorldMap_Main.unity` 仍是天空、云层和控制器序列化引用的唯一事实源；不创建运行时视觉对象。
+
+### WorldMap 云层速度再次校正（2026-09-08）
+
+- 只将 `WorldMapAmbientAnimationController._cloudMoveSpeed` 和 `WorldMap_Main.unity` 中的序列化值从 `0.12` 改为 `0.06`。
+- 天空派生移动范围、中心加正弦位移以及到端点折返方式均保持不变。

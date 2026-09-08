@@ -84,7 +84,7 @@ namespace GeminiLab.Modules.WorldMap
         [SerializeField] private TreeBinding[] _treeBindings = Array.Empty<TreeBinding>();
 
         [Header("云层")]
-        [SerializeField, Min(0f)] private float _cloudMoveSpeed = 0.12f;
+        [SerializeField, Min(0f)] private float _cloudMoveSpeed = 0.06f;
 
         [Header("单朵花")]
         [SerializeField, Range(0f, 15f)] private float _singleFlowerRotationAngle = 8f;
@@ -94,14 +94,9 @@ namespace GeminiLab.Modules.WorldMap
         [SerializeField, Range(0f, 8f)] private float _treeRotationAngle = 2.6f;
         [SerializeField, Min(0f)] private float _treeRotationSpeed = 0.5f;
 
-        // The previous authored motion used a 1.2-unit sinusoidal range. Keep
-        // that peak displacement speed after expanding the travel interval.
-        private const float PreviousCloudMoveRange = 1.2f;
-
         private Vector3 _cloudBaseLocalPosition;
-        private float _cloudMoveMinLocalX;
-        private float _cloudMoveMaxLocalX;
-        private float _cloudAngularSpeed;
+        private float _cloudMoveCenterLocalX;
+        private float _cloudMoveHalfRangeLocalX;
         private bool _cloudMotionConfigured;
         private readonly List<FlowerPose> _flowerPoses = new();
         private readonly List<TreePose> _treePoses = new();
@@ -206,21 +201,18 @@ namespace GeminiLab.Modules.WorldMap
 
             if (cloudParent == null)
             {
-                _cloudMoveMinLocalX = minWorldPoint.x;
-                _cloudMoveMaxLocalX = maxWorldPoint.x;
+                _cloudMoveCenterLocalX = (minWorldPoint.x + maxWorldPoint.x) * 0.5f;
+                _cloudMoveHalfRangeLocalX = (maxWorldPoint.x - minWorldPoint.x) * 0.5f;
             }
             else
             {
-                _cloudMoveMinLocalX = cloudParent.InverseTransformPoint(minWorldPoint).x;
-                _cloudMoveMaxLocalX = cloudParent.InverseTransformPoint(maxWorldPoint).x;
+                float minLocalX = cloudParent.InverseTransformPoint(minWorldPoint).x;
+                float maxLocalX = cloudParent.InverseTransformPoint(maxWorldPoint).x;
+                _cloudMoveCenterLocalX = (minLocalX + maxLocalX) * 0.5f;
+                _cloudMoveHalfRangeLocalX = (maxLocalX - minLocalX) * 0.5f;
             }
 
-            float halfRange = (_cloudMoveMaxLocalX - _cloudMoveMinLocalX) * 0.5f;
-            float previousPeakSpeed = _cloudMoveSpeed * PreviousCloudMoveRange;
-            _cloudAngularSpeed = halfRange > Mathf.Epsilon
-                ? previousPeakSpeed / halfRange
-                : 0f;
-            _cloudMotionConfigured = true;
+            _cloudMotionConfigured = _cloudMoveHalfRangeLocalX > Mathf.Epsilon;
         }
 
         private void AnimateCloud(float time)
@@ -228,10 +220,8 @@ namespace GeminiLab.Modules.WorldMap
             if (_cloudRenderer == null || !_cloudMotionConfigured) return;
 
             Vector3 position = _cloudBaseLocalPosition;
-            float normalized = (_cloudAngularSpeed <= 0f
-                ? 0.5f
-                : (Mathf.Sin(time * _cloudAngularSpeed) + 1f) * 0.5f);
-            position.x = Mathf.Lerp(_cloudMoveMinLocalX, _cloudMoveMaxLocalX, normalized);
+            position.x = _cloudMoveCenterLocalX
+                + Mathf.Sin(time * _cloudMoveSpeed) * _cloudMoveHalfRangeLocalX;
             _cloudRenderer.transform.localPosition = position;
         }
 

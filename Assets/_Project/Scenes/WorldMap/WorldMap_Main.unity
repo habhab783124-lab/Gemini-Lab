@@ -75849,7 +75849,7 @@ MonoBehaviour:
     _localPivot: {x: 0, y: -5.215}
   - _target: {fileID: 3914250887358895616}
     _localPivot: {x: 0, y: -5.2}
-  _cloudMoveSpeed: 0.12
+  _cloudMoveSpeed: 0.06
   _singleFlowerRotationAngle: 8
   _singleFlowerRotationSpeed: 1.4
   _treeRotationAngle: 1.2
