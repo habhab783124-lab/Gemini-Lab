@@ -253649,7 +253649,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _hoverTint: {r: 1.15, g: 1.15, b: 1.15, a: 1}
-  _interactionPriority: 25
+  _interactionPriority: 15
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
