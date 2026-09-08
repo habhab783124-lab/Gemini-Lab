@@ -77,6 +77,11 @@ namespace GeminiLab.Modules.Apple
 
         private void Show(string message)
         {
+            if (!gameObject.activeSelf)
+            {
+                gameObject.SetActive(true);
+            }
+
             CacheOrigins();
             _isShowing = true;
             _remaining = Mathf.Max(0.1f, _durationSeconds);
@@ -84,8 +89,9 @@ namespace GeminiLab.Modules.Apple
             if (_statusText != null)
             {
                 _statusText.text = message;
-                _statusText.gameObject.SetActive(true);
+                SetTextVisible(_statusText, true);
                 SetAlpha(_statusText, 1f);
+                _statusText.ForceMeshUpdate(true, true);
             }
 
             ResetLeaf(_leftLeaf, _leftLeafOrigin);
@@ -96,9 +102,9 @@ namespace GeminiLab.Modules.Apple
         {
             _isShowing = false;
             _remaining = 0f;
-            if (_statusText != null) _statusText.gameObject.SetActive(false);
-            if (_leftLeaf != null) _leftLeaf.gameObject.SetActive(false);
-            if (_rightLeaf != null) _rightLeaf.gameObject.SetActive(false);
+            SetTextVisible(_statusText, false);
+            SetTextVisible(_leftLeaf, false);
+            SetTextVisible(_rightLeaf, false);
         }
 
         private void CacheOrigins()
@@ -111,8 +117,19 @@ namespace GeminiLab.Modules.Apple
         {
             if (leaf == null) return;
             leaf.transform.localPosition = origin;
-            leaf.gameObject.SetActive(true);
+            SetTextVisible(leaf, true);
             SetAlpha(leaf, 1f);
+            leaf.ForceMeshUpdate(true, true);
+        }
+
+        private static void SetTextVisible(TMP_Text? text, bool visible)
+        {
+            if (text == null) return;
+
+            text.gameObject.SetActive(visible);
+            text.enabled = visible;
+            Renderer? renderer = text.GetComponent<Renderer>();
+            if (renderer != null) renderer.enabled = visible;
         }
 
         private static void SetAlpha(TMP_Text text, float alpha)

@@ -1,6 +1,7 @@
 #nullable enable
 using GeminiLab.Core;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace GeminiLab.Modules.Pet
 {
@@ -18,6 +19,7 @@ namespace GeminiLab.Modules.Pet
         [SerializeField] private bool _acceptArrowKeys = true;
         [SerializeField] private bool _horizontalOnly = false;
         [SerializeField, Min(0f)] private float _moveSpeed = 2.5f;
+        [SerializeField] private bool _allowLegacyMouseTakeover = true;
 
         public static Transform? ActiveTransform => s_activeController != null ? s_activeController.transform : null;
 
@@ -72,6 +74,14 @@ namespace GeminiLab.Modules.Pet
 
         private void OnMouseDown()
         {
+            // WorldMap 的唯一点击处理者是 WorldMapSceneInteractionRouter。
+            // 保留默认 true 以兼容室内场景；WorldMap 不再让旧 OnMouseDown 与路由竞争。
+            if (!_allowLegacyMouseTakeover ||
+                string.Equals(SceneManager.GetActiveScene().name, "WorldMap_Main", System.StringComparison.Ordinal))
+            {
+                return;
+            }
+
             if (ClickOcclusionUtility.IsPointerOverUI())
             {
                 return;

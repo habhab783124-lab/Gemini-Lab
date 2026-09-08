@@ -1,5 +1,39 @@
 # Gemini-Lab Memory Main
 
+## 2026-09-08 苹果掉落核心恢复到 eb1c300
+
+- `AppleTreeDropController.cs`、`AppleDropSlot.cs`、`AppleTreeFeedback.cs` 已恢复到 `eb1c300b991d92ec6336afaf5441d0b0ca81544c` 的掉落表现和反馈逻辑。
+- `AppleDropSlot` 仅保留当前 WorldMap `IWorldMapSceneClickTarget` / Collider2D 路由适配，旧 `OnMouseDown` 不恢复；`AppleService.cs` 已与该提交一致。
+- 当前 `AppleRuntimeBootstrap` 的直启注册修复、Tarot 启动顺序修复、WorldMap 场景、室外桌宠移动/过桥和动画资源不在本次恢复范围内；Unity Play 仍待人工确认。
+
+## 2026-09-08 苹果掉落逻辑恢复到 cc54 基准
+
+- `Assets/_Project/Scripts/Modules/Apple/AppleService.cs` 已恢复到提交 `cc54b1a9196ff1d16c341ecdfffdd0f27e1c37f1` 的苹果货币与树掉落状态实现。
+- `AppleDropSlot` 和 `AppleTreeFeedback` 保留当前 WorldMap Collider2D 路由适配，但恢复 cc54 的 Scene 文本显示语义；运行时不再给 `TMP_Text.fontMaterial` 赋 null。
+- TMP 3.0.7 的 `fontMaterial` setter 会对传入值直接调用 `GetInstanceID()`，传入 null 会在树点击后的反馈阶段抛出 `NullReferenceException`。反馈继续使用 Scene 中已有的字体和材质引用。
+- 当前 `AppleRuntimeBootstrap`、WorldMap 点击路由、室外桌宠移动/过桥链路、动画资源和室内系统未回退；Unity Play 仍待人工验证。
+
+## 2026-09-08 Boot 苹果服务与 Tarot 启动顺序修正
+
+- `Boot.unity` 的 `BootstrapRoot` 保留一个 `TarotRuntimeBootstrap`，继续使用作者化的 TarotDeck 和 LLM 配置；重复的无 LLM 配置实例已移除。
+- `AppleRuntimeBootstrap` 在 `Start` 注册 `IAppleService`，`TarotRuntimeBootstrap` 的服务初始化改为 `Start`，并设置为晚于 Apple bootstrap 的执行顺序，避免 Tarot 在苹果服务注册前读取服务。
+- `AppleRuntimeBootstrap`、WorldMap 苹果树、室外桌宠移动/过桥链路、动画资源和室内系统不属于本次修正范围；Unity Play 仍需人工确认。
+
+## 2026-09-08 WorldMap 苹果树成熟与调试快进初始化修复
+
+- 当前苹果树点击已经能够通过真实 `PolygonCollider2D` 命中 `AppleTreeInteractable` 并显示已有 `AppleTreeFeedback`；此前反复点击调试按钮后仍提示“还没成熟哦”的根因是树状态首次在点击树时才创建，快进发生在状态创建之前。
+- `AppleRuntimeBootstrap` 现在在运行时场景加载阶段确保 `IAppleService` 注册，并监听后续场景加载；每次场景加载后为当前已作者化的 `AppleTreeInteractable` 调用 `IAppleService.EnsureTree`。不创建任何最终 UI、Sprite、Animator 或视觉 GameObject。
+- 现有 `AppleService` 的 45～90 分钟随机生成、每天最多 5 轮、批次固定总量、逐个掉落领取和货币入账逻辑保持不变；本次修复的是服务与三棵树状态的初始化时序。
+- 新增 EditMode 回归测试覆盖“先建立树状态、再推进调试时钟、随后可以开始收获”。Unity Play 仍需用户手动确认，当前不能把静态/编译结果当作实机通过。
+
+## 2026-09-08 WorldMap 点击映射与室外桌宠过桥链路恢复
+
+- WorldMap 第一阶段的点击业务固定为：天使标牌打开 Angel 情绪输入、恶魔标牌打开 Devil 情绪输入、邮箱打开 `DailySummaryMailbox`、许愿树打开许愿系统、大树 2/3/5 进入对应苹果树掉落流程、两只室外桌宠只切换对应玩家控制权；大树 1 不接苹果逻辑。
+- `WorldMapSceneInteractionRouter` 只裁决 Scene 中显式登记的目标；每个目标通过自身 `Collider2D` 的 `OverlapPoint` 命中。桌宠点击区与底部物理 CapsuleCollider 分离，许愿树点击 Collider 覆盖其作者化 Sprite 区域。
+- 室外桌宠的移动链路必须保留 `PetController`、`RandomWander`、`PetPlayerInputController` 和 `WalkableSurface`。桥对象 `桥` 的 PolygonCollider2D 上侧轮廓仍是过桥高度事实源；WorldMap 点击组件不再直接写 Transform/Rigidbody2D 或强制固定基线。
+- `WorldMapPetAnimationTriggerController` 只负责 WorldMap 特殊动作并通过 `PetController.SetExternalMovementLock` 暂停移动；它不修改室内 Animator 状态机，也不修改 Clip、关键帧、循环、Motion 或视觉参数。
+- 本次静态修正尚未经过用户 Unity Play 实机确认。
+
 ## 2026-08-21 indoor furniture selection feedback
 
 Apartment task 2 now has a scene-authored `ApartmentFurnitureSelection` presenter, one inactive `FurnitureSelectionHighlight` per available target, and an authored `FurnitureSelectionMessage` TMP node. The presenter is routed by `ApartmentViewportInputBridge` and uses `ClickOcclusionUtility` for overlapping 2D furniture. The nine original targets plus existing `家具_装饰_储物的家具_恶魔_01` are wired; the requirement's apple-pad name is the semantic label for this storage furniture. Tasks 3 and 4 are out of scope.
@@ -625,3 +659,26 @@ WorldMap 苹果树点击后由 `AppleTreeDropController` 播放快速晃动并�
 - 面板保存 `left.png`、`right.png`、`outdoor/close.png` 三个按钮资源，并提供 `Btn_OutdoorTutorial` 占位入口。入口当前只负责打开第一页，后续可在 Inspector 中替换按钮 Sprite 或绑定正式入口。
 - `SceneAuthoredImageVariantView` 负责运行时切换已作者化页面，上一页/下一页在首尾边界停止；运行时不创建 GameObject、不加载路径资源，也不写入最终 Sprite。
 - `WorldMapOutdoorTutorialAuthoring` 是定向作者化工具（菜单 `Tools/Gemini-Lab/WorldMap/Author Outdoor Tutorial`），只维护自己的节点，不重建或清空 WorldMap 场景。当前没有绑定邮箱、标牌或首次进入等正式业务触发条件。
+### 2026-09-07 WorldMap 第一阶段室外点击路由
+
+- `WorldMapSceneInteractionRouter` 现在统一裁决邮箱、天使标牌、恶魔标牌、两只室外桌宠、许愿树、三棵苹果树和九个现有 `AppleDropSlot`；场景目标通过序列化引用注册，不依赖对象名查找。
+- 大树 2、3、5 使用现有作者化 `PolygonCollider2D` 命中；许愿树独立打开许愿系统；大树上的旧 `ClickableSceneObject` 已从 `WorldMap_Main.unity` 移除。
+- `AppleDropSlot` 领取后继续复用 Scene `CollectionText`；本阶段只修复点击路由，不改变掉落数量分配、动画触发条件或室内系统。Play 尚未由助手验证。
+### 2026-09-08 WorldMap Collider2D 点击命中修正
+
+- WorldMap 路由目标的 `ContainsWorldPoint` 只使用目标自身启用的 `Collider2D.OverlapPoint`；邮箱、天使/恶魔标牌和两只室外桌宠不再以 `SpriteRenderer.bounds` 作为点击区域。
+- 树木继续使用 Scene 中保存的真实 `PolygonCollider2D`，许愿树和 `AppleDropSlot` 继续使用各自 Collider2D；本次不调整 Collider 几何。
+- 本次只完成静态代码与编译修正，Play 实机点击范围仍待人工确认。
+
+### 2026-09-08 WorldMap 苹果服务入口修正
+
+- `AppleRuntimeBootstrap.EnsureRegistered()` 会复用 Boot 已注册的 `IAppleService`；WorldMap 直启时，如果核心 `IGameClock` 已存在，则注册同一个现有 `AppleService` 实现并加入持久化服务注册表，不创建第二个货币权威。
+- `AppleTreeDropController.TryBeginHarvest()` 在读取 `IAppleService` 前调用该幂等入口；树点击仍由 `WorldMapSceneInteractionRouter` 和三棵树自身的 `PolygonCollider2D` 命中，成熟判断、掉落分配和苹果领取逻辑不变。
+- WorldMap 直启缺少苹果服务时是树点击无掉落的专项风险；没有成熟批次时仍应显示已有“还没成熟哦”反馈。该修正已通过静态检查和程序集编译，Play 实机仍待人工确认。
+
+### 2026-09-08 WorldMap 苹果货币收集逻辑重写
+
+- `AppleService` 重新收口为苹果货币的唯一状态权威：成熟调度、树的待领取总量、一次掉落批次的预留余量、逐个苹果领取和余额增加均由同一服务完成；领取金额超过当前预留余量时直接失败，不再自动截断。
+- `AppleRuntimeBootstrap` 在核心时钟可用后注册服务，并为当前场景已有的三棵目标树建立状态；`AppleTreeDropController` 只分配 Scene 中已有的 1～3 个 `AppleDropSlot`，不创建运行时视觉对象。
+- `AppleDropSlot` 只有服务领取成功后才隐藏苹果、增加余额并显示 `CollectionText`；`AppleTreeFeedback` 使用已有 `StatusText` 显示未成熟提示，持续时间约 2 秒。
+- 3 个 `StatusText`、9 个 `CollectionText` 的 MeshRenderer 与 TMP 覆盖材质已统一改为现有 `NotoSansSC_SDF`，清除了旧 `LiberationSans` 实例材质，修复中文反馈设置成功但不出字的问题；本阶段未进入 Unity Play。

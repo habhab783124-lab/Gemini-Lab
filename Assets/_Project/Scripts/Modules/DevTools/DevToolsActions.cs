@@ -24,6 +24,9 @@ namespace GeminiLab.Modules.DevTools
             if (ServiceLocator.TryResolve(out IGameClock? clock) && clock != null)
                 clock.DebugAdvanceDays(1);
 
+            if (ServiceLocator.TryResolve(out IDailyResetService? dailyReset) && dailyReset != null)
+                dailyReset.CheckAndReset();
+
             if (ServiceLocator.TryResolve(out IEmotionGardenService? service) && service != null)
                 service.RefreshBlooming();
 

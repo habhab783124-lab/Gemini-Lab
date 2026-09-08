@@ -298,6 +298,39 @@ namespace GeminiLab.Modules.Apple
             DateTime now = _clock.UtcNow;
             EnsureGenerationSchedule(ref state, now);
 
+            // A development clock can be advanced and later reset. In that
+            // case an empty tree may contain a schedule entirely in the
+            // future relative to the current clock and would otherwise stay
+            // blocked until the real clock catches up. Do not touch a
+            // pending or active harvest: those are player-owned progress.
+            if (state.PendingCount <= 0 &&
+                state.HarvestRemaining <= 0 &&
+                state.LastGeneratedUtcTicks > now.Ticks)
+            {
+                state.GenerationDayKey = DayKey(now);
+                state.GeneratedRoundsToday = 0;
+                state.LastGeneratedUtcTicks = now.Ticks;
+                state.NextGenerationUtcTicks = now.Ticks;
+                Debug.LogWarning(
+                    $"[AppleService][ClockRollback] tree={state.TreeId} " +
+                    $"scheduleReanchored={now:O}");
+            }
+
+            // A debug day advance is expected to make a tree usable on the new
+            // calendar day. If the previous day ended with no cached or active
+            // harvest, make the first round of the new day due immediately;
+            // normal 45-90 minute scheduling continues after that round.
+            if (state.PendingCount <= 0 &&
+                state.HarvestRemaining <= 0 &&
+                state.LastGeneratedUtcTicks > 0 &&
+                new DateTime(state.LastGeneratedUtcTicks, DateTimeKind.Utc).Date < now.Date)
+            {
+                state.GenerationDayKey = DayKey(now);
+                state.GeneratedRoundsToday = 0;
+                state.NextGenerationUtcTicks = now.Ticks;
+                Debug.Log($"[AppleService][DayBoundary] tree={state.TreeId} dueNow={now:O}");
+            }
+
             long nextTicks = state.NextGenerationUtcTicks;
             int iterations = 0;
             while (nextTicks > 0 && nextTicks <= now.Ticks && iterations++ < MaxGenerationCatchUpIterations)

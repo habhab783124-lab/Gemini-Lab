@@ -19,7 +19,7 @@ namespace GeminiLab.Editor.SceneBootstrap
         private const string ScenePath = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
         private const string WeatherArtFolder = "Assets/_Project/Art/WorldMap/weather";
         private const string RainSpritePath = WeatherArtFolder + "/rain.png";
-        private const string CloudSpritePath = WeatherArtFolder + "/WorldMapClouds_Alpha.png";
+        private const string CloudSpritePath = "Assets/_Project/Art/WorldMap/苹果云背景补充/cloud.png";
         private const string StarsSpritePath = WeatherArtFolder + "/\u661f\u661f.PNG";
         private const string SunnyName = "WorldMapWeatherSunnyOverlay";
         private const string RainName = "WorldMapWeatherRainOverlay";

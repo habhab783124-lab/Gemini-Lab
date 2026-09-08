@@ -18,8 +18,11 @@ namespace GeminiLab.Editor.SceneBootstrap
             EditorApplication.delayCall += () =>
             {
                 int currentVersion = EditorPrefs.GetInt(SetupDoneKey, 0);
-                bool needsLatestAuthoring = RequiresLatestAuthoring();
-                if (currentVersion >= ExpectedVersion && !needsLatestAuthoring) return;
+                // 已完成的迁移不能再根据场景文本做“自动返修”。Scene/Prefab
+                // 才是作者化结果的唯一来源；重复 Patch 会覆盖用户在 Inspector、
+                // Animator 与场景中的手工调整。只有显式提升 ExpectedVersion（或
+                // 用户主动 Reset）时，才执行一次对应版本迁移。
+                if (currentVersion >= ExpectedVersion) return;
 
                 if (EditorApplication.isPlayingOrWillChangePlaymode || Application.isPlaying)
                 {
@@ -447,7 +450,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                         ApartmentAppleBalanceAuthoring.Patch();
                     }
 
-                    if (currentVersion < 66 || needsLatestAuthoring)
+                    if (currentVersion < 66)
                     {
                         DailySummaryMailboxAuthoring.Patch();
                         WorldMapOutdoorPetAnimationAuthoring.Patch();
@@ -463,7 +466,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                         WorldMapAppleTreeAuthoring.Patch();
                     }
 
-                    if (currentVersion < 71 || needsLatestAuthoring)
+                    if (currentVersion < 71)
                     {
                         // 只应用本次 UI 增量，避免重建已有场景层级和花朵对象。
                         WorldMapEmotionGardenUIPatch.PatchUiTaskMinimizedAll();

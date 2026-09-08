@@ -89,9 +89,30 @@ namespace GeminiLab.Tests.EditMode
             int first = total > 1 ? 1 : total;
             Assert.IsTrue(_service.TryCollectHarvest("world_tree_2", first));
             Assert.AreEqual(total - first, _service.GetHarvestRemaining("world_tree_2"));
+            if (total > first)
+            {
+                Assert.IsTrue(_service.TryCollectHarvest("world_tree_2", total - first));
+            }
+
             Assert.IsFalse(_service.TryCollectHarvest("world_tree_2", total));
             Assert.AreEqual(20 + total, _service.Balance);
             Assert.AreEqual(0, _service.GetHarvestRemaining("world_tree_2"));
+        }
+
+        [Test]
+        public void RuntimeBootstrapCreatesTreeServiceBeforeDebugClockAdvance()
+        {
+            ServiceLocator.Register<IGameClock>(_clock);
+
+            Assert.IsTrue(AppleRuntimeBootstrap.EnsureRegistered());
+            Assert.IsTrue(ServiceLocator.TryResolve(out IAppleService? registered));
+            Assert.IsNotNull(registered);
+
+            registered!.EnsureTree("world_tree_5");
+            _clock.DebugAdvanceDays(1);
+
+            Assert.IsTrue(registered.TryBeginHarvest("world_tree_5", out int total));
+            Assert.That(total, Is.GreaterThan(0));
         }
 
         [Test]

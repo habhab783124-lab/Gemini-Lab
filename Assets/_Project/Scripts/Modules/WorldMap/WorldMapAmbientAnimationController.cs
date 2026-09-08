@@ -83,12 +83,12 @@ namespace GeminiLab.Modules.WorldMap
         [SerializeField] private TreeBinding[] _treeBindings = Array.Empty<TreeBinding>();
 
         [Header("云层")]
-        [SerializeField, Min(0f)] private float _cloudMoveSpeed = 0.12f;
+        [SerializeField, Min(0f)] private float _cloudMoveSpeed = 0.8f;
         [SerializeField, Min(0f)] private float _cloudMoveRange = 1.2f;
 
         [Header("单朵花")]
-        [SerializeField, Range(0f, 5f)] private float _singleFlowerRotationAngle = 3.2f;
-        [SerializeField, Min(0f)] private float _singleFlowerRotationSpeed = 0.9f;
+        [SerializeField, Range(0f, 15f)] private float _singleFlowerRotationAngle = 8f;
+        [SerializeField, Min(0f)] private float _singleFlowerRotationSpeed = 1.4f;
 
         [Header("树木")]
         [SerializeField, Range(0f, 8f)] private float _treeRotationAngle = 2.6f;

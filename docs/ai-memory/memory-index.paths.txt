@@ -1,5 +1,5 @@
 # Gemini-Lab AI memory index
-# Updated: 2026-09-05
+# Updated: 2026-09-08
 
 AGENTS.md
 Assets/_Project/Scripts/Modules/HubUI/ApartmentFurnitureSelectionPresenter.cs
@@ -111,6 +111,12 @@ Assets/_Project/Scripts/Modules/WorldMap/ClickableSceneObject.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapInteractiveObjectFeedback.cs
 Assets/_Project/Scripts/Modules/Apple/AppleService.cs
 Assets/_Project/Scripts/Modules/Apple/IAppleService.cs
+Assets/_Project/Scripts/Modules/Apple/AppleRuntimeBootstrap.cs (idempotent AppleService registration for Boot and direct WorldMap entry)
+Assets/_Project/Scripts/Modules/Apple/AppleService.cs (cc54b1a apple currency and harvest baseline)
+Assets/_Project/Scripts/Modules/Apple/AppleTreeDropController.cs (eb1c300 drop presentation baseline)
+Assets/_Project/Scripts/Modules/Apple/AppleDropSlot.cs (authored collection feedback and Collider2D route adapter)
+Assets/_Project/Scripts/Modules/Apple/AppleTreeFeedback.cs (authored not-mature feedback without null TMP material)
+Assets/_Project/Scripts/Modules/Tarot/TarotRuntimeBootstrap.cs (initializes after AppleRuntimeBootstrap in Boot)
 Assets/_Project/Scripts/Modules/Apple/AppleTreeInteractable.cs
 Assets/_Project/Scripts/Modules/Apple/AppleTreeFeedback.cs
 Assets/_Project/Scripts/Modules/Collection/AppleBalanceDisplay.cs
@@ -256,3 +262,19 @@ Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAmbientAnimationAuthoring.
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs (云层移动与单花独立相位旋转)
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (WorldMap 双宠特殊动画范围、F键和摆花事件触发)
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationTriggerAuthoring.cs (WorldMap 双宠动画触发对象作者化)
+Assets/_Project/Scripts/Core/ServiceLocator.cs (IWorldMapSceneClickTarget contract)
+Assets/_Project/Scripts/Modules/Apple/AppleTreeInteractable.cs (WorldMap tree click target)
+Assets/_Project/Scripts/Modules/Apple/AppleDropSlot.cs (WorldMap apple collection target)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapSceneInteractionRouter.cs (outdoor click routing)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishTreeInteractable.cs (wish tree click target)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (serialized outdoor click target references)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetInteractionController.cs (WorldMap outdoor pet collider hit target)
+Assets/_Project/Scripts/Modules/Pet/PetPlayerInputController.cs (WorldMap disables legacy mouse takeover; indoor default remains enabled)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (WorldMap pet movement/bridge bindings and authored click colliders)
+docs/ai-memory/gemini-lab-memory-main.md (2026-09-08 apple tree runtime initialization timing)
+docs/ai-memory/gemini-lab-project-file-guide.md (2026-09-08 apple tree runtime initialization timing)
+docs/project-structure-overview.md (2026-09-08 apple tree runtime initialization timing)
+Assets/_Project/Scripts/Modules/Apple/AppleService.cs (2026-09-08 full harvest and feedback rewrite)
+Assets/_Project/Scripts/Modules/Apple/AppleDropSlot.cs (2026-09-08 authored collection text visibility)
+Assets/_Project/Scripts/Modules/Apple/AppleTreeFeedback.cs (2026-09-08 authored not-mature feedback visibility)
+Assets/_Project/Art/Fonts/NotoSansSC_SDF.asset (WorldMap apple feedback font)

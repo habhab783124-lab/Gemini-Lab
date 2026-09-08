@@ -137,7 +137,16 @@ namespace GeminiLab.Modules.HubUI.Panels
 
             if (_service != null)
             {
-                _clusters.AddRange(_service.GetAllClusters());
+                // Empty catalog entries are not authored placeholder cards.
+                // Keep only flowers that have actually been collected so the
+                // runtime never exposes a grid of unknown/empty cards.
+                foreach (ClusterProgress cluster in _service.GetAllClusters())
+                {
+                    if (cluster.TotalCount > 0 && cluster.UnlockedStage > 0)
+                    {
+                        _clusters.Add(cluster);
+                    }
+                }
                 _clusters.Sort(CompareClusters);
             }
 
@@ -446,6 +455,7 @@ namespace GeminiLab.Modules.HubUI.Panels
 
             public void Set(bool visible, int number, bool unlocked, string name, string meta, string? flowerVariantKey)
             {
+                if (_button != null) _button.gameObject.SetActive(visible);
                 if (_button != null) _button.interactable = visible;
                 if (_cardImage != null) _cardImage.enabled = visible && unlocked;
                 if (_lockedImage != null) _lockedImage.gameObject.SetActive(visible && !unlocked);

@@ -10,13 +10,14 @@ namespace GeminiLab.Modules.Apple
     /// feedback text are created in the editor; runtime only toggles them.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class AppleDropSlot : MonoBehaviour
+    public sealed class AppleDropSlot : MonoBehaviour, IWorldMapSceneClickTarget
     {
         [SerializeField] private SpriteRenderer? _renderer;
         [SerializeField] private Collider2D? _collider;
         [SerializeField] private TMP_Text? _feedbackText;
         [SerializeField, Min(0.1f)] private float _feedbackDurationSeconds = 2f;
         [SerializeField] private Vector3 _feedbackLocalOffset = new(0f, 0.9f, -0.1f);
+        [SerializeField] private int _interactionPriority = 30;
 
         private AppleTreeDropController? _owner;
         private Vector3 _targetWorldPosition;
@@ -31,6 +32,15 @@ namespace GeminiLab.Modules.Apple
 
         public bool IsOccupied => _occupied;
         public int Amount => _amount;
+        public bool IsWorldMapInteractionEnabled =>
+            isActiveAndEnabled &&
+            _occupied &&
+            !_falling &&
+            _owner != null &&
+            _collider != null &&
+            _collider.enabled;
+        public int WorldMapInteractionPriority => _interactionPriority;
+        public Renderer? WorldMapSortingRenderer => _renderer;
 
         private void Awake()
         {
@@ -62,7 +72,7 @@ namespace GeminiLab.Modules.Apple
             if (_feedbackRemaining <= 0f)
             {
                 _showingFeedback = false;
-                if (_feedbackText != null) _feedbackText.gameObject.SetActive(false);
+                SetFeedbackVisible(false);
             }
         }
 
@@ -85,7 +95,7 @@ namespace GeminiLab.Modules.Apple
 
             if (_renderer != null) _renderer.enabled = true;
             if (_collider != null) _collider.enabled = false;
-            if (_feedbackText != null) _feedbackText.gameObject.SetActive(false);
+            SetFeedbackVisible(false);
             _falling = true;
         }
 
@@ -103,7 +113,11 @@ namespace GeminiLab.Modules.Apple
             _feedbackText.text = $"收获 +{Mathf.Max(0, collectedAmount)}";
             _feedbackText.transform.position = transform.position +
                 transform.TransformVector(_feedbackLocalOffset);
-            _feedbackText.gameObject.SetActive(true);
+            SetFeedbackVisible(true);
+            Color feedbackColor = _feedbackText.color;
+            feedbackColor.a = 1f;
+            _feedbackText.color = feedbackColor;
+            _feedbackText.ForceMeshUpdate(true, true);
             _feedbackRemaining = Mathf.Max(0.1f, _feedbackDurationSeconds);
             _showingFeedback = true;
         }
@@ -118,15 +132,27 @@ namespace GeminiLab.Modules.Apple
             _feedbackRemaining = 0f;
             if (_renderer != null) _renderer.enabled = false;
             if (_collider != null) _collider.enabled = false;
-            if (_feedbackText != null) _feedbackText.gameObject.SetActive(false);
+            SetFeedbackVisible(false);
         }
 
-        private void OnMouseDown()
+        public bool ContainsWorldPoint(Vector2 worldPoint)
         {
-            if (!_occupied || _falling || _owner == null || _collider == null) return;
-            if (ClickOcclusionUtility.IsPointerOverUI()) return;
-            if (!ClickOcclusionUtility.IsTopmostColliderUnderMouse(_collider)) return;
-            _owner.CollectDrop(this);
+            return IsWorldMapInteractionEnabled && _collider!.OverlapPoint(worldPoint);
+        }
+
+        public void HandleWorldMapClick()
+        {
+            if (IsWorldMapInteractionEnabled) _owner?.CollectDrop(this);
+        }
+
+        private void SetFeedbackVisible(bool visible)
+        {
+            if (_feedbackText == null) return;
+
+            _feedbackText.gameObject.SetActive(visible);
+            _feedbackText.enabled = visible;
+            Renderer? renderer = _feedbackText.GetComponent<Renderer>();
+            if (renderer != null) renderer.enabled = visible;
         }
     }
 }

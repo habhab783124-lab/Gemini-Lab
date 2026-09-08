@@ -18,7 +18,19 @@ namespace GeminiLab.Editor.SceneBootstrap
     {
         private const string ScenePath = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
         private const string AppleSpritePath = "Assets/_Project/Art/WorldMap/苹果云背景补充/apple.png";
-        private static readonly string[] TreeNames = { "大树 2", "大树 3", "大树 4", "大树 5" };
+        private const string FeedbackFontPath = "Assets/_Project/Art/Fonts/NotoSansSC_SDF.asset";
+        private static readonly string[] TreeNames =
+        {
+            "\u5927\u6811 2",
+            "\u5927\u6811 3",
+            "\u5927\u6811 5"
+        };
+        private static readonly string[] TreeIds =
+        {
+            "world_tree_2",
+            "world_tree_3",
+            "world_tree_5"
+        };
         private static readonly float[] SlotXOffsets = { -1.35f, 0f, 1.35f };
 
         [MenuItem("Tools/Gemini-Lab/WorldMap/Setup Apple Tree Drops")]
@@ -47,6 +59,9 @@ namespace GeminiLab.Editor.SceneBootstrap
                 return;
             }
 
+            TMP_FontAsset? feedbackFont =
+                AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FeedbackFontPath);
+
             Transform dropRoot = EnsureDropRoot(sceneRoot.transform, out bool rootChanged);
             bool changed = rootChanged;
             int boundCount = 0;
@@ -63,8 +78,14 @@ namespace GeminiLab.Editor.SceneBootstrap
                     continue;
                 }
 
-                string treeId = $"world_tree_{treeIndex + 2}";
+                string treeId = TreeIds[treeIndex];
                 AppleTreeFeedback? feedback = tree.transform.Find("AppleTreeFeedback")?.GetComponent<AppleTreeFeedback>();
+                TextMeshPro? statusText = feedback?.transform.Find("StatusText")?.GetComponent<TextMeshPro>();
+                if (statusText != null && feedbackFont != null)
+                {
+                    statusText.font = feedbackFont;
+                    statusText.fontSharedMaterial = feedbackFont.material;
+                }
                 AppleDropSlot[] slots = new AppleDropSlot[3];
                 SpriteRenderer? treeRenderer = tree.GetComponent<SpriteRenderer>();
                 float groundY = treeRenderer != null
@@ -83,6 +104,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                         slotIndex,
                         worldPosition,
                         appleSprite,
+                        feedbackFont,
                         out bool slotChanged);
                     changed |= slotChanged;
                 }
@@ -114,7 +136,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                         slotsProperty.GetArrayElementAtIndex(slotIndex).objectReferenceValue = slots[slotIndex];
                     }
                 }
-                SetFloat(controllerSo, "_shakeAmplitudeDegrees", 9f);
+                SetFloat(controllerSo, "_shakeAmplitudeDegrees", 15f);
                 SetInt(controllerSo, "_shakeCycles", 6);
                 SetFloat(controllerSo, "_shakeDurationSeconds", 0.58f);
                 controllerSo.ApplyModifiedPropertiesWithoutUndo();
@@ -159,6 +181,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             int index,
             Vector3 worldPosition,
             Sprite appleSprite,
+            TMP_FontAsset? feedbackFont,
             out bool changed)
         {
             changed = false;
@@ -207,13 +230,19 @@ namespace GeminiLab.Editor.SceneBootstrap
             }
 
             text.text = string.Empty;
+            if (feedbackFont != null)
+            {
+                text.font = feedbackFont;
+                text.fontSharedMaterial = feedbackFont.material;
+            }
             text.fontSize = 0.52f;
             text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
             text.outlineWidth = 0.18f;
             text.outlineColor = new Color(0.35f, 0.15f, 0.05f, 1f);
             text.transform.localPosition = new Vector3(0f, 1.5f, -0.15f);
-            text.transform.localScale = Vector3.one;
+            float parentScale = Mathf.Max(0.0001f, Mathf.Abs(slotObject.transform.lossyScale.x));
+            text.transform.localScale = Vector3.one / parentScale;
             Renderer? textRenderer = text.GetComponent<Renderer>();
             if (textRenderer != null)
             {
@@ -271,7 +300,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             if (property != null) property.floatValue = value;
         }
 
-        private static void SetObjectReference(SerializedObject so, string name, Object? value)
+        private static void SetObjectReference(SerializedObject so, string name, UnityEngine.Object? value)
         {
             SerializedProperty? property = so.FindProperty(name);
             if (property != null) property.objectReferenceValue = value;

@@ -225,7 +225,6 @@ GameObject:
   - component: {fileID: 1934747560}
   - component: {fileID: 1934747559}
   - component: {fileID: 1934747561}
-  - component: {fileID: 1934747562}
   - component: {fileID: 1934747563}
   - component: {fileID: 1934747565}
   - component: {fileID: 1934747564}
@@ -288,20 +287,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _fontCatalog: {fileID: 11400000, guid: 71a4d21ed2a1b134fa9598e94e1efab6, type: 2}
   _artCatalog: {fileID: 11400000, guid: be14dab566e8853419d6f667c4bed75d, type: 2}
---- !u!114 &1934747562
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1934747558}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 11a423671c598764baf4f8e969425fcd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _deck: {fileID: 11400000, guid: 7a2560ab8af095d44a8baba7d0818e46, type: 2}
-  _llmConfig: {fileID: 0}
 --- !u!114 &1934747563
 MonoBehaviour:
   m_ObjectHideFlags: 0

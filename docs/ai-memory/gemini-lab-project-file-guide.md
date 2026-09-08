@@ -1,5 +1,37 @@
 # Gemini-Lab Project File Guide
 
+## 2026-09-08 苹果掉落核心恢复到 eb1c300
+
+- `Assets/_Project/Scripts/Modules/Apple/AppleTreeDropController.cs`、`AppleDropSlot.cs`、`AppleTreeFeedback.cs` 以 `eb1c300b991d92ec6336afaf5441d0b0ca81544c` 为行为基准。
+- `AppleDropSlot` 的点击入口仍由 WorldMap 路由通过自身 Collider2D 调用，不恢复旧 `OnMouseDown`；`AppleRuntimeBootstrap.cs` 保留当前直启初始化。
+
+## 2026-09-08 苹果掉落逻辑恢复基准
+
+- `Assets/_Project/Scripts/Modules/Apple/AppleService.cs` 当前以提交 `cc54b1a9196ff1d16c341ecdfffdd0f27e1c37f1` 为逻辑基准。
+- `AppleTreeDropController.cs`、`AppleDropSlot.cs`、`AppleTreeFeedback.cs` 继续使用 Scene 中作者化的掉落槽位和反馈文字；WorldMap 路由适配保留在 `AppleDropSlot`，不恢复旧 `OnMouseDown`。
+- 不要在运行时或作者化脚本中把 `TMP_Text.fontMaterial` 设为 null；空值会触发 TMP 3.0.7 的空引用异常。字体和共享材质由 Scene / Inspector 序列化引用提供。
+
+## 2026-09-08 Boot 启动顺序
+
+- `Assets/_Project/Scenes/Boot.unity` 的 `BootstrapRoot` 是核心服务宿主，保留唯一的 `TarotRuntimeBootstrap`，并保存 TarotDeck 与 LLM 配置引用。
+- `Assets/_Project/Scripts/Modules/Apple/AppleRuntimeBootstrap.cs` 在核心服务存在后于 `Start` 注册 `IAppleService`；`Assets/_Project/Scripts/Modules/Tarot/TarotRuntimeBootstrap.cs` 在 `Start` 初始化 Tarot，避免 `Awake` 时序竞争。
+- 本次只修复 Boot 启动初始化顺序，不触碰 WorldMap 场景、苹果树收集逻辑或桌宠桥交互。
+
+## 2026-09-08 WorldMap 苹果树成熟状态初始化
+
+- `Assets/_Project/Scripts/Modules/Apple/AppleRuntimeBootstrap.cs` 不再只依赖 Scene 中的 Bootstrap GameObject；它会在场景加载阶段确保苹果服务存在，并为当前场景中已作者化的 `AppleTreeInteractable` 建立树状态。
+- 这一步必须发生在调试按钮快进时间之前。否则第一次点击大树时才创建状态，成熟计时会从快进后的当前时间重新开始，表现为始终“还没成熟哦”。
+- `AppleTreeDropController`、`AppleDropSlot`、树 PolygonCollider2D、掉落槽和 CollectionText 的 Scene 序列化引用仍是原有事实源；本次不改 WorldMap 场景文件。
+- 相关回归测试位于 `Assets/_Project/Tests/EditMode/AppleResourceServiceTests.cs`；Play 结果仍由人工验证。
+
+## 2026-09-08 WorldMap 点击与室外桌宠移动边界
+
+- `Assets/_Project/Scripts/Modules/WorldMap/WorldMapSceneInteractionRouter.cs` 是 WorldMap 显式点击目标的唯一裁决入口；邮箱、标牌、许愿树、苹果树、掉落苹果和桌宠都必须在 `WorldMap_Main.unity` 的 `_targets` 中拥有明确序列化引用。
+- `WorldMapGardenZone` 的 `_owner` 分别为 `angel` / `demon`，邮箱通过 `PanelOpenButton` 指向 `DailySummaryMailbox`，许愿树通过 `WorldMapWishSystemController` 打开许愿面板；这些业务映射不能依赖对象名称猜测。
+- `WorldMapPetInteractionController` 只负责桌宠 Collider2D 命中和控制权切换；普通移动、漫游、玩家输入和桥面高度分别由 `PetController`、`RandomWander`、`PetPlayerInputController` 和 `WalkableSurface` 负责。
+- `WorldMapPetAnimationTriggerController` 是室外特殊动画入口，绑定两只 `PetController` 并在动作期间施加移动锁；不能用一个同时直接移动刚体的 WorldMap 脚本替代这条链路。
+- 2026-09-08 的 Scene/脚本改动没有修改动画资源；Play 结果仍需人工确认。
+
 ## 2026-08-21 furniture selection feedback
 
 Indoor furniture selection paths: `Assets/_Project/Scripts/Modules/HubUI/ApartmentFurnitureSelectionPresenter.cs`, `Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentFurnitureSelectionAuthoring.cs`, and the authored nodes `ApartmentFurnitureSelection`, `FurnitureSelectionHighlight`, and `FurnitureSelectionMessage` in `Assets/_Project/Scenes/Apartment/Apartment_Main.unity`. Runtime only toggles authored objects and text; the viewport bridge owns click routing. The nine original targets plus `家具_装饰_储物的家具_恶魔_01` are wired; “苹果垫” is the requirement label for this existing storage furniture.
@@ -492,3 +524,25 @@ Updated: 2026-08-22
 - 作者化脚本：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorTutorialAuthoring.cs`，菜单为 `Tools/Gemini-Lab/WorldMap/Author Outdoor Tutorial`。脚本只增量维护新手指引子树。
 - 页面资源：`Assets/_Project/Art/新手引导/outdoor/intro.png`、`outdoor1.png`～`outdoor6.png`；按钮资源：`Assets/_Project/Art/新手引导/left.png`、`right.png`、`outdoor/close.png`。
 - 运行时分页组件：`Assets/_Project/Scripts/Modules/HubUI/Panels/SceneAuthoredImageVariantView.cs`，只操作 Scene 中的页面节点和按钮事件。
+### WorldMap 室外点击路由（2026-09-07）
+
+- 点击契约位于 `Assets/_Project/Scripts/Core/ServiceLocator.cs` 的 `IWorldMapSceneClickTarget`，以避免 Apple 与 WorldMap 程序集互相引用；路由器位于 `Assets/_Project/Scripts/Modules/WorldMap/WorldMapSceneInteractionRouter.cs`。
+- `Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity` 的 `_SceneRoot` 路由器显式保存邮箱、标牌、桌宠、许愿树、三棵苹果树和九个掉落槽引用。三棵苹果树保留 PolygonCollider2D，掉落槽保留 Scene `CollectionText` 引用。
+- 本阶段不修改动画资源、室内资源、花朵基线或其他视觉对象；Unity Play 验证仍由人工执行。
+### 2026-09-08 WorldMap 点击命中区域
+
+- `ClickableSceneObject`、`WorldMapGardenZone`、`WorldMapPetInteractionController` 的点击命中必须使用同一物体上的 Collider2D；`SpriteRenderer.bounds` 只可用于视觉排序或非点击辅助计算。
+- 本次只移除三处 bounds-first 命中分支，不改 `WorldMap_Main.unity` 中 Collider2D 的作者化几何，最终覆盖范围由 Scene/Play 人工确认。
+
+### WorldMap 苹果服务入口（2026-09-08）
+
+- `Assets/_Project/Scripts/Modules/Apple/AppleRuntimeBootstrap.cs` 提供幂等的 `EnsureRegistered()`：优先复用已有 `IAppleService`，直启 WorldMap 且已有 `IGameClock` 时才注册现有 `AppleService`，并同步到 `IPersistentServiceRegistry`。
+- `Assets/_Project/Scripts/Modules/Apple/AppleTreeDropController.cs` 在开始树收获前确保服务入口可用；它不改变 `TryBeginHarvest` 的成熟批次规则，也不改变 `AppleDropSlot` 成功领取后增加货币的路径。
+- Boot 正常启动和 WorldMap 直启都应使用同一 `IAppleService`；树的 Router、Collider2D、Scene 掉落槽和 CollectionText 引用仍以 `WorldMap_Main.unity` 为准。
+
+### WorldMap 苹果收集系统文件边界（2026-09-08）
+
+- 业务状态：`Assets/_Project/Scripts/Modules/Apple/AppleService.cs`、`IAppleService.cs`、`AppleModels.cs`。
+- 运行时入口：`AppleRuntimeBootstrap.cs`；树点击与掉落表现：`AppleTreeInteractable.cs`、`AppleTreeDropController.cs`、`AppleDropSlot.cs`、`AppleTreeFeedback.cs`。
+- Scene 唯一视觉来源：`WorldMap_Main.unity` 中 `WorldMapAppleDrops` 下的 9 个苹果槽位、9 个 `CollectionText`，以及 3 个树下 `StatusText`。这些节点必须保持序列化引用，运行时只切换显隐和文本。
+- 反馈文字使用 `Assets/_Project/Art/Fonts/NotoSansSC_SDF.asset` 及其材质；不要把旧 Liberation 字体实例材质重新绑定到这些节点。

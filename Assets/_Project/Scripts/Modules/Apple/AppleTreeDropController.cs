@@ -85,25 +85,64 @@ namespace GeminiLab.Modules.Apple
 
         public bool TryBeginHarvest()
         {
-            if (HasActiveDrops()) return false;
+            bool hasActiveDrops = HasActiveDrops();
+            Debug.Log(
+                $"[AppleTreeHarvest][Entered] object={name} tree={_treeId} " +
+                $"slotCount={_dropSlots.Length} activeDrops={hasActiveDrops}",
+                this);
+
+            if (hasActiveDrops)
+            {
+                Debug.Log(
+                    $"[AppleTreeHarvest][Blocked] tree={_treeId} reason=active-drops",
+                    this);
+                return false;
+            }
+
             List<AppleDropSlot> availableSlots = GetAvailableSlots();
+            Debug.Log(
+                $"[AppleTreeHarvest][Slots] tree={_treeId} available={availableSlots.Count}",
+                this);
+
             if (availableSlots.Count == 0)
             {
                 Debug.LogError($"[AppleTreeDrop] {_treeId} 没有作者化的掉落槽位。", this);
+                Debug.LogWarning(
+                    $"[AppleTreeHarvest][Blocked] tree={_treeId} reason=no-available-slots",
+                    this);
                 _feedback?.ShowNotReady();
                 return false;
             }
 
-            _appleService ??= ServiceLocator.TryResolve(out IAppleService? service) ? service : null;
+            if (_appleService == null)
+            {
+                _appleService = ServiceLocator.TryResolve(out IAppleService? service) ? service : null;
+            }
+
+            Debug.Log(
+                $"[AppleTreeHarvest][Service] tree={_treeId} resolved={_appleService != null}",
+                this);
+
             if (_appleService == null)
             {
                 Debug.LogWarning($"[AppleTreeDrop] {_treeId} 未找到 IAppleService。", this);
+                Debug.LogWarning(
+                    $"[AppleTreeHarvest][Blocked] tree={_treeId} reason=missing-apple-service",
+                    this);
                 _feedback?.ShowNotReady();
                 return false;
             }
 
-            if (!_appleService.TryBeginHarvest(_treeId, out int total) || total <= 0)
+            bool started = _appleService.TryBeginHarvest(_treeId, out int total);
+            Debug.Log(
+                $"[AppleTreeHarvest][ServiceResult] tree={_treeId} started={started} total={total}",
+                this);
+
+            if (!started || total <= 0)
             {
+                Debug.LogWarning(
+                    $"[AppleTreeHarvest][Blocked] tree={_treeId} reason=no-mature-batch",
+                    this);
                 _feedback?.ShowNotReady();
                 return false;
             }
@@ -113,6 +152,11 @@ namespace GeminiLab.Modules.Apple
             int upperDrops = Mathf.Max(minDrops, Mathf.Min(_maxDropCount, maxDrops));
             int dropCount = UnityEngine.Random.Range(minDrops, upperDrops + 1);
             int[] allocations = SplitTotal(total, dropCount);
+
+            Debug.Log(
+                $"[AppleTreeHarvest][Started] tree={_treeId} total={total} " +
+                $"dropCount={dropCount} allocations={string.Join(",", allocations)}",
+                this);
 
             for (int index = 0; index < dropCount; index++)
             {
@@ -133,13 +177,50 @@ namespace GeminiLab.Modules.Apple
 
         internal void CollectDrop(AppleDropSlot slot)
         {
-            if (slot == null || !slot.IsOccupied || slot.Amount <= 0) return;
-            _appleService ??= ServiceLocator.TryResolve(out IAppleService? service) ? service : null;
-            if (_appleService == null) return;
-
-            if (_appleService.TryCollectHarvest(_treeId, slot.Amount))
+            if (slot == null)
             {
-                slot.CompleteCollection(slot.Amount);
+                Debug.LogWarning($"[AppleTreeCollect][Blocked] tree={_treeId} reason=null-slot", this);
+                return;
+            }
+
+            Debug.Log(
+                $"[AppleTreeCollect][Entered] tree={_treeId} occupied={slot.IsOccupied} amount={slot.Amount}",
+                this);
+
+            if (!slot.IsOccupied || slot.Amount <= 0)
+            {
+                Debug.LogWarning(
+                    $"[AppleTreeCollect][Blocked] tree={_treeId} reason=invalid-slot-state",
+                    this);
+                return;
+            }
+
+            if (_appleService == null)
+            {
+                _appleService = ServiceLocator.TryResolve(out IAppleService? service) ? service : null;
+            }
+
+            Debug.Log(
+                $"[AppleTreeCollect][Service] tree={_treeId} resolved={_appleService != null}",
+                this);
+
+            if (_appleService == null)
+            {
+                Debug.LogWarning(
+                    $"[AppleTreeCollect][Blocked] tree={_treeId} reason=missing-apple-service",
+                    this);
+                return;
+            }
+
+            int amount = slot.Amount;
+            bool collected = _appleService.TryCollectHarvest(_treeId, amount);
+            Debug.Log(
+                $"[AppleTreeCollect][Result] tree={_treeId} amount={amount} collected={collected}",
+                this);
+
+            if (collected)
+            {
+                slot.CompleteCollection(amount);
             }
         }
 
