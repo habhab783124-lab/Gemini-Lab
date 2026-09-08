@@ -1,9 +1,11 @@
 #nullable enable
+using System;
 using GeminiLab.Modules.Furniture;
 using GeminiLab.Modules.Pet;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using Object = UnityEngine.Object;
 
 namespace GeminiLab.Modules.HubUI
 {
@@ -15,9 +17,12 @@ namespace GeminiLab.Modules.HubUI
     [RequireComponent(typeof(RectTransform))]
     public sealed class ApartmentViewportInputBridge : MonoBehaviour, IPointerClickHandler
     {
+        // 视口点击桥显式限定 UnityEngine.Object，避免与 System.Object 发生歧义。
         [SerializeField] private RawImage? _viewportImage;
         [SerializeField] private Camera? _viewportCamera;
         [SerializeField] private float _worldPlaneZ;
+        [Tooltip("Scene-authored world click handlers, evaluated in array order after Build Mode and before pets.")]
+        [SerializeField] private MonoBehaviour[] _worldPointInteractables = Array.Empty<MonoBehaviour>();
 
         public void OnPointerClick(PointerEventData eventData)
         {
@@ -35,7 +40,13 @@ namespace GeminiLab.Modules.HubUI
                 return;
             }
 
-            PetClickReactionController[] petClicks = Object.FindObjectsByType<PetClickReactionController>(
+            if (eventData.button == PointerEventData.InputButton.Left &&
+                TryHandleWorldPointInteractables(worldPoint))
+            {
+                return;
+            }
+
+            PetClickReactionController[] petClicks = UnityEngine.Object.FindObjectsByType<PetClickReactionController>(
                 FindObjectsInactive.Exclude,
                 FindObjectsSortMode.None);
 
@@ -48,7 +59,7 @@ namespace GeminiLab.Modules.HubUI
                 }
             }
 
-            PetPlayerFurnitureInteractionController[] furnitureInteractions = Object.FindObjectsByType<PetPlayerFurnitureInteractionController>(
+            PetPlayerFurnitureInteractionController[] furnitureInteractions = UnityEngine.Object.FindObjectsByType<PetPlayerFurnitureInteractionController>(
                 FindObjectsInactive.Exclude,
                 FindObjectsSortMode.None);
 
@@ -63,6 +74,22 @@ namespace GeminiLab.Modules.HubUI
 
             // 点击空地 → 取消所有宠物的选中，双方都进入自由漫游
             PetPlayerInputController.ReleaseAllControl();
+        }
+
+        private bool TryHandleWorldPointInteractables(Vector2 worldPoint)
+        {
+            for (int i = 0; i < _worldPointInteractables.Length; i++)
+            {
+                MonoBehaviour candidate = _worldPointInteractables[i];
+                if (candidate is IApartmentWorldPointInteractable interactable &&
+                    candidate.isActiveAndEnabled &&
+                    interactable.TryHandleWorldPoint(worldPoint))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public bool TryScreenPointToWorldPoint(
@@ -144,7 +171,7 @@ namespace GeminiLab.Modules.HubUI
                 return false;
             }
 
-            BuildModeController[] buildControllers = Object.FindObjectsByType<BuildModeController>(
+            BuildModeController[] buildControllers = UnityEngine.Object.FindObjectsByType<BuildModeController>(
                 FindObjectsInactive.Exclude,
                 FindObjectsSortMode.None);
 

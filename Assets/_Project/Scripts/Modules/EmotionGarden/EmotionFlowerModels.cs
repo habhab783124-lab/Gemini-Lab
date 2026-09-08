@@ -22,6 +22,9 @@ namespace GeminiLab.Modules.EmotionGarden
         public string EmotionType;
         public string FlowerName;
         public string EmotionDetail;
+        public string[] EmotionKeywords;
+        public string FlowerDescription;
+        public string FlowerLanguage;
         public string Owner;
         public GrowthState State;
         public bool IsCollected;
@@ -55,7 +58,8 @@ namespace GeminiLab.Modules.EmotionGarden
 
     /// <summary>
     /// 一朵已经摆放到 WorldMap 的花卉记录。
-    /// SlotIndex 对应 Scene 中稳定作者化的 PlacementSlot；世界坐标只保存运行态布局，
+    /// SlotIndex 对应 Scene 中稳定作者化的 PlacementSlot；PlacementLayerId 记录 BaselineItem 层，
+    /// 世界坐标只保存运行态布局，
     /// 不写回 Scene 或 ScriptableObject。
     /// </summary>
     [Serializable]
@@ -67,6 +71,25 @@ namespace GeminiLab.Modules.EmotionGarden
         public bool IsCluster;
         public float WorldX;
         public float WorldY;
+        public string PlacementLayerId;
+    }
+
+    /// <summary>
+    /// AI 每日小结的持久化结果。它与当天的情绪花绑定，但单独保存，
+    /// 这样邮箱展示不会依赖当前场景是否仍然打开。
+    /// </summary>
+    [Serializable]
+    public struct EmotionDailySummaryData
+    {
+        public string DateIso;
+        public string InputSentence;
+        public string EmotionType;
+        public string FlowerName;
+        public string FlowerDescription;
+        public string Summary;
+        public string AngelNote;
+        public string DevilNote;
+        public long GeneratedAtUtcTicks;
     }
 
     /// <summary>情绪花提交成功。</summary>

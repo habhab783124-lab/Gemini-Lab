@@ -1,12 +1,17 @@
 param(
     [ValidateSet("write", "review")]
-    [string]$Mode = "write"
+    [string]$Mode = "write",
+    [string]$TaskCardPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$taskCardPath = Join-Path $repoRoot "docs/current-task-card.json"
+if ([string]::IsNullOrWhiteSpace($TaskCardPath)) {
+    $TaskCardPath = Join-Path $repoRoot "docs/current-task-card.json"
+}
+$taskCardPath = $TaskCardPath
+. (Join-Path $PSScriptRoot "task-card-utils.ps1")
 
 if (-not (Test-Path -LiteralPath $taskCardPath)) {
     Write-Error "Task gate failed: missing docs/current-task-card.json"
@@ -41,10 +46,52 @@ function Test-PathMatchesAny([string]$pathValue, [string[]]$patterns) {
     return $false
 }
 
-$allowedStatus = @("planned", "approved", "executing", "done")
+$allowedStatus = @("draft", "explored", "planned", "approved", "executing", "verifying", "done", "blocked")
 
 if (-not (Test-NonEmptyString $task.status) -or ($allowedStatus -notcontains $task.status)) {
-    $errors.Add("status must be one of: planned, approved, executing, done")
+    $errors.Add("status must be one of: draft, explored, planned, approved, executing, verifying, done, blocked")
+}
+
+$hasWorkflowContract = $task.PSObject.Properties.Name -contains "workflow_contract_version"
+if (-not $hasWorkflowContract) {
+    if ($Mode -eq "write") {
+        $errors.Add("workflow_contract_version is missing; create a fresh task card before write operations")
+    }
+}
+elseif ([int]$task.workflow_contract_version -lt 2) {
+    $errors.Add("workflow_contract_version must be at least 2")
+}
+
+if ($hasWorkflowContract) {
+    if (-not (Test-NonEmptyString $task.task_id)) {
+        $errors.Add("task_id must be a non-empty string")
+    }
+    if (-not ($task.PSObject.Properties.Name -contains "human_approved")) {
+        $errors.Add("human_approved field is missing")
+    }
+    elseif ($Mode -eq "write" -and $task.human_approved -ne $true) {
+        $errors.Add("human_approved must be true before write operations")
+    }
+    if (-not (Test-NonEmptyString $task.approval_source)) {
+        $errors.Add("approval_source must be a non-empty string")
+    }
+    if (-not (Test-NonEmptyString $task.approval_scope)) {
+        $errors.Add("approval_scope must be a non-empty string")
+    }
+    if (-not (Test-NonEmptyString $task.plan_hash)) {
+        $errors.Add("plan_hash must be a non-empty string")
+    }
+    else {
+        try {
+            $expectedPlanHash = Get-TaskPlanHash $task
+            if ([string]$task.plan_hash -ne $expectedPlanHash) {
+                $errors.Add("plan_hash does not match the immutable task scope and acceptance criteria")
+            }
+        }
+        catch {
+            $errors.Add("plan_hash could not be calculated: $($_.Exception.Message)")
+        }
+    }
 }
 
 if (-not (Test-NonEmptyString $task.task_source)) {
@@ -76,6 +123,10 @@ if (-not ($task.PSObject.Properties.Name -contains "approved")) {
 }
 elseif ($task.approved -ne $true -and $Mode -eq "write") {
     $errors.Add("approved must be true before write operations")
+}
+
+if ($hasWorkflowContract -and $Mode -eq "review" -and $task.status -eq "draft") {
+    $errors.Add("draft tasks cannot enter review")
 }
 
 if (-not ($task.PSObject.Properties.Name -contains "scene_play_parity_required")) {
@@ -154,8 +205,8 @@ if ($errors.Count -eq 0 -and $task.scene_play_parity_required -eq $true) {
     }
 }
 
-if ($Mode -eq "write" -and $task.status -notin @("approved", "executing", "done")) {
-    $errors.Add("status must be approved/executing/done before write operations")
+if ($Mode -eq "write" -and $task.status -notin @("approved", "executing")) {
+    $errors.Add("status must be approved or executing before write operations")
 }
 
 if ($errors.Count -gt 0) {
@@ -170,5 +221,9 @@ Write-Host "[TaskGate] PASSED" -ForegroundColor Green
 Write-Host " status   : $($task.status)"
 Write-Host " source   : $($task.task_source)"
 Write-Host " approved : $($task.approved)"
+if ($hasWorkflowContract) {
+    Write-Host " task_id  : $($task.task_id)"
+    Write-Host " planHash : $($task.plan_hash)"
+}
 Write-Host " parity   : $($task.scene_play_parity_required)"
 exit 0

@@ -29,6 +29,7 @@ namespace GeminiLab.Editor.SceneBootstrap
         private const string FlowerArtDir = "Assets/_Project/Art/WorldMap/flower";
         private const string FlowerHeadArtDir = "Assets/_Project/Art/WorldMap/花朵图鉴/花朵";
         private const string FlowerArtCatalogPath = "Assets/_Project/Art/WorldMap/flower/EmotionFlowerArtCatalog.asset";
+        private const string EmotionInputArtDir = "Assets/_Project/Art/WorldMap/输入心情";
         private const string WeeklyOutlineShaderName = "GeminiLab/UI/SpriteAlphaOutline";
         private const string WeeklyOutlineMaterialPath = "Assets/_Project/Art/WorldMap/UI/garden_week/SelectedBottleOutline.mat";
         private const int FirstCodexFlowerNumber = 27;
@@ -80,17 +81,22 @@ namespace GeminiLab.Editor.SceneBootstrap
             var panelWeekly = EnsurePanel<WeeklyGardenPanelStub>(canvasGo, uiLayer, "Panel_WeeklyGarden");
             var panelCollection = EnsurePanel<FlowerCollectionPanelStub>(canvasGo, uiLayer, "Panel_EmotionCollection");
 
-            SetupEmotionInputContent(panelInput, uiLayer);
+            SetupEmotionInputContentReference(panelInput, uiLayer);
             SetupWeeklyGardenContent(panelWeekly, uiLayer);
             SetupFlowerCollectionBookContent(panelCollection, uiLayer);
 
             EnsureDevTools(canvasGo, uiLayer);
 
-            var inputBtn = EnsureButton(canvasGo, uiLayer, "Btn_EmotionInput", "情绪输入", 0);
+            var inputBtn = canvasGo.transform.Find("Btn_EmotionInput")?.GetComponent<Button>();
             var weeklyBtn = EnsureButton(canvasGo, uiLayer, "Btn_WeeklyGarden", "每周培育", 1);
             var collectionBtn = EnsureButton(canvasGo, uiLayer, "Btn_EmotionCollection", "情绪图鉴", 2);
 
-            WireButtonToPanel(inputBtn, PanelId.EmotionInput);
+            // 情绪输入改由场景中的天使/恶魔标牌进入；旧的右上角按钮保留节点但不再显示。
+            if (inputBtn != null)
+            {
+                inputBtn.gameObject.SetActive(false);
+                inputBtn.interactable = false;
+            }
             WireButtonToPanel(weeklyBtn, PanelId.WeeklyGardenView);
             WireButtonToPanel(collectionBtn, PanelId.EmotionCollection);
 
@@ -110,7 +116,154 @@ namespace GeminiLab.Editor.SceneBootstrap
             Debug.Log("[WorldMapEmotionGardenUI] 情绪花园面板 + 触发按钮 + 7/20 修改已应用到 WorldMap Canvas");
         }
 
+        /// <summary>
+        /// Applies only the currently requested UI delta to an already-authored scene.
+        /// This deliberately avoids rebuilding the garden/codex hierarchy so unrelated
+        /// scene object ids, placement visuals and animation assets remain untouched.
+        /// </summary>
+        public static void PatchUiTaskMinimized()
+        {
+            var scene = EditorSceneManager.GetActiveScene().path == ScenePath
+                ? EditorSceneManager.GetActiveScene()
+                : EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var canvasGo = GameObject.Find("Canvas");
+            if (canvasGo == null)
+            {
+                Debug.LogError("[WorldMapEmotionGardenUI] 未找到 Canvas");
+                return;
+            }
+
+            int uiLayer = canvasGo.layer;
+            var inputButton = canvasGo.transform.Find("Btn_EmotionInput")?.GetComponent<Button>();
+            if (inputButton != null)
+            {
+                inputButton.gameObject.SetActive(false);
+                inputButton.interactable = false;
+            }
+
+            var inputPanel = canvasGo.transform.Find("Panel_EmotionInput")?.GetComponent<EmotionInputPanelStub>();
+            if (inputPanel != null)
+            {
+                var panelSo = new SerializedObject(inputPanel);
+                var content = panelSo.FindProperty("_content")?.objectReferenceValue as GameObject;
+                var contentTransform = content?.transform;
+                var visualRoot = contentTransform?.Find("EmotionInputVisual");
+                var angelTheme = visualRoot?.Find("AngelTheme");
+                var demonTheme = visualRoot?.Find("DemonTheme");
+                var inputField = contentTransform?.Find("InputField")?.GetComponent<TMP_InputField>();
+                if (angelTheme != null && demonTheme != null && inputField != null)
+                {
+                    var angelPrompt = angelTheme.Find("InputVisual")?.GetComponent<Image>();
+                    var demonPrompt = demonTheme.Find("InputVisual")?.GetComponent<Image>();
+                    var angelFocused = EnsureImageChild(angelTheme, "InputVisual_Focused", uiLayer,
+                        LoadNoTextEmotionInputSprite("angel_emotion_input"), new Vector2(0f, 42f), new Vector2(708f, 239f));
+                    var demonFocused = EnsureImageChild(demonTheme, "InputVisual_Focused", uiLayer,
+                        LoadNoTextEmotionInputSprite("devil_emotion_input"), new Vector2(0f, 42f), new Vector2(713f, 253f));
+                    if (angelPrompt != null) angelPrompt.raycastTarget = false;
+                    if (demonPrompt != null) demonPrompt.raycastTarget = false;
+                    angelFocused.raycastTarget = false;
+                    demonFocused.raycastTarget = false;
+                    angelFocused.gameObject.SetActive(false);
+                    demonFocused.gameObject.SetActive(false);
+                    panelSo.FindProperty("_inputField")!.objectReferenceValue = inputField;
+                    panelSo.FindProperty("_angelPromptInputImage")!.objectReferenceValue = angelPrompt;
+                    panelSo.FindProperty("_angelFocusedInputImage")!.objectReferenceValue = angelFocused;
+                    panelSo.FindProperty("_demonPromptInputImage")!.objectReferenceValue = demonPrompt;
+                    panelSo.FindProperty("_demonFocusedInputImage")!.objectReferenceValue = demonFocused;
+                    panelSo.ApplyModifiedPropertiesWithoutUndo();
+                    EditorUtility.SetDirty(inputPanel);
+                }
+            }
+
+            ConfigureSceneEmotionSign("天使标牌", "angel");
+            ConfigureSceneEmotionSign("恶魔标牌", "demon");
+            DeactivateLegacyEmotionEntry();
+            RemoveCodexSoilVisuals(canvasGo);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[WorldMapEmotionGardenUI] Minimal UI delta authored without rebuilding unrelated scene objects");
+        }
+
+        public static void PatchUiTaskMinimizedAll()
+        {
+            PatchUiTaskMinimized();
+            WorldMapWishSystemAuthoring.PatchInputTaskMinimized();
+        }
+
+        private static void ConfigureSceneEmotionSign(string objectName, string owner)
+        {
+            var sign = GameObject.Find(objectName);
+            if (sign == null) return;
+            var zone = sign.GetComponent<WorldMapGardenZone>() ?? sign.AddComponent<WorldMapGardenZone>();
+            var so = new SerializedObject(zone);
+            so.FindProperty("_owner")!.stringValue = owner;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(zone);
+        }
+
+        private static void DeactivateLegacyEmotionEntry()
+        {
+            foreach (var name in new[] { "EmotionEntry_Angel", "EmotionEntry_Demon" })
+            {
+                var legacy = GameObject.Find(name);
+                if (legacy != null) legacy.SetActive(false);
+            }
+        }
+
+        private static void RemoveCodexSoilVisuals(GameObject canvasGo)
+        {
+            var panel = canvasGo.transform.Find("Panel_EmotionCollection")?.GetComponent<FlowerCollectionPanelStub>();
+            if (panel == null) return;
+            var so = new SerializedObject(panel);
+            var content = so.FindProperty("_content")?.objectReferenceValue as GameObject;
+            if (content == null) return;
+            var soilNodes = content.GetComponentsInChildren<Transform>(true);
+            foreach (var node in soilNodes)
+            {
+                if (node != null && node.name == "SoilImage")
+                    Object.DestroyImmediate(node.gameObject);
+            }
+            var slots = so.FindProperty("_cardSlots");
+            if (slots != null && slots.isArray)
+            {
+                for (int index = 0; index < slots.arraySize; index++)
+                {
+                    var element = slots.GetArrayElementAtIndex(index);
+                    var soil = element.FindPropertyRelative("_soilImage");
+                    if (soil != null) soil.objectReferenceValue = null;
+                }
+            }
+            var detailSoil = so.FindProperty("_detailSoilImage");
+            if (detailSoil != null) detailSoil.objectReferenceValue = null;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(panel);
+        }
+
         // ── DevTools 调试工具父节点 ──────────────────────────
+
+        /// <summary>
+        /// 只作者化输入心情面板，避免为了替换一套 UI 而重跑其它 WorldMap 补丁。
+        /// </summary>
+        public static void PatchEmotionInputArtOnly()
+        {
+            var scene = EditorSceneManager.GetActiveScene().path == ScenePath
+                ? EditorSceneManager.GetActiveScene()
+                : EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var canvasGo = GameObject.Find("Canvas");
+            if (canvasGo == null)
+            {
+                Debug.LogError("[WorldMapEmotionGardenUI] 未找到 Canvas，无法作者化输入心情面板");
+                return;
+            }
+
+            int uiLayer = canvasGo.layer;
+            var panelInput = EnsurePanel<EmotionInputPanelStub>(canvasGo, uiLayer, "Panel_EmotionInput");
+            SetupEmotionInputContentReference(panelInput, uiLayer);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[WorldMapEmotionGardenUI] 输入心情面板已按天使/恶魔参考图作者化");
+        }
 
         private static void EnsureDevTools(GameObject canvasGo, int uiLayer)
         {
@@ -302,6 +455,173 @@ namespace GeminiLab.Editor.SceneBootstrap
         }
 
         // ── 情绪输入面板内容 ──────────────────────────────────
+
+        private static void SetupEmotionInputContentReference(GameObject panel, int uiLayer)
+        {
+            var stub = panel.GetComponent<EmotionInputPanelStub>();
+            if (stub == null) return;
+
+            var so = new SerializedObject(stub);
+            var content = so.FindProperty("_content").objectReferenceValue as GameObject;
+            if (content == null) return;
+
+            var contentT = content.transform;
+            var contentImage = GetOrAdd<Image>(content);
+            contentImage.sprite = null;
+            contentImage.color = new Color(1f, 1f, 1f, 0f);
+            // Content 是模态面板的全屏透明阻挡层：即使鼠标落在主题图片之外，
+            // 点击也不能穿透到 WorldMap 的“室内”等场景物体；面板关闭时由 StubPanelBase 一起隐藏。
+            contentImage.raycastTarget = true;
+
+            // 两套主题都预先存在于 Scene，运行时只切换 active 状态，不创建最终视觉节点。
+            var visualRoot = EnsureFullRect(contentT, "EmotionInputVisual", uiLayer);
+            visualRoot.transform.SetAsFirstSibling();
+            var angelTheme = EnsureFullRect(visualRoot.transform, "AngelTheme", uiLayer);
+            var demonTheme = EnsureFullRect(visualRoot.transform, "DemonTheme", uiLayer);
+            angelTheme.SetActive(true);
+            demonTheme.SetActive(false);
+
+            var angelBackground = EnsureImageChild(angelTheme.transform, "Background", uiLayer,
+                LoadEmotionInputSprite("angel_Input", "background"), Vector2.zero, new Vector2(1175f, 743f));
+            ApplyRect(angelBackground.gameObject, Vector2.zero, new Vector2(1175f, 743f));
+            var demonBackground = EnsureImageChild(demonTheme.transform, "Background", uiLayer,
+                LoadEmotionInputSprite("devil_Input", "background"), Vector2.zero, new Vector2(1575f, 799f));
+            ApplyRect(demonBackground.gameObject, Vector2.zero, new Vector2(1575f, 799f));
+
+            // 员工卡就是参考图中的培育者选择入口；点击当前卡片即可切换到另一位桌宠。
+            var angelOwnerButton = EnsureImageButton(angelTheme.transform, "OwnerCardButton", uiLayer, null,
+                new Vector2(474f, -12f), new Vector2(235f, 340f));
+            ConfigureTransparentButton(angelOwnerButton);
+            var demonOwnerButton = EnsureImageButton(demonTheme.transform, "OwnerCardButton", uiLayer, null,
+                new Vector2(-638f, -24f), new Vector2(275f, 420f));
+            ConfigureTransparentButton(demonOwnerButton);
+
+            var inputField = EnsureInputField(contentT, uiLayer);
+            ApplyRect(inputField.gameObject, new Vector2(0f, 42f), new Vector2(708f, 239f));
+            ConfigureEmotionInputField(inputField);
+
+            var angelInput = EnsureImageChild(angelTheme.transform, "InputVisual", uiLayer,
+                LoadEmotionInputSprite("angel_Input", "input"), new Vector2(0f, 42f), new Vector2(708f, 239f));
+            ApplyRect(angelInput.gameObject, new Vector2(0f, 42f), new Vector2(708f, 239f));
+            angelInput.raycastTarget = false;
+            angelInput.gameObject.SetActive(true);
+            var angelFocusedInput = EnsureImageChild(angelTheme.transform, "InputVisual_Focused", uiLayer,
+                LoadNoTextEmotionInputSprite("angel_emotion_input"), new Vector2(0f, 42f), new Vector2(708f, 239f));
+            ApplyRect(angelFocusedInput.gameObject, new Vector2(0f, 42f), new Vector2(708f, 239f));
+            angelFocusedInput.raycastTarget = false;
+            angelFocusedInput.gameObject.SetActive(false);
+            var demonInput = EnsureImageChild(demonTheme.transform, "InputVisual", uiLayer,
+                LoadEmotionInputSprite("devil_Input", "input"), new Vector2(0f, 42f), new Vector2(713f, 253f));
+            ApplyRect(demonInput.gameObject, new Vector2(0f, 42f), new Vector2(713f, 253f));
+            demonInput.raycastTarget = false;
+            demonInput.gameObject.SetActive(true);
+            var demonFocusedInput = EnsureImageChild(demonTheme.transform, "InputVisual_Focused", uiLayer,
+                LoadNoTextEmotionInputSprite("devil_emotion_input"), new Vector2(0f, 42f), new Vector2(713f, 253f));
+            ApplyRect(demonFocusedInput.gameObject, new Vector2(0f, 42f), new Vector2(713f, 253f));
+            demonFocusedInput.raycastTarget = false;
+            demonFocusedInput.gameObject.SetActive(false);
+
+            var angelSubmit = EnsureImageChild(angelTheme.transform, "SubmitVisual", uiLayer,
+                LoadEmotionInputSprite("angel_Input", "submit"), new Vector2(0f, -222f), new Vector2(446f, 98f));
+            ApplyRect(angelSubmit.gameObject, new Vector2(0f, -222f), new Vector2(446f, 98f));
+            var demonSubmit = EnsureImageChild(demonTheme.transform, "SubmitVisual", uiLayer,
+                LoadEmotionInputSprite("devil_Input", "submit"), new Vector2(0f, -222f), new Vector2(488f, 110f));
+            ApplyRect(demonSubmit.gameObject, new Vector2(0f, -222f), new Vector2(488f, 110f));
+
+            var submitBtn = EnsureButtonWithLabel(contentT, uiLayer, "SubmitBtn", string.Empty,
+                new Vector2(0f, -222f), new Vector2(488f, 110f), new Color(1f, 1f, 1f, 0f));
+            ApplyRect(submitBtn.gameObject, new Vector2(0f, -222f), new Vector2(488f, 110f));
+            ConfigureTransparentButton(submitBtn);
+            var submitLabel = submitBtn.transform.Find("Label");
+            if (submitLabel != null) submitLabel.gameObject.SetActive(false);
+
+            var ownerGo = EnsureChildText(contentT, uiLayer, "OwnerText", string.Empty, 20,
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -40), new Vector2(300, 36));
+            ownerGo.SetActive(false);
+            var titleGo = EnsureChildText(contentT, uiLayer, "Title_Input", string.Empty, 28,
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -40), new Vector2(600, 46));
+            titleGo.SetActive(false);
+
+            var statusGo = EnsureChildText(contentT, uiLayer, "StatusText", string.Empty, 18,
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -315), new Vector2(700, 34));
+            var statusTmp = statusGo.GetComponent<TextMeshProUGUI>();
+            statusTmp.color = new Color(0.38f, 0.23f, 0.16f, 1f);
+
+            foreach (var oldName in new[] { "DebugResetBtn", "DebugNextDayBtn" })
+            {
+                var old = contentT.Find(oldName);
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+            }
+
+            so.FindProperty("_inputField").objectReferenceValue = inputField;
+            so.FindProperty("_submitButton").objectReferenceValue = submitBtn;
+            so.FindProperty("_statusText").objectReferenceValue = statusTmp;
+            so.FindProperty("_ownerText").objectReferenceValue = ownerGo.GetComponent<TextMeshProUGUI>();
+            so.FindProperty("_angelPromptInputImage").objectReferenceValue = angelInput;
+            so.FindProperty("_angelFocusedInputImage").objectReferenceValue = angelFocusedInput;
+            so.FindProperty("_demonPromptInputImage").objectReferenceValue = demonInput;
+            so.FindProperty("_demonFocusedInputImage").objectReferenceValue = demonFocusedInput;
+            so.FindProperty("_angelTheme").objectReferenceValue = angelTheme;
+            so.FindProperty("_demonTheme").objectReferenceValue = demonTheme;
+            so.FindProperty("_angelOwnerButton").objectReferenceValue = angelOwnerButton;
+            so.FindProperty("_demonOwnerButton").objectReferenceValue = demonOwnerButton;
+            so.ApplyModifiedProperties();
+        }
+
+        private static Sprite? LoadEmotionInputSprite(string ownerFolder, string fileName)
+        {
+            return AssetDatabase.LoadAssetAtPath<Sprite>($"{EmotionInputArtDir}/{ownerFolder}/{fileName}.png");
+        }
+
+        private static Sprite? LoadNoTextEmotionInputSprite(string fileName)
+        {
+            return AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/_Project/Art/WorldMap/UI输入框去字/{fileName}.png");
+        }
+
+        private static void ConfigureTransparentButton(Button button)
+        {
+            button.transition = Selectable.Transition.None;
+            if (button.targetGraphic is Image image)
+            {
+                image.color = new Color(1f, 1f, 1f, 0f);
+                image.raycastTarget = true;
+                image.preserveAspect = false;
+            }
+        }
+
+        private static void ConfigureEmotionInputField(TMP_InputField field)
+        {
+            if (field.targetGraphic is Image image)
+            {
+                image.color = new Color(1f, 1f, 1f, 0f);
+                image.raycastTarget = true;
+            }
+
+            var textArea = field.transform.Find("Text Area");
+            if (textArea != null)
+            {
+                EnsureStretch(textArea.gameObject);
+                var textAreaRt = textArea.GetComponent<RectTransform>();
+                textAreaRt!.offsetMin = new Vector2(32f, 24f);
+                textAreaRt.offsetMax = new Vector2(-32f, -24f);
+            }
+
+            if (field.placeholder is TextMeshProUGUI placeholder)
+            {
+                // input.png 已经包含参考图中的占位文案；清掉 TMP 占位文本，避免出现两层文案。
+                placeholder.gameObject.SetActive(false);
+                field.placeholder = null;
+            }
+
+            if (field.textComponent is TextMeshProUGUI text)
+            {
+                text.fontSize = 30f;
+                text.color = new Color(0.30f, 0.19f, 0.12f, 1f);
+                text.alignment = TextAlignmentOptions.TopLeft;
+                text.raycastTarget = false;
+                EnsureStretch(text.gameObject);
+            }
+        }
 
         private static void SetupEmotionInputContent(GameObject panel, int uiLayer)
         {
@@ -979,7 +1299,6 @@ namespace GeminiLab.Editor.SceneBootstrap
         private static SceneAuthoredImageVariantView EnsureDetailFlowerVariantView(
             Transform detailView,
             int uiLayer,
-            Sprite? soilSprite,
             IReadOnlyList<KeyValuePair<string, Sprite>> bindings)
         {
             var owner = EnsureChild(detailView, "FlowerImage", uiLayer);
@@ -1023,13 +1342,6 @@ namespace GeminiLab.Editor.SceneBootstrap
                 ApplyRect(flower.gameObject, Vector2.zero, new Vector2(330f, 330f));
                 flower.color = Color.white;
                 flower.raycastTarget = false;
-
-                float soilY = ResolveDetailSoilY(binding.Key);
-                var soil = EnsureImageChild(pair.transform, "SoilImage", uiLayer, soilSprite,
-                    new Vector2(0f, soilY), new Vector2(330f, 100f));
-                ApplyRect(soil.gameObject, new Vector2(0f, soilY), new Vector2(330f, 100f));
-                soil.color = Color.white;
-                soil.raycastTarget = false;
 
                 pair.SetActive(false);
                 if (string.Equals(binding.Key, previewKey, System.StringComparison.Ordinal))
@@ -1230,7 +1542,6 @@ namespace GeminiLab.Editor.SceneBootstrap
             var detailCloseSprite = LoadFlowerInfoSprite("close");
             var detailLeftSprite = LoadFlowerInfoSprite("left");
             var detailRightSprite = LoadFlowerInfoSprite("right");
-            var soilSprite = LoadFlowerSprite("土壤");
             var flowerArtCatalog = EnsureFlowerArtCatalog();
 
             var codexView = EnsureFullRect(contentT, "CodexView", uiLayer);
@@ -1283,7 +1594,7 @@ namespace GeminiLab.Editor.SceneBootstrap
 
             for (int i = 0; i < cardPositions.Length; i++)
             {
-                var slot = EnsureCodexCardSlot(cardsRoot.transform, uiLayer, i, cardPositions[i], cardSprite, unknownSprite, soilSprite);
+                var slot = EnsureCodexCardSlot(cardsRoot.transform, uiLayer, i, cardPositions[i], cardSprite, unknownSprite);
                 ApplyRect(slot, cardPositions[i], new Vector2(154, 216));
                 if (cardSlotsProp != null)
                 {
@@ -1309,7 +1620,7 @@ namespace GeminiLab.Editor.SceneBootstrap
 
             var detailFlowerBindings = BuildBloomedFlowerBindings();
             var detailFlowerView = EnsureDetailFlowerVariantView(
-                detailView.transform, uiLayer, soilSprite, detailFlowerBindings);
+                detailView.transform, uiLayer, detailFlowerBindings);
             var detailNumber = EnsureTextChild(detailView.transform, uiLayer, "NumberText", "No. 027", 28,
                 new Vector2(-392, -282), new Vector2(260, 46), new Color(0.35f, 0.2f, 0.12f, 1f), TextAlignmentOptions.Center);
 
@@ -1536,7 +1847,7 @@ namespace GeminiLab.Editor.SceneBootstrap
         }
 
         private static GameObject EnsureCodexCardSlot(Transform parent, int uiLayer, int index, Vector2 anchoredPosition,
-            Sprite? cardSprite, Sprite? unknownSprite, Sprite? soilSprite)
+            Sprite? cardSprite, Sprite? unknownSprite)
         {
             string name = $"CodexCardSlot_{index:00}";
             var slot = EnsureChild(parent, name, uiLayer);
@@ -1558,12 +1869,11 @@ namespace GeminiLab.Editor.SceneBootstrap
             EnsureStretch(lockedImage.gameObject);
             lockedImage.raycastTarget = false;
 
-            var soilImage = EnsureImageChild(slot.transform, "SoilImage", uiLayer, soilSprite,
-                new Vector2(0, -10), new Vector2(98, 48));
-            ApplyRect(soilImage.gameObject, new Vector2(0, -10), new Vector2(98, 48));
-            soilImage.raycastTarget = false;
-            soilImage.enabled = false;
-            soilImage.gameObject.SetActive(false);
+            var oldSoilImage = slot.transform.Find("SoilImage");
+            if (oldSoilImage != null)
+            {
+                Object.DestroyImmediate(oldSoilImage.gameObject);
+            }
 
             var flowerBindings = BuildBloomedFlowerBindings();
             var flowerPreview = flowerBindings.Count > 0 ? flowerBindings[0].Value : null;
@@ -1575,7 +1885,6 @@ namespace GeminiLab.Editor.SceneBootstrap
             bool showSceneUnlockedPreview = !string.IsNullOrEmpty(flowerPreviewKey);
             ConfigureImageVariantView(flowerImage.gameObject, flowerImage, uiLayer, flowerBindings,
                 flowerPreviewKey, showSceneUnlockedPreview);
-            soilImage.transform.SetSiblingIndex(flowerImage.transform.GetSiblingIndex());
 
             var unlockedContent = EnsureFullRect(slot.transform, "UnlockedContent", uiLayer);
             var numberText = EnsureTextChild(unlockedContent.transform, uiLayer, "NumberText", "No. 027", 16,
@@ -1593,8 +1902,6 @@ namespace GeminiLab.Editor.SceneBootstrap
             lockedImage.gameObject.SetActive(!showSceneUnlockedCard);
             flowerImage.enabled = showSceneUnlockedCard;
             flowerImage.gameObject.SetActive(showSceneUnlockedCard);
-            soilImage.enabled = showSceneUnlockedCard;
-            soilImage.gameObject.SetActive(showSceneUnlockedCard);
             unlockedContent.SetActive(showSceneUnlockedCard);
             if (showSceneUnlockedCard)
             {
@@ -1658,7 +1965,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             slotProp.FindPropertyRelative("_cardImage").objectReferenceValue = slot.GetComponent<Image>();
             slotProp.FindPropertyRelative("_lockedImage").objectReferenceValue = slot.transform.Find("LockedImage")?.GetComponent<Image>();
             slotProp.FindPropertyRelative("_flowerView").objectReferenceValue = slot.transform.Find("FlowerImage")?.GetComponent<SceneAuthoredImageVariantView>();
-            slotProp.FindPropertyRelative("_soilImage").objectReferenceValue = slot.transform.Find("SoilImage")?.GetComponent<Image>();
+            slotProp.FindPropertyRelative("_soilImage").objectReferenceValue = null;
             slotProp.FindPropertyRelative("_unlockedContent").objectReferenceValue = slot.transform.Find("UnlockedContent")?.gameObject;
             slotProp.FindPropertyRelative("_numberText").objectReferenceValue = slot.transform.Find("UnlockedContent/NumberText")?.GetComponent<TextMeshProUGUI>();
             slotProp.FindPropertyRelative("_nameText").objectReferenceValue = slot.transform.Find("UnlockedContent/NameText")?.GetComponent<TextMeshProUGUI>();

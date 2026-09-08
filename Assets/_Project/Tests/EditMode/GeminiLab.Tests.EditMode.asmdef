@@ -12,9 +12,12 @@
     "GeminiLab.Modules.DesktopOverlay",
     "GeminiLab.Modules.Travel",
     "GeminiLab.Modules.Tarot",
+    "GeminiLab.Modules.Collection",
     "GeminiLab.Modules.Apple",
     "GeminiLab.Modules.HubUI",
-    "GeminiLab.Modules.EmotionGarden"
+    "GeminiLab.Modules.EmotionGarden",
+    "GeminiLab.Modules.WorldMap",
+    "GeminiLab.Modules.ApartmentKeepsake"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

@@ -15,6 +15,9 @@ namespace GeminiLab.Modules.WorldMap
         [Header("夜幕覆盖")]
         [SerializeField] private SpriteRenderer? _nightOverlay;
 
+        [Header("夜晚天空资源")]
+        [SerializeField] private SpriteRenderer? _starsRenderer;
+
         [Header("本地时间区间")]
         [Tooltip("从该小时开始视为白天。")]
         [Range(0, 23)]
@@ -80,6 +83,11 @@ namespace GeminiLab.Modules.WorldMap
             if (_nightOverlay != null)
             {
                 _nightOverlay.enabled = isNight;
+            }
+
+            if (_starsRenderer != null)
+            {
+                _starsRenderer.enabled = isNight;
             }
         }
 

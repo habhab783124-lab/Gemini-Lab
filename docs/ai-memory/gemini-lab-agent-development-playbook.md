@@ -1,6 +1,6 @@
 # Gemini-Lab Agent Development Playbook
 
-Updated: 2026-04-27
+Updated: 2026-08-21
 
 ## 这份文档解决什么问题
 它告诉后续进入 Gemini-Lab 的智能体：
@@ -28,6 +28,9 @@ Updated: 2026-04-27
    - 目标态规划
    - 当前真实实现
    - 还是两者之间的差距
+9. 对已批准任务创建本轮基线：
+   - `tools/check-task-scope.ps1 -Mode CreateBaseline`
+   - 基线只记录本轮开始前的工作树路径和文件摘要，不回滚历史改动。
 
 ## 当前入口约定
 当前正式入口顺序固定为：
@@ -85,6 +88,9 @@ Updated: 2026-04-27
 6. 写文档时优先真实、可维护、可接手，不追求表面完整。
 7. 能写成“可验证陈述”的地方，不写成模糊愿景句。
 8. 如果仓库现状和 README 规划不一致，要显式标出来。
+9. 新任务卡必须有唯一 `task_id`、`workflow_contract_version`、`human_approved`、`approval_source` 和 `plan_hash`。
+10. 写入闸门会校验计划 hash；任务范围检查会拒绝不在 `direct_files` 中的新增或变化路径。
+11. 用户回复“执行”仍是原有批准方式，不要求额外的 token 或命令。
 
 ## 收尾验证流程
 1. 查看 `git status`，确认这次任务实际改了哪些文件。
@@ -102,6 +108,9 @@ Updated: 2026-04-27
    - `memory-index.paths.txt`
 4. 若涉及验证结果，回写人工验证清单。
 5. 若涉及长期规则、历史决策或已知缺口，更新规则与历史文档。
+6. 运行统一验证入口：
+   - `tools/verify-task.ps1 -JsonOnly`
+   - 该入口组合 review 闸门、任务范围、`git diff --check` 和 PowerShell 语法检查；任一失败都不能标记任务完成。
 
 ## 当前推荐开发顺序
 1. 先补齐 Prefab 与 ScriptableObject 资产，把当前运行时兜底结构收回到可维护的作者化资产体系。

@@ -25,6 +25,7 @@ namespace GeminiLab.Core.UI
         EmotionInput = 26,
         WeeklyGardenView = 27,
         EmotionCollection = 28,
+        DailySummaryMailbox = 29,
 
         // 通用
         ConfirmDialog = 90

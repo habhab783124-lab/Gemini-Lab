@@ -41,3 +41,6 @@ TagManager:
   - name: Default
     uniqueID: 0
     locked: 0
+  - name: WorldMapNightOverlay
+    uniqueID: 1975865427
+    locked: 0

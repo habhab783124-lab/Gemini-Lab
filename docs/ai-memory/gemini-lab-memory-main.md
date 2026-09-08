@@ -1,15 +1,144 @@
 # Gemini-Lab Memory Main
 
-Updated: 2026-08-10
+## 2026-09-09 WorldMap outdoor pet facing: fixed-step single-source correction
 
-## 2026-08-14 苹果资源系统
+- Normal outdoor animation sampling now runs in `WorldMapPetAnimationTriggerController.FixedUpdate`, after `PetController.FixedUpdate` because the WorldMap controller has execution order `1000`.
+- `Move_Side` is selected only when the sampled `Rigidbody2D.position.x` delta for that physics step exceeds `0.005`; otherwise `Idle_Side` is selected. Input, target direction, and roaming intent are not used as normal-animation movement evidence.
+- A direction change must be observed in two consecutive physics steps before `flipX` changes. This filters one-step collision, interpolation, and position-correction reversals while keeping the current facing when the delta is zero or below the threshold.
+- `PetController.UpdateSideMirror` now exits while the WorldMap animation owner is active, so the generic pet animation path cannot write a competing `flipX`. Movement, player control, roaming, bridge traversal, interactions, indoor pets, and authored animation resources remain outside this fix.
 
-- 新增 `GeminiLab.Modules.Apple`：`AppleService` 以 `IAppleService` 为门面，首次新档余额为 20 个苹果，存档 key 为 `apple`。
-- `AppleService` 只通过 `IGameClock.UtcNow` 计算大树离线生成：每棵树每 6 小时生成 1 个，单树缓存上限 3 个；树 ID、上次生成时间、待领取数量和累计领取量都会进入存档，重启不会重复生成。
-- `WorldMap_Main.unity` 的「大树 1」～「大树 5」已由 `WorldMapAppleTreeAuthoring` 作者化 `AppleTreeInteractable`，点击树即领取缓存苹果；不创建运行时树/苹果视觉对象。
-- 情绪花首次开花通过 `EmotionGardenService.BloomAt` 奖励 1 个苹果；扭蛋单抽/五连分别消耗 1/5 个苹果，塔罗开始一次抽牌会话消耗 1 个苹果。
+## 2026-09-09 WorldMap 室外普通移动朝向单一位移来源修复
+
+- 室外普通移动朝向不再读取玩家输入、漫游目标或多重回退来源，只读取每只桌宠实际 `Rigidbody2D.position.x` 的相邻帧差值。
+- 实际横向位移超过 `0.005` 才进入对应 `Move_Side` 并更新左右朝向；位移为零或只有微小物理修正时保持当前 `flipX`，不重置、不反转。
+- 特殊动作仍独立保持目标朝向；普通移动朝向只在没有特殊动作时写入。移动、玩家操控、漫游、过桥、天使/恶魔交互白名单和室内桌宠未修改。
+- 未修改 WorldMap/室内 Animator Controller、Animation Clip、关键帧、循环设置、Motion、Sprite、Scene 或 Prefab。
+
+## 2026-09-09 WorldMap 室外普通移动朝向稳定性修复
+
+- `WorldMapPetAnimationTriggerController` 仍以两只桌宠每帧真实 `Rigidbody2D.position.x` 变化决定普通 `Idle_Side` / `Move_Side`，但不再直接使用每个微小位移差的正负驱动 `flipX`。
+- 玩家操控时，普通朝向使用当前 `PetPlayerInputController` 的横向输入；自动漫游时使用 `RandomWander.TargetPosition` 或行为运行时目标的横向方向；只有没有稳定指令来源时才使用超过阈值的实际位移作为回退。
+- 普通朝向保留每只桌宠上一次稳定方向，过滤碰撞、插值和位置修正造成的微小反向位移。特殊动作期间仍由特殊动作目标朝向负责，普通动画逻辑不覆盖它。
+- 本次未修改移动、玩家操控、漫游、过桥、交互白名单、室内桌宠或任何 Animation Clip、Animator Controller、关键帧、循环设置、Motion、Sprite 和 Scene/Prefab 序列化引用。
+
+## 2026-09-09 WorldMap 室外普通移动动画控制权修复
+
+- WorldMap 室外天使和恶魔的普通 Idle/Move Animator 播放现在由 `WorldMapPetAnimationTriggerController` 统一负责；`PetController` 仍负责移动、玩家操控、漫游、物理和 `WalkableSurface` 过桥，只在该场景动画控制权启用时跳过通用 Animator 写入。
+- WorldMap 动画控制器按每帧真实 `Rigidbody2D.position.x` 差值判断是否发生横向移动。没有真实横向位移时播放对应 `Idle_Side`，有真实横向位移时播放对应 `Move_Side`，并只在状态改变或残留转场时调用一次 `Animator.Play`。
+- 两个现有 Animator Controller 的 Move Any State 转场允许自身转场；运行时保持 `IsMoving=false` 并直接播放作者化状态，避免持续条件每帧重置 `WorldMap_Angel_Move.anim` 或 `WorldMap_Devil_Move.anim`。没有修改 Controller、Clip、关键帧、循环设置、Motion 或 Sprite。
+- 室外特殊动作仍由同一 WorldMap 控制器触发、锁定移动并恢复；玩家操控、漫游和过桥接口保持不变。室内 PetController 行为不变，室内桌宠资源不在本次修改范围。
+
+## 2026-09-09 WorldMap 普通移动动画交还 PetController
+
+- `WorldMapPetAnimationTriggerController` 不再在每帧采样横向位移后覆盖 `IsMoving`、`MoveX`、`MoveY`、`MoveDir`，也不再直接强制 `Play("Move_Side")` / `Play("Idle_Side")`。此前它以 `DefaultExecutionOrder(1000)` 晚于 `PetController.UpdateMovementAnimation()` 执行，造成两个运行时脚本重复控制同一个 Animator，移动方向和 Clip 播放时序会被覆盖；特殊动作释放时仅保留一次性 `Idle_Side` 恢复同步。
+- WorldMap 普通 `Idle/Move` 现在由现有 `PetController` 动画链路单一负责；WorldMap 控制器只保留室外特殊动作的触发、移动锁、一次性播放和结束恢复。`PetController.cs`、移动核心、玩家操纵、漫游、过桥和室内桌宠脚本未修改。
+- `WorldMap_Angel_Move.anim` 与 `WorldMap_Devil_Move.anim` 当前工作树中的用户修改保持不变；两个 Clip 均无位置曲线，本次未修改 Clip、关键帧、Controller、Motion、循环设置或 Scene/Prefab 引用。Play 验证需单独确认。
+
+## 2026-09-09 WorldMap 玩家控制期间屏蔽漫游特殊动画
+
+- 玩家控制期间，`WorldMapPetAnimationTriggerController` 不再评估或接受任何 `TriggerSource.Roaming` 特殊动作；天使和恶魔各自的漫游目标锁存也会被清理，避免玩家移动经过花朵、苹果树或标牌时被自动动画打断。
+- 玩家控制释放后仍由各桌宠自己的白名单和漫游冷却重新判断；玩家按 F 的 `PlayerInput` 触发路径不受本次屏蔽影响。移动、过桥、场景切换和室内桌宠逻辑未修改。
+
+## 2026-09-09 WorldMap 作者化花朵区域作为唯一边界
+
+- `WorldMap_Main.unity` 已绑定 `FlowerPlacementRegion_Angel` / `FlowerPlacementRegion_Demon`；修复前 `WorldMapFlowerPlacementController.IsValidPlacement()` 即使存在作者化区域，仍会叠加旧 `FlowerPlacementBounds`，导致恶魔区域被总范围右边界截断。
+- 现在只要作者化区域配置有效，就由所选 owner 的区域 Collider2D 裁决完整花朵 footprint；只有没有区域配置的旧场景才使用 `FlowerPlacementBounds` 回退。未修改区域 Collider、Scene 序列化引用、槽位资源或其他系统。
+
+## 2026-09-08 WorldMap 室外双宠动画状态机最终阶段
+
+- `WorldMapPetAnimationTriggerController` 已重写为 WorldMap 室外天使/恶魔动画的唯一最终仲裁入口：每个特殊动作在 `PetAction` 中固定归属一个桌宠，并由 `StateNameFor` 映射到已有 `Outdoor_*` 状态；天使和恶魔不会共享无来源的特殊触发器。
+- 普通 `Idle/Move` 以每帧实际横向 Transform 位移为唯一移动依据；特殊动作期间由该控制器保持特殊 Animator 状态并调用现有 `PetController.SetExternalMovementLock`，结束后依据最新横向位移恢复 `Idle_Side` 或 `Move_Side`。
+- 苹果树、许愿树和天使/恶魔标牌只使用 Scene 序列化目标及其启用的 `Collider2D.ClosestPoint`；不再运行时按对象名查找。摆花开心/得意只消费 EmotionGarden 已接受的摆花记录，并按 `Owner` 分别路由到天使或恶魔；浇水只匹配天使区域已占用的 `WorldMapPlacementSlot` 作者化落脚区域，排除预览、空槽位和恶魔花朵。
+- 漫游特殊动作使用目标进入锁存、随机概率和冷却；玩家 F 使用按键边沿；特殊 Clip 按当前 Animator 状态长度只播放一遍，不改动资源中已有的循环设置。
+- 桥能力未从动画改动中移除：`PetController`、`RandomWander`、`PetPlayerInputController`、`WalkableSurface`、桥面检测、外部移动锁接口和过桥后的恢复逻辑均未修改。`WorldMap_Main.unity` 的桌宠 Animator、移动/桥引用也未由本阶段写入。
+- 本阶段未修改 Animation Clip、Animator Controller、关键帧、Motion、循环方式、Sprite、室内桌宠脚本或室内 Prefab。受影响程序集静态编译通过；Unity MCP Play 验证已获授权但当前 Unity 编辑器进程无响应，仍需恢复编辑器后验证，不能把静态结果当作最终实机确认。
+- 本次白名单修复确认室外特殊动画 Clip 没有位置曲线；位置跳变来源是两只室外桌宠仍启用的 `PetPlayerFurnitureInteractionController`，其家具绑定会使用回退世界坐标并应用交互姿势。`WorldMapPetAnimationTriggerController` 现在只对显式绑定的两只室外桌宠在运行时隔离该旧组件，停用适配器时恢复原始 `enabled` 状态；天使仅允许苹果树、许愿树和天使区域已成功摆放花，恶魔仅允许苹果树、恶魔标牌和恶魔区域已成功摆放花。移动、玩家操纵、漫游、桥面/过桥和室内系统未修改。
+- 2026-09-09 补充：玩家控制天使按 F 的路径现在也查询最近有效天使花朵，并使用玩家交互半径触发 `AngelWater`；漫游路径继续使用漫游半径。`ActiveAnimation` 会在特殊动作期间持续维护目标 `flipX`，确保浇水动作面向花朵，结束时恢复动作开始前朝向。该补充未改变花朵资源、槽位或动画资源。
+
+## 2026-09-08 WorldMap UI 点击优先级修正
+
+- `WorldMapSceneInteractionRouter` 先查询当前鼠标位置的 `EventSystem.RaycastAll` 结果；只要命中作者化 `GraphicRaycaster` 的有效 `Graphic` 且 `raycastTarget=true`，就阻止同一点击继续进入 WorldMap 场景目标路由。
+- UI 阻挡判断不再根据 Graphic 的透明 alpha 或最终视觉可见度放行。情绪面板等全屏透明 Graphic 也可以作为作者化输入阻挡层；UI 自身按钮、输入框和面板事件仍由 EventSystem 处理。
+- 本次只修复 UI 与 WorldMap 点击链路之间的穿透，不改变邮箱、标牌、许愿树、苹果树、掉落苹果、桌宠、室内入口、Collider2D、云层或动画资源。静态检查完成后仍需用户 Play 验证。
+
+## 2026-09-08 苹果掉落核心恢复到 eb1c300
+
+- `AppleTreeDropController.cs`、`AppleDropSlot.cs`、`AppleTreeFeedback.cs` 已恢复到 `eb1c300b991d92ec6336afaf5441d0b0ca81544c` 的掉落表现和反馈逻辑。
+- `AppleDropSlot` 仅保留当前 WorldMap `IWorldMapSceneClickTarget` / Collider2D 路由适配，旧 `OnMouseDown` 不恢复；`AppleService.cs` 已与该提交一致。
+- 当前 `AppleRuntimeBootstrap` 的直启注册修复、Tarot 启动顺序修复、WorldMap 场景、室外桌宠移动/过桥和动画资源不在本次恢复范围内；Unity Play 仍待人工确认。
+
+## 2026-09-08 苹果掉落逻辑恢复到 cc54 基准
+
+- `Assets/_Project/Scripts/Modules/Apple/AppleService.cs` 已恢复到提交 `cc54b1a9196ff1d16c341ecdfffdd0f27e1c37f1` 的苹果货币与树掉落状态实现。
+- `AppleDropSlot` 和 `AppleTreeFeedback` 保留当前 WorldMap Collider2D 路由适配，但恢复 cc54 的 Scene 文本显示语义；运行时不再给 `TMP_Text.fontMaterial` 赋 null。
+- TMP 3.0.7 的 `fontMaterial` setter 会对传入值直接调用 `GetInstanceID()`，传入 null 会在树点击后的反馈阶段抛出 `NullReferenceException`。反馈继续使用 Scene 中已有的字体和材质引用。
+- 当前 `AppleRuntimeBootstrap`、WorldMap 点击路由、室外桌宠移动/过桥链路、动画资源和室内系统未回退；Unity Play 仍待人工验证。
+
+## 2026-09-08 Boot 苹果服务与 Tarot 启动顺序修正
+
+- `Boot.unity` 的 `BootstrapRoot` 保留一个 `TarotRuntimeBootstrap`，继续使用作者化的 TarotDeck 和 LLM 配置；重复的无 LLM 配置实例已移除。
+- `AppleRuntimeBootstrap` 在 `Start` 注册 `IAppleService`，`TarotRuntimeBootstrap` 的服务初始化改为 `Start`，并设置为晚于 Apple bootstrap 的执行顺序，避免 Tarot 在苹果服务注册前读取服务。
+- `AppleRuntimeBootstrap`、WorldMap 苹果树、室外桌宠移动/过桥链路、动画资源和室内系统不属于本次修正范围；Unity Play 仍需人工确认。
+
+## 2026-09-08 WorldMap 苹果树成熟与调试快进初始化修复
+
+- 当前苹果树点击已经能够通过真实 `PolygonCollider2D` 命中 `AppleTreeInteractable` 并显示已有 `AppleTreeFeedback`；此前反复点击调试按钮后仍提示“还没成熟哦”的根因是树状态首次在点击树时才创建，快进发生在状态创建之前。
+- `AppleRuntimeBootstrap` 现在在运行时场景加载阶段确保 `IAppleService` 注册，并监听后续场景加载；每次场景加载后为当前已作者化的 `AppleTreeInteractable` 调用 `IAppleService.EnsureTree`。不创建任何最终 UI、Sprite、Animator 或视觉 GameObject。
+- 现有 `AppleService` 的 45～90 分钟随机生成、每天最多 5 轮、批次固定总量、逐个掉落领取和货币入账逻辑保持不变；本次修复的是服务与三棵树状态的初始化时序。
+- 新增 EditMode 回归测试覆盖“先建立树状态、再推进调试时钟、随后可以开始收获”。Unity Play 仍需用户手动确认，当前不能把静态/编译结果当作实机通过。
+
+## 2026-09-08 WorldMap 点击映射与室外桌宠过桥链路恢复
+
+- WorldMap 第一阶段的点击业务固定为：天使标牌打开 Angel 情绪输入、恶魔标牌打开 Devil 情绪输入、邮箱打开 `DailySummaryMailbox`、许愿树打开许愿系统、大树 2/3/5 进入对应苹果树掉落流程、两只室外桌宠只切换对应玩家控制权；大树 1 不接苹果逻辑。
+- `WorldMapSceneInteractionRouter` 只裁决 Scene 中显式登记的目标；每个目标通过自身 `Collider2D` 的 `OverlapPoint` 命中。桌宠点击区与底部物理 CapsuleCollider 分离，许愿树点击 Collider 覆盖其作者化 Sprite 区域。
+- 室外桌宠的移动链路必须保留 `PetController`、`RandomWander`、`PetPlayerInputController` 和 `WalkableSurface`。桥对象 `桥` 的 PolygonCollider2D 上侧轮廓仍是过桥高度事实源；WorldMap 点击组件不再直接写 Transform/Rigidbody2D 或强制固定基线。
+- `WorldMapPetAnimationTriggerController` 只负责 WorldMap 特殊动作并通过 `PetController.SetExternalMovementLock` 暂停移动；它不修改室内 Animator 状态机，也不修改 Clip、关键帧、循环、Motion 或视觉参数。
+- 本次静态修正尚未经过用户 Unity Play 实机确认。
+
+## 2026-08-21 indoor furniture selection feedback
+
+Apartment task 2 now has a scene-authored `ApartmentFurnitureSelection` presenter, one inactive `FurnitureSelectionHighlight` per available target, and an authored `FurnitureSelectionMessage` TMP node. The presenter is routed by `ApartmentViewportInputBridge` and uses `ClickOcclusionUtility` for overlapping 2D furniture. The nine original targets plus existing `家具_装饰_储物的家具_恶魔_01` are wired; the requirement's apple-pad name is the semantic label for this storage furniture. Tasks 3 and 4 are out of scope.
+
+Updated: 2026-08-22
+
+## 2026-08-20 verification: daily summary mailbox and WorldMap free wander
+
+- Unity MCP Play verification completed. The outdoor `WorldMap_Main/室外背景/邮箱` has a serialized listener to `WorldMapDailySummaryMailboxOpenTarget.PanelOpenButton.OnClick`; it opens the authored WorldMap `Panel_DailySummaryMailbox` and activates `DailySummaryContent`.
+- The retired Apartment `MailboxButton` and `Panel_DailySummaryMailbox` remain in the saved scene only as inactive legacy objects, so they cannot act as a second entry point.
+- `Pet_Angel` and `Pet_Devil` in `WorldMap_Main` both use authored `RandomWander` bounds X -18..18 with horizontal baseline Y -1.75. Their transforms changed during Play; the Animator reported `IsMoving=true` and a directional `MoveDir` while moving.
+- Summary submission/autosave/restore is covered by `EmotionGardenPlacementPersistenceTests` (5/5); the runtime probe did not submit or persist test data.
+
+## 2026-08-18 WorldMap local weather switching
+
+- `WorldMapWeatherController` now reads current weather through `IWeatherProvider` and `OpenMeteoWeatherProvider`; WMO weather codes are classified into the first-pass `Sunny` and `Rainy` states.
+- `WorldMap_Main.unity` now contains only the authored `WorldMapWeatherRainOverlay`; it references `Assets/_Project/Art/WorldMap/weather/rain.png`. Clear weather uses the saved WorldMap scene background, and no legacy `garden/天气（最上层）` Sprite is referenced. Runtime only toggles the saved rain `SpriteRenderer` state.
+- The default Inspector location is Shanghai (`31.2304, 121.4737`) with `timezone=auto` and a 30-minute refresh. This is a replaceable placeholder until the project has a location source. The service caches the last successful result and falls back to Sunny on the first network failure.
+- Weather and day/night are independent: `WorldMapDayNightController` still uses `IGameClock` for 06:00–18:00 day / 18:00–06:00 night, while weather uses the remote WMO code. Open-Meteo was reachable during the Play smoke test and returned code `3` (Sunny) for the default location.
+
+### 2026-08-21 WorldMap 雨天美术资源接入
+
+- `Assets/_Project/Art/WorldMap/weather/` is the weather-art source folder. `rain.png` is saved on `WorldMapWeatherRainOverlay` in `WorldMap_Main.unity` with the existing full-scene overlay size and sorting order.
+- `WorldMapWeatherAuthoring` reads only `weather/rain.png`; it removes the obsolete sunny overlay instead of preserving a legacy Scene reference. Until a dedicated sunny asset is provided, the authored WorldMap background is the clear-weather presentation. Runtime weather logic and the Open-Meteo request are unchanged.
+
+### 2026-09-04 WorldMap 云层与星星资源接入
+- `WorldMap_Main.unity` now contains authored `WorldMapWeatherClouds` and `WorldMapWeatherStars` SpriteRenderers. They use `weather/云层.jpg` and `weather/星星.PNG`, fit the saved outdoor background bounds, and bind `BaselineItem` to the existing `Environment_Clouds` / `Environment_Stars` definitions.
+- `WorldMapCloudColorKey.mat` uses the authored `GeminiLab/WorldMap/CloudColorKey` shader so the white background of the cloud JPG is transparent while the blue cloud shapes remain visible. No legacy `garden/天气（最上层）` asset is referenced.
+- `WorldMapDayNightController` now toggles the saved stars renderer together with `WorldMapNightOverlay`: stars are hidden from 06:00 through 18:00 and visible from 18:00 through 06:00. Runtime only changes `enabled`; it does not create visual objects.
+
+### 2026-09-04 WorldMap 环境动画
+
+- `WorldMapAmbientAnimationController` 已作者化到 `WorldMap_Main` 的 `_SceneRoot`，通过序列化引用驱动云层、`WorldMapPlacedFlowers` 下的单花视觉节点，以及许愿树和大树 2～5。
+- 云层只沿 X 轴平滑往返移动；单花节点按名称哈希获得不同确定性相位并轻微旋转，花丛节点不参与；树木以现有 Sprite 边界底部为局部根点做轻微摆动，根点不漂移。
+- `WorldMapAmbientAnimationAuthoring` 只负责绑定现有 Scene 节点和保存参数，不在运行时创建最终视觉对象。天气、昼夜、基线和花朵摆放逻辑保持不变。
+
+## 2026-08-18 苹果资源系统按新版需求修正
+
+- `AppleService` 以 `IAppleService` 为门面，新档余额仍为 20；每棵树通过 `IGameClock.UtcNow` 按 45–90 分钟随机生成一轮，每天最多 5 轮，每轮按 70%/30% 生成 1/2 个苹果，`NextGenerationUtcTicks`、当日轮数和未领取缓存进入 `apple` 存档。
+- 未领取苹果不再有 3 个上限；跨重启、跨日会继续累计，晃树一次领取该树全部缓存。旧版只保存 `LastGeneratedUtcTicks` 的存档会迁移到新版调度字段，不会清空既有缓存。
+- `WorldMap_Main.unity` 的「大树 2」～「大树 5」由 `WorldMapAppleTreeAuthoring` 作者化 `AppleTreeInteractable` 与 `AppleTreeFeedback`；「大树 1」不是苹果树，不再绑定苹果领取或反馈节点。苹果树无可领取时显示“还没成熟哦”并播放两片 Scene 中已保存的落叶文字节点，运行时不创建最终视觉对象。
+- 情绪花首次开花通过 `EmotionGardenService.BloomAt` 奖励 12 个苹果且不重复；恶魔房间扭蛋单抽/五连消耗 20/100 个苹果，塔罗开始一次抽牌会话消耗 8 个苹果。
 - `BootAppleBootstrapAuthoring` 已将苹果服务注册宿主保存到 `Boot/BootstrapRoot`；Apartment 四个页面复用原有 `TopResource/BalanceLabel`，由 `StubPanelBase`/`AppleBalanceDisplay` 统一更新苹果数量，不再创建独立的 `AppleBalanceLabel`。苹果是 UI 资源栏的唯一货币，文本只显示数字。
-- EditMode 新增 `AppleResourceServiceTests`，覆盖初始余额、树生成/缓存往返、领取、消费和成熟奖励去重；Unity 编译与任务/视觉闸门已通过，PlayMode 晃树与完整抽扭蛋/塔罗仍需人工复验。
+- EditMode `AppleResourceServiceTests` 覆盖初始余额、随机间隔、每日轮数上限、70/30 数量、缓存往返、领取、消费和成熟奖励去重；WorldMap 晃树反馈、四页余额和完整扭蛋/塔罗流程仍需 Unity PlayMode 人工复验。
 
 ## 定位
 这份文档是 Gemini-Lab 的长期项目记忆总览。
@@ -43,6 +172,14 @@ Updated: 2026-08-10
 - `tools/check-scene-visual-contract.ps1` 检查任务卡声明的 Scene 节点是否真实存在，并可检查关键 UI 节点的 `m_Sprite` 是否为非空序列化引用。
 - `tools/check-runtime-visual-contract.ps1` 拦截运行时代码直接赋值 `Sprite` / `runtimeAnimatorController`，以及用 `new GameObject`、`AddComponent`、`Instantiate` 生成最终 UI 视觉。
 - 花卉图鉴的花图、土壤和锁定卡现已作者化到 Scene；运行时只切换预置节点。2026-08-09 的 AutoSetup 41 又补强了锁定卡整对象隐藏，防止未解锁卡片泄露预览花朵。
+
+## 2026-08-21 工作流兼容增强
+- 原有协作流程没有改动，仍按“探索 → 规划 → 用户确认 → 行动”推进，四段式规划模板仍是用户可读入口。
+- `docs/current-task-card.json` 现在为新任务增加 `workflow_contract_version`、`task_id`、`human_approved`、`approval_source` 和 `plan_hash`；执行状态、批准时间和验证记录不参与计划 hash。
+- `tools/check-task-gate.ps1` 在写入模式校验批准状态、任务 ID 和计划 hash；缺少新字段的旧卡需要先重写为新任务卡，避免误用上一轮任务范围。
+- `tools/check-task-scope.ps1` 可记录任务开始时的 git 状态基线，并拒绝不在 `direct_files` 中的新增或变化路径。
+- `tools/verify-task.ps1` 统一执行 review 闸门、任务范围、`git diff --check` 和 PowerShell 语法检查，输出机器可读 JSON；Unity 编译、测试及视觉契约仍按任务卡的任务类型执行。
+- 这些是仓库内可执行的防线，不是操作系统级写权限隔离；直接文件工具或外部进程仍可能绕过它们。
 
 ## 2026-08-09 每周培育与情绪花图鉴回归修复
 - `WeeklyGardenPanelStub` 现在将空日期的瓶内 `FlowerImage`、`UIbar/Growth` 与 `SoilImage` 一并隐藏；三个 UIbar 信息区无花时统一显示 `---`，有花时只填入真实日期、情绪和花名/状态。
@@ -99,6 +236,10 @@ Updated: 2026-08-10
   - `docs/current-task-card.md`
   - `docs/current-task-card.json`
   - `tools/check-task-gate.ps1`
+- 当前还启用了工作流兼容检查：
+  - `tools/task-card-utils.ps1`
+  - `tools/check-task-scope.ps1`
+  - `tools/verify-task.ps1`
 - 渐进式上下文压缩已纳入设计，但当前默认不启用自动压缩；现阶段只保留人工分层方案。
 - 做梦整理、L2 技能手册、L3 知识库已纳入第二部分建设，当前以人工整理、skill 沉淀和索引增强为主。
 - 第一批 workflow skill 已开始落地：
@@ -118,7 +259,7 @@ Updated: 2026-08-10
 - `AGENTS.md`、`docs/` 与 `docs/ai-memory/` 于 2026-04-21 建立；2026-04-27 完成 fork 主线同步并补齐 Git 工作流文档。
 - `Assets/_Project/` 下已经存在真实运行时代码、场景、asmdef、测试程序集、示例美术资源与动画资源。
 - `2026-06-02` 已新增 `Assets/_Project/Scripts/Editor/Build/McpNuGetPlayerImportGuard.cs`，用于把 `Assets/Plugins/NuGet` 下由 Unity MCP 依赖解析器落地的 `McpPlugin / SignalR / Microsoft.Extensions.*` DLL 统一校正为 `Editor-only`，避免 Windows Player Build 在 Burst AOT 阶段因带版本号文件名的预编译程序集解析失败。
-- `2026-06-02` 同日先把 4 个 Unity MCP 注册表包嵌入到了 `Packages/`，随后又按“临时停用、保留恢复能力”的方案把它们从 `Packages/` 软移出到 `PackageBackups/MCP-disabled-2026-06-02/`；当前停用范围仅限 `com.ivanmurzak.unity.mcp`、`com.ivanmurzak.unity.mcp.animation`、`com.ivanmurzak.unity.mcp.particlesystem`、`com.ivanmurzak.unity.mcp.probuilder`，`Packages/SkillsForUnity` 明确保留不动。
+- `2026-06-02` 同日先把 4 个旧版 Unity MCP 注册表包按“临时停用、保留恢复能力”方案软移出到 `PackageBackups/MCP-disabled-2026-06-02/`；`2026-08-18` 起 `Packages/manifest.json` 已启用 `com.ivanmurzak.unity.mcp` `0.88.0`，旧版动画/粒子/ProBuilder 包仍保留在备份目录，`Packages/SkillsForUnity` 明确保留不动。
 - `2026-06-02` 同日又把 `Assets/Plugins/NuGet` 及其 `.meta` 从活动资源路径软移出到 `PackageBackups/NuGet-disabled-2026-06-02/`，并清掉了 `ProjectSettings/ProjectSettings.asset` 中 `Standalone` 的 `UNITY_MCP_READY`；当前这样做是为了让 Burst 不再从活动项目路径扫描到 `ReflectorNet / SignalR / Microsoft.Extensions.*` 残留 DLL。
 - `2026-07-12` 已完成 HubUI 每日抽签页面的 UI 工具与预览系统收口：
   - `DebugDisplayWindow` 新增 `RefreshPreviewObjects()` 静态方法：Toggle Tarot Preview 开关时自动刷新场景中已 disable 的 `ReadingBubble` / `TarotSummaryPreview` 对象，解决 Scene 视图中预览 UI 被禁用不可见的问题
@@ -316,7 +457,7 @@ Updated: 2026-08-10
   - `2026-05-26` 已补 `SidebarController` / `StubPanelBase` 的 `IUIRouter` / `EventBus` 兜底注册，便于直接打开 `Apartment_Main` 调试时面板切换仍可工作
   - `2026-05-26` 已补 `ProfilePanelStub`、`TarotPanelStub`、`InventoryPanelStub` 的服务缺失 / 空数据兜底；其中 `InventoryPanelStub` 未绑定 `_emptyHint` 时会复用 Tooltip 区域显示空状态
   - `2026-05-26` 已建立 `Assets/_Project/Prefabs/UI/Panels` 与 `Assets/_Project/Prefabs/UI/Widgets` 的 README 工程落点；本轮未绑定任何新 UI 美术资源，也未制作正式 UI prefab
-  - 本轮 `git diff --check` 通过；由于当前 shell 找不到 Unity Editor / `unity-mcp-cli`，Unity Test Runner 与 PlayMode 仍需在 Unity 内补验，结果已写入 `docs/manual-validation-checklist.md`
+  - `2026-08-18` 已安装 Node.js `v24.19.0` 与 `unity-mcp-cli` `v0.88.0`，并将活动 MCP 插件写入 manifest；Unity 已安全重启并连接 `http://localhost:27345`。情绪花园定向 EditMode 5/5 通过，全量 EditMode 仍有既有 Furniture / MovingState 失败，PlayMode 仍需补验。
 - `Assets/_Project/Prefabs/` 与 `Assets/_Project/ScriptableObjects/` 现在都不再是完全空目录，且 `Furniture` / `FurnitureConfig` 这条线已覆盖当前全部家具 Sprite 资源；其他模块仍未完成资产作者化。
 - README 系列文档描述的目标状态仍然大于当前实现范围，阅读时必须显式区分“已实现事实”和“规划目标”。
 - 项目本地 skill 目录当前仍保持 `.agents/skills/` 与 `.cursor/skills/` 镜像关系，当前统计为 `72` 项。
@@ -333,7 +474,7 @@ Updated: 2026-08-10
 5. `Packages/manifest.json` 当前已经包含：
    - `com.unity.ai.navigation`
    - `com.besty.unity-skills`
-   - 4 个 Unity MCP 包当前已从 `Packages/manifest.json` 临时移除，并备份到 `PackageBackups/MCP-disabled-2026-06-02/`
+   - `Packages/manifest.json` 当前启用 `com.ivanmurzak.unity.mcp` `0.88.0`；旧版 4 个包仍备份在 `PackageBackups/MCP-disabled-2026-06-02/`
    - `Assets/Plugins/NuGet` 当前也已临时移出到 `PackageBackups/NuGet-disabled-2026-06-02/`
 6. 当前原型里仍存在多处“占位实现 / 运行时兜底”：
    - `NavigationService` 与 `NavMesh2DRebaker` 目前更接近占位导航层，不是完整 2D NavMesh 方案
@@ -396,17 +537,19 @@ Updated: 2026-08-10
 
 ### 2026-08-10 / 2026-08-11 WorldMap 花朵摆放侧边栏作者化
 - `WorldMapFlowerPlacementAuthoring` 已将旧底部库存栏改为 `WorldMap_Main.unity` 中右侧滚动式 `FlowerPlacementPanel`，面板使用 `Assets/_Project/Art/WorldMap/arrange/UIBoard.png` 原始 `498 x 899` 尺寸，条目使用 `item.png`、单花卡 `singleCard.png`、花丛卡 `tripleCard.png`、合成按钮 `synthesis.png`、勾选 `tick.png`、上下箭头和提示气泡等正式资源。`Btn_FlowerPlacement` 已落在右下角。
-- 花卉资源不从 `arrange.png` 裁剪：18 个“培育者 + 情绪”组合的花种标题取 `花朵图鉴/花朵`，单花取 `花朵图鉴/花枝/*（完整）.PNG`，花丛取 `花朵图鉴/花丛/*（花丛）.PNG`，均由 Editor 保存为 Scene Sprite 引用。
+- 花卉资源不从 `arrange.png` 裁剪：18 个“培育者 + 情绪”组合的花种标题取 `花朵图鉴/花朵`，放置系统单花取 `花朵图鉴/花朵放置/*.PNG`，花丛取 `花朵图鉴/花丛/*（花丛）.PNG`，均由 Editor 保存为 Scene Sprite 引用。
+- `2026-08-24` 起，WorldMap 花朵放置系统的单花资源切换为 `Assets/_Project/Art/WorldMap/花朵图鉴/花朵放置/` 下 18 张 Sprite（9 种情绪 × 天使/恶魔）；花种列表图标仍取 `花朵`，花丛仍取 `花丛`，其他图鉴和培育模块不变。作者化已重新保存预览与已摆放槽位的 Scene 引用。
 - `WorldMap_Main.unity` 已作者化 18 个花卉条目、36 个预览变体、32 个有限落位槽及其 1152 个单花/花丛预置显示对象；运行时只切换预置对象、更新槽位位置/占用状态和文本，不创建 GameObject、UI、Sprite 或网格线。
 - 网格材质 `Assets/_Project/Art/WorldMap/arrange/PlacementGrid.mat` 与 10 条竖线、5 条横线已落盘；网格单元仍严格读取 `garden/中景/花丛.png` 的 Sprite 完整尺寸 `4.01 x 2.24` Unity 单位，花丛资源本身不作为摆放显示。
 - `2026-08-11` 已将条目展开改为固定详情页手风琴：`FlowerList` 是 `ScrollRect` 唯一内容与唯一纵向布局根，`FlowerSidebarContent` 仅保留层级容器。每个 `FlowerOption_00...17` 场景中都预置标题与 `ExpandedOptions`；收起高度为 `73`，展开高度为 `320`，详情页以顶部 Pivot 固定在标题下方 `-76`。`FlowerList.VerticalLayoutGroup.childControlHeight` 已保存为开启，确保展开条目的 320 高度真实参与排版，后续条目会整体下移而不覆盖详情。运行时只切换详情节点和该条目的已序列化高度，并在切换条目时补偿 ScrollRect，使被点击标题栏保持当前视窗位置；上方条目不移动。
-- 当前交互为：打开右侧栏 → 展开花种 → 选择单花/花丛 → 网格与半透明预览显示 → 点击有效区域连续落位 → `Esc` 退出；同种 3 朵单花可主动合成 1 个花丛，不足时显示 `组 5.png` 提示气泡。
+- 当前交互为：打开右侧栏 → 展开花种 → 选择单花/花丛 → 侧栏自动收起并保留半透明预览 → 点击有效区域连续落位 → `Esc` 退出；网格只用于内部吸附计算、运行时不显示；同种 3 朵单花可主动合成 1 个花丛，不足时显示 `组 5.png` 提示气泡。
 - `2026-08-12` 起，摆放库存已收口到 `EmotionGardenService` 的 `emotion-garden` 持久化数据：每朵花开花时给对应“情绪类型 + 培育者”增加 1 个单花库存；摆放单花/花丛与“3 单花合成 1 花丛”都直接读写同一库存，并通过 `EmotionFlowerPlacementInventoryChangedEvent` 实时刷新侧栏。存档版本升级为 3，旧存档只在迁移时按已开花记录（缺失时以累计进度补齐）初始化一次单花库存，不会在每次打开侧栏时重复补发。
 - `2026-08-13` 起，存档版本为 4：成功摆放以槽位、花型、情绪/培育者和世界坐标写入 `PlacedFlowers`，原子扣除对应库存并立即串行 autosave；启动读档会恢复原槽位和坐标，不会再次扣库存。单花和花丛摆放均不附带土壤；旧的顶层 `Canvas/FlowerPlacementStatusBar` 已从场景移除，当前提示只使用侧栏内 `PlacementStatus`。
 - `2026-08-13` 同步清理 `FlowerPlacementPanel` 下旧原型的 `FlowerButtons`、`SingleButton`、`ClusterButton`、`CancelButton`，并重新把 32 个 `WorldMapPlacementSlot` 的正式视觉绑定保存到 Scene；运行时恢复只切换这些已作者化节点。当前 Editor 默认使用 `Saves-Dev`，其中没有 `PlacedFlowers` 的旧记录时无法凭空恢复历史摆放，之后的新摆放会写入版本 4 存档。
 - `2026-08-13` 摆放层改为读取 Scene 中的 `BaselineItem`：花卉基线与其排序层绑定，同层才做占用冲突检查，跨层允许重叠；内部吸附仍按相邻层半个单元宽度错位，但 `FlowerPlacementGrid` 不再在运行时显示，避免抽象网格误导玩家。作者化会过滤摆放区域外的基线，花丛 footprint 改为单格，视觉/占用尺寸以场景 `花丛 3` 的 `3.99 x 2.22` 碰撞体基准，点击草地时会真正提交摆放，并清理槽位遗留的重复旧组件。
 - `2026-08-14` 修正落位链路：`WorldMapPlacementSlot` 与 `WorldMapPlacedFlower` 使用独立稳定脚本 GUID，运行时校验为 `32/32` 槽位、`1152` 个正式视觉绑定；槽位绑定会扫描已作者化的 `PlacedVisual_*` 子节点，并以显式占用状态参与同层冲突判断。提交期间忽略同步 `EmotionFlowerPlacementsChangedEvent` 的重入恢复，避免库存扣减成功后恢复回调清空刚落位槽位；直接槽位验证已确认绑定 `36`、占用状态为真。鼠标端到端仍需在有可用库存的 Play 存档中人工点击确认。
 - `2026-08-14` 同日修正花朵与桌宠的遮挡基准：撤销错误的全局花朵前置偏移，正式花朵/预览和桌宠共享 `BaselineItem.SortingOrder` 主层级，并在同一主层级内按基线 Y 二次排序（Y 越低越靠前，完全同线时桌宠仅提高 1 个排序单位）。`WorldMap_Main.unity` 的 1152 个预置视觉统一保存为 `Default` Sorting Layer，槽位显示树内所有 SpriteRenderer 也会同步该深度键。AutoSetup 63 已给 `Pet_Angel`、`Pet_Devil` 场景根对象保存 `BaselineItem`，基线取碰撞体底部、`solidCollider=true` 且不参与可种植层收集。
+- `2026-08-23` 起，花朵摆放保留可在 Scene/Inspector 调整的 `FlowerPlacementBounds`，并在 `WorldMapPlacedFlowers` 下作者化 `FlowerPlacementRegion_Angel` 与 `FlowerPlacementRegion_Demon` 两个 BoxCollider2D 区域。只要区域列表已配置，控制器就把区域作为唯一放置范围和网格原点来源；区域引用缺失或 owner 不匹配时直接判定无效并记录诊断，不再静默回退到 `FlowerPlacementBounds`。只有完全没有区域配置的旧场景才保留 `FlowerPlacementBounds` 回退。区域边界不再受固定层级 XMin/XMax 限制，BaselineItem 仍只负责基线和遮挡层级。旧存档不自动迁移或删除。
 - `2026-08-12` 同步修正 `FlowerSidebarViewport`：拉伸锚点下改用 `offsetMin=(34,56)` 与 `offsetMax=(-34,-132)` 保存面板内边距，第一条花种固定在标题下方，列表滚动内容由 `RectMask2D` 裁剪在装饰窗口内部。独立作者化入口为 `Tools/Gemini-Lab/WorldMap/Author Flower Placement`。
 
 - `2026-07-30` 起，`WorldMap_Main.unity` 中 `Panel_WeeklyGarden/Grid/CellTemplate` 需要保持场景里可编辑但默认不可见；`WeeklyGardenPanelStub` 会在运行时兜底隐藏模板，实际面板只应显示 7 个 Day cell。`tools/check-task-gate.ps1 write` 已通过，Scene 视图仍需补验确认没有第 8 个瓶子。
@@ -415,8 +558,9 @@ Updated: 2026-08-10
 ### 2026-08-05 WorldMap 昼夜切换
 - WorldMap 使用 `Assets/_Project/Scripts/Modules/WorldMap/WorldMapDayNightController.cs` 按 `IGameClock.Now` 切换昼夜。
 - 默认 06:00–18:00 为白天，其余时间为夜晚；夜晚启用场景中的 `WorldMapNightOverlay`。
-- 夜幕使用已有 `Assets/_Project/Art/WorldMap/garden/天气（最上层）/夜幕.png`，场景作者化入口为 `WorldMapDayNightAuthoring`。
+- 夜幕使用已有 `Assets/_Project/Art/WorldMap/weather/夜幕.png`，场景作者化入口为 `WorldMapDayNightAuthoring`；废弃的 `garden/天气（最上层）` 文件不作为天气来源。
 - 当前 Scene 已直接保存 `WorldMapNightOverlay` 的位置、排序和控制器引用；夜幕碰撞已禁用，UI 不受其世界渲染排序影响。
+- 2026-08-24 修正夜幕覆盖：`WorldMapNightOverlay` 改用 `ProjectSettings/TagManager.asset` 中位于 `Default` 之后的专用 Sorting Layer，确保按 `BaselineItem` 动态排序的两名桌宠和花朵也会被夜幕覆盖；`WorldMapDayNightController` 仍只切换已作者化 SpriteRenderer。
 
 ### 2026-08-06 WorldMap 桌宠数字键动画调试
 - `WorldMapPetAnimationTriggerController` 现在是无可视化占位物的数字键调试入口，挂在 `_SceneRoot`，不再依赖宠物位置、临时点位或 `F` 键。
@@ -428,12 +572,19 @@ Updated: 2026-08-10
 - 天使走路资源的原始侧身朝向按左向处理，因此 WorldMap 天使的 `_sideFramesFaceLeft` 保持 `true`；恶魔配置保持原样。
 
 ### 2026-08-05 WorldMap 可交互场景物体反馈
-- `WorldMap_Main.unity` 中的 `室内`、`邮箱`、`大树 1`～`大树 5` 已由 `WorldMapInteractiveObjectAuthoring` 作者化为统一可交互对象。
+- `WorldMap_Main.unity` 中的 `室内`、`邮箱`、`大树 1`～`大树 5` 已由 `WorldMapInteractiveObjectAuthoring` 作者化悬停反馈；点击入口只保留给 `室内`、`邮箱` 和大树 2～5，大树 1 暂不绑定点击交互。
 - 新增运行时组件 `WorldMapInteractiveObjectFeedback`：以对象在 Scene 中保存的 localScale 为基准，在通过 UI / 最上层 2D collider 裁决后平滑放大并在移出时恢复，不累计修改最终视觉。
-- 邮箱和 5 棵大树接入 `ClickableSceneObject` 的序列化 `UnityEvent` 点击入口；当前只输出占位日志，具体业务交互仍待确定。
+- 邮箱和大树 2～5 接入 `ClickableSceneObject` 的序列化 `UnityEvent` 点击入口；大树 1 已清理苹果领取和通用点击占位，等待策划确定后再接入业务。
 - `室内` 继续使用 `CabinReturnPortal` 返回 `Apartment`；`GameBootstrap` 增加服务缺失时的重新注册保护，降低 Editor 反复进入 Play 或关闭域重载导致 `ISceneFlowService` 缺失的概率。
 - AutoSetup 版本提升到 31；PlayMode 悬停、遮挡和点击跳转仍需人工验证。
 - 后续修正：`WorldMapInteractiveObjectFeedback` 改用鼠标世界坐标与自身 `Collider2D.OverlapPoint` 检测悬停，不再因大树下方的花丛等场景碰撞体排序导致反馈失效；点击入口仍保留 `ClickOcclusionUtility` 的最上层裁决。
+
+### 2026-08-24 WorldMap 苹果树轮廓交互判定
+
+- `WorldMapInteractiveObjectAuthoring` 现在只对「大树 2」～「大树 5」在编辑器作者化阶段读取各自 Sprite 的透明轮廓，保存为根节点 `PolygonCollider2D`；不再用整块 `BoxCollider2D` 覆盖树的透明区域。
+- 轮廓生成通过 Unity 编辑器内部 Sprite 轮廓 API 完成并落盘到 Scene，运行时只读取已保存的碰撞体；悬停 `OverlapPoint` 与点击 `ClickOcclusionUtility` 共用同一轮廓。
+- 每棵苹果树现在只有一个有效轮廓碰撞体，位置、缩放、排序、`AppleTreeInteractable`、`ClickableSceneObject` 和 `AppleTreeFeedback` 不变；「大树 1」仍不是苹果树且没有点击入口。
+- 最终需要在 Unity Play 视图逐棵点击可见树边缘确认轮廓覆盖；本轮不改变苹果服务规则或树的美术资源。
 
 ### 2026-08-06 WorldMap 双宠动画调整预览场景
 - 新增 `Assets/_Project/Scenes/WorldMap/WorldMap_PetAnimationPreview.unity`，由 `_SceneRoot` 统一承载 `Main Camera`、`Pet_Angel`、`Pet_Devil`，用于在不加载室外完整环境的情况下调整两只桌宠动画。
@@ -457,3 +608,155 @@ Updated: 2026-08-10
 - 新增 `Assets/_Project/Scripts/Editor/Tools/WorldMapFlowerSoilLayoutWindow.cs`，入口为 `Tools/Gemini-Lab/WorldMap 花卉布局复用`。
 - 窗口分别保存每周种植参考格、图鉴列表参考卡和图鉴详情参考页，三个按钮将参考对象下 `FlowerImage` 与 `SoilImage` 的 `RectTransform` 布局复制到对应目标集合。
 - 复制目标为 `CellTemplate` 与 `Day0`~`Day6`、`CodexCardSlot_00`~`11` 和所有 `DetailView`；操作使用 Unity Undo 并标记当前场景 dirty，不复制 Sprite、颜色或启用状态。
+
+### 2026-08-18 AI 每日小结与 WorldMap 自由行走
+- `EmotionGardenService` 新增 `EmotionDailySummaryData` 与 `DailySummaries` 持久化字段；提交情绪时按日期覆盖当天小结，旧存档缺少该字段时从已有花朵记录补出兼容摘要。
+- `PersistenceBootstrap` 订阅 `EmotionFlowerSubmittedEvent`，提交成功后串行写入 `autosave`；因此不再依赖 `OnApplicationQuit`，Unity 停止 Play 或异常退出前也能保留最新小结。
+- `WorldMap_Main.unity` 的 Canvas 已作者化 `Panel_DailySummaryMailbox`；室外邮箱通过序列化 UnityEvent 打开该面板。Apartment 中同名 `MailboxButton` 与面板已停用，避免错误入口。`DailySummaryMailboxPanel` 只填充 Scene 中已有的 TMP 节点，不在运行时创建 UI。当前网关没有结构化“每日小结”接口，因此使用离线确定性 AI 风格兜底文本，后续可替换生成提供器而不改变邮箱和存档结构。
+- `WorldMap_Main.unity` 的 `Pet_Angel`、`Pet_Devil` 均保存 `RandomWander` 和 `PetPlayerInputController`，默认不抢占玩家控制；无控制/交互时在作者化边界内漫游，`PetController` 继续驱动现有 `IsMoving`、方向参数和 Idle/Move Animator 状态，点击后可取得控制权。
+- `AutoSetup` 版本提升到 66；Scene 与 Play 的最终 UI、Sprite、Animator 和边界均来自已保存场景/组件，运行时仅更新状态和文本。
+
+### 2026-09-01 WorldMap 环境基线扩展
+
+- `WorldMap_Main.unity/WorldMapPlacedFlowers/FlowerPlacementGrid` 由十一条独立 `WorldMapBaselineDefinition` 节点承载固定基线：天空、星星、云、树木后排、树木前排、地面、四条花丛层和桌宠层。环境基线使用蓝色，花丛基线使用白色，桌宠基线使用红色。
+- 云和星星已经有独立场景美术节点：`WorldMapWeatherClouds` / `WorldMapWeatherStars` 分别绑定 `Environment_Clouds` / `Environment_Stars`，位置保持与室外背景的作者化范围一致。
+- `BaselineItem` 只通过序列化定义引用读取基线 Y、X 范围和相对渲染顺序值；WorldMap 场景保留每个物体原本的 `_baselineTransformOffset`（由 Sprite 轴心决定），物体自身只沿 X 移动并锁定在 `BaselineY + 原偏移`。删除绑定物体不会删除基线，只有基线工具移动基线时才会同步带动物体 Y。`WorldMapBaselineDefinition` 是基线身份、位置、范围、放置许可和遮挡顺序的唯一事实源，Inspector 与批量基线工具共享同一份参数，不再提供 `BaselineItem` 本地覆盖值。
+- 花朵放置控制器只序列化四个花朵层，不再从每个 `BaselineItem` 动态推导层数。
+- `Tools/Gemini-Lab/WorldMap/场景基线` 提供 Scene 视图基线手柄，移动基线会同步移动同一基线上的绑定物体；窗口按 RenderOrder 相对值从大到小显示，可直接编辑共享值，并用固定点击式前移/后移交换相邻基线，修改后刷新跟随基线的 SpriteRenderer。RenderOrder 只用于相对比较，不代表基线条数。
+### 2026-08-20 Apartment 遗留物系统首轮
+- 新增 `ApartmentKeepsake` 模块：`ApartmentKeepsakeService` 实现纸条、Relation 45–79 随机纪念物、Relation≥80 永久赠礼的每日首次室内判定与 JSON 存档；判定日期防重复，状态变更经 `PersistenceBootstrap` 立即写入 autosave。
+- `PetRuntimeData.Relation` 已纳入 Pet 存档与快照等价比较；ApartmentKeepsake 模块使用自有 `ApartmentKeepsakeOwner` 枚举，避免依赖循环，Presenter 仅在边界层映射 Angel/Devil。
+- `Apartment_Main.unity` 增量作者化 `ArtGenerated/ApartmentKeepsakeWorldPresentation`、`UI_Sidebar/ApartmentKeepsakeOverlay`、详情弹窗、赠礼收藏面板、固定纸条/纪念物点位；所有 Sprite 引用保存于 Scene，运行时只切换显示与填充 TMP。
+- `ApartmentViewportInputBridge` 新增世界点交互路由，点击优先级经过 `ClickOcclusionUtility`，确保 RenderTexture 视口内的遗留物点击不依赖 `OnMouseDown`。
+- 资产现实：`ui1.0` 目前提供 Angel/Devil 木牌与图鉴入口，不包含正式纸条/遗留物/赠礼本体；首轮复用仓库已有纸张、纪念物和收藏卡，后续美术可直接替换 Scene 引用。
+- 验证：ApartmentKeepsakeService 定向 EditMode 7/7 通过；Play smoke 服务注册成功且无本任务异常。全量 EditMode 仍有 22 个既有 Furniture/MovingState 失败，未在本任务扩大范围修复。
+### 2026-08-21 WorldMap AI diary visual resources
+
+- `WorldMap_Main.unity` now stores the AI diary board and five clickable resources as Scene-authored Sprite nodes under `Panel_DailySummaryMailbox/DailySummaryContent`.
+- Each target opens its matching enlarged preview (`angel_note`, `summary`, `devil_note`, `angel_card`, or `devil_card`) through `DailySummaryDetailPopup`; `弹窗1.png` remains reference-only.
+- `DailySummaryMailboxPanel` only toggles authored nodes and fills text. Mailbox routing, summary generation and persistence remain unchanged.
+### 2026-08-22 WorldMap AI diary reference layout calibration
+
+- `DailySummaryMailboxAuthoring` now aligns the saved board layout with the reference composition: title `AI每日小结`, selected `今日小结` tab, multi-line empty-state input, three note regions, and the two character cards use Scene-authored positions and sizes.
+- The five board buttons use `Selectable.Transition.None` so the imported `AI_diary` Sprite colors remain unchanged during hover/press; the matching enlarged previews remain Scene-authored and are still selected by `DailySummaryDetailPopup` at runtime.
+- Unity saved the updated `WorldMap_Main.unity` layout and added the needed Chinese glyphs to `Assets/TextMesh Pro/Resources/Fonts & Materials/LXGWWenKai SDF.asset`; this font asset is part of the visual change, not a runtime-generated UI resource.
+
+### 2026-08-22 WorldMap AI diary date history and popup resource
+
+- `IEmotionGardenService.GetDailySummaryDates()` returns the de-duplicated persisted summary dates in descending order; `DailySummaryMailboxPanel` reads the selected record through `GetDailySummary(dateIso)`.
+- `WorldMap_Main.unity` now stores `DateListViewport/DateListContent` with 14 `DailySummaryDateOption` entries. Each entry contains selected/unselected Sprite children and a date TMP; runtime only toggles them and fills the date.
+- `PopupButton` uses `AI_diary/弹窗.png` and opens the authored `PopupView` using `AI_diary/弹窗1.png`. `PopupContent` no longer has a solid Image background; the outer backdrop remains the modal close layer.
+- `EmotionGardenDailySummaryTests` covers unique descending dates and selecting a historical summary. Mailbox routing, summary generation and persistence format remain unchanged.
+
+### 2026-08-23 AI diary popup text overlay fix
+
+- `DailySummaryMailboxAuthoring` now authors `PopupBodyText` at the center of the enlarged paper resource (`PopupContent` local position `(0,-30)`, size `400x260`) and places it above the preview image in sibling order.
+- Summary, angel-note and devil-note previews therefore display the selected date's dynamic text on the paper itself; `PopupView` for `弹窗1.png` keeps its own baked-in message and hides the dynamic text.
+
+### 2026-08-24 Pet runtime save conflict resolution
+
+- `Assets/_Project/Scripts/Modules/Pet/PetRuntimeSaveService.cs` now combines the branch's `PetRuntimeData.Relation` persistence with the upstream v2 offline-mood timestamp rules.
+- v2 payloads save `relation` and `savedAtUtcTicks`. On restore, Mood moves toward 50 by one point per five offline minutes, capped at six points; Energy and Satiety restore unchanged. Relation is restored for v2 payloads.
+- v1 payloads remain compatible: missing `savedAtUtcTicks` skips offline regression, and missing `relation` leaves the current runtime Relation unchanged.
+- The branch was rebased onto `upstream/main`; `PetController` behavior-weight changes and upstream-deleted assets were not reintroduced.
+
+### 2026-09-03 WorldMap 基线视觉修复
+
+- `BaselineItem.RefreshBaselineBinding` now captures the bound object's current world-space Y as its preserved offset before re-aligning, avoiding the previous local-space/world-space mix-up for PSD child objects.
+- `WorldMap_Main.unity` keeps the authored PSD-relative local transforms and stores only the corresponding world-space baseline offsets; the active camera is calibrated to cover the authored sky and ground without adding blank framing.
+- Flower restore snaps saved flowers to the resolved baseline Y, while `FlowerPlacementBounds` remains the authoritative grass anchor rectangle so legacy saved positions cannot restore above or below the grass.
+
+### 2026-09-03 WorldMap PSD 相对位置修复复核
+
+- 复核发现上次基线作者化曾把 16 个 PSD 子物体的世界 Y 写入了父节点局部 Y，造成背景、地面、天空、树、桥、桌宠和花丛整体上移约一个父节点偏移量。
+- 本次只恢复这些物体的原始局部 Transform，并恢复活动相机的原始取景；不改基线定义、排序或存档。
+- 以后修改绑定物体时必须区分 `transform.position`（世界坐标）和 `transform.localPosition`（父节点局部坐标），Scene/Play 视觉验证以 `WorldMap_Main` 实际画面为准。
+
+### 2026-09-04 WorldMap 许愿系统
+
+- WorldMap 场景中的 `许愿树`（原“大树 1”）现在绑定 `WorldMapWishTreeInteractable`，点击只打开许愿系统，不执行苹果逻辑。
+- `WorldMapWishService` 独立保存 Active、Fulfilled、Archived 愿望记录，使用 PlayerPrefs JSON 跨重启持久化；活动显示槽位固定为 12 个，新增愿望在槽位满时归档最旧记录后复用槽位。
+- `WorldMapWishSystemController` 只连接 Scene 中预先作者化的主界面、输入、详情、记忆列表和 12 个星位按钮；运行时只切换显示状态、填充文字和处理按钮事件。
+- “全部”记忆列表保留进行中、已实现与已归档记录；归档记录不再占用树上或面板的活动星位。
+- 主面板的 12 个愿望星位是 `MainView/WishStarSlot_00..11`，全部作者化在主背景左上角插画许愿树区域内；点击星星不打开详情。
+- 右上角作者化的 `item_button.png` 是唯一的愿望详情入口，打开一个右侧可滚轮滚动的愿望列表，并在左侧显示当前选中愿望；旧世界空间星位容器保持隐藏且不参与绑定。
+
+### 2026-09-05 WorldMap 愿望 UI 流程修正
+
+- 已将星星限制为主面板左上角许愿树区域，取消全 panel 随机显示和星星点击详情行为。
+- 详情页改为单页滚动手册：打开时优先选中当天最新未归档愿望，列表换选后同步更新左侧内容、日期和状态。
+
+### 2026-09-05 WorldMap 云层与单花环境动画修复
+
+- `Assets/_Project/Art/WorldMap/weather/WorldMapClouds_Alpha.png` 是由天气目录现有云层 JPG 派生的透明 Sprite；仅移除与图像边缘连通的背景白色像素，封闭在云朵轮廓内的白色像素保留，原 JPG 不修改。
+- `WorldMapWeatherAuthoring` 将云层绑定到 `WorldMapWeatherClouds` 的 `Environment_Clouds` 基线，并使用 Unity 标准 `Sprites-Default` 材质；不再使用会误删亮色云朵的颜色键材质。云层基线 Y 为 6.8，Scene/Play 均显示完整云朵。
+- `WorldMapAmbientAnimationController` 只旋转名称以 `_Single` 结尾且已有 SpriteRenderer 的单花，默认幅度 3.2°、速度 0.9，并以层级路径生成稳定的独立相位；`_Cluster` 花丛不旋转。云层继续沿 X 轴缓慢移动。
+### 2026-09-05 WorldMap 双宠动画触发状态机
+- `WorldMapPetAnimationTriggerController` 按 PetId 分别维护特殊动画、计时、移动锁和待播放队列；无特殊动作时仍由 `PetController` 根据实际移动状态驱动 Idle/Move。
+- 漫游时天使在苹果树、许愿树、天使区域已摆放单花/花丛附近触发坐地、祈祷、浇水；恶魔在苹果树、恶魔标牌附近触发睡觉、施法。苹果树候选排除大树 1/许愿树。
+- 玩家控制时 F 键按对应目标触发；新增摆花事件分别触发天使开心或恶魔得意，初次读取存档快照不会误触发。
+- 数字键 1～7 调试入口仍保留，动画状态来自现有 `WorldMap_Angel.controller` / `WorldMap_Devil.controller` 的 `Outdoor_*` 状态，不修改 Clip/Controller 资产。
+### 2026-09-05 苹果树掉落批次
+
+WorldMap 苹果树点击后由 `AppleTreeDropController` 播放快速晃动并启用 Scene 作者化苹果槽位；`AppleService` 保存批次剩余值，只有逐个点击 `AppleDropSlot` 才增加苹果余额。掉落 Sprite 固定来自 `Assets/_Project/Art/WorldMap/苹果云背景补充/apple.png`，许愿树不参与。
+
+### 2026-09-05 WorldMap 输入框视觉状态与情绪入口
+
+- `EmotionInputPanelStub` 的天使/恶魔主题各自保存提示图 `输入心情/*/input.png` 与无字图 `UI输入框去字/angel_emotion_input.png`、`devil_emotion_input.png`；运行时仅在输入框获得焦点和结束编辑时切换已作者化 Image 的显隐，提交成功后恢复提示图。
+- `WorldMapWishSystemController` 的 `WishInputField` 保存提示图 `许愿树/input.png` 与无字图 `UI输入框去字/wish_input.png`；打开输入页不自动抢焦点，点击输入框后切换无字图，结束编辑、取消或提交后恢复提示图。
+- WorldMap 情绪输入入口改为真实场景对象 `天使标牌` / `恶魔标牌` 上的 `WorldMapGardenZone`，分别传入 `angel` / `demon`；旧的 `EmotionEntry_Angel` / `EmotionEntry_Demon` 仅作为停用遗留节点，不再作为入口。Canvas 右上 `Btn_EmotionInput` 停用。
+- `FlowerCollectionPanelStub` 与 `WorldMapEmotionGardenUIPatch` 不再显示或绑定图鉴卡片、图鉴详情的 `SoilImage`；土壤仅保留在 `WeeklyGardenPanelStub` 的每周培育节点。
+
+### 2026-09-05 WorldMap AI 情绪花园接入
+
+- `EmotionGardenService.SubmitEmotionAsync` 复用室内 `Resources/LLMConfig.asset` 的 OpenAI 兼容配置；AI 负责从九种标准情绪中判定情绪、生成关键词、花朵基础描述、花语，以及每日 `summary`、`angelNote`、`devilNote`。
+- AI 结果写入 `EmotionFlowerData` 和 `EmotionDailySummaryData`，随情绪花园存档持久化；旧存档缺少新字段时由本地规则补齐。AI 超时、未配置或返回不合规内容时自动使用本地兜底，不阻塞提交。
+- `EmotionInputPanelStub` 使用异步提交并在等待时锁定按钮；`WeeklyGardenPanelStub` 显示 AI 关键词和花语；`DailySummaryMailboxPanel` 继续读取选中日期的持久化每日总结。
+- 许愿面板 AI 接入暂缓，当前不修改 `WorldMapWishSystemController` 的本地愿望流程。
+
+### 2026-09-06 WorldMap 室外新手指引
+
+- `WorldMap_Main.unity` 的 `Canvas/Panel_OutdoorTutorial` 已保存七个页面节点：`Page_Intro` 与 `Page_Outdoor1`～`Page_Outdoor6`，图片来自 `Assets/_Project/Art/新手引导/outdoor/`。
+- 面板保存 `left.png`、`right.png`、`outdoor/close.png` 三个按钮资源，并提供 `Btn_OutdoorTutorial` 占位入口。入口当前只负责打开第一页，后续可在 Inspector 中替换按钮 Sprite 或绑定正式入口。
+- `SceneAuthoredImageVariantView` 负责运行时切换已作者化页面，上一页/下一页在首尾边界停止；运行时不创建 GameObject、不加载路径资源，也不写入最终 Sprite。
+- `WorldMapOutdoorTutorialAuthoring` 是定向作者化工具（菜单 `Tools/Gemini-Lab/WorldMap/Author Outdoor Tutorial`），只维护自己的节点，不重建或清空 WorldMap 场景。当前没有绑定邮箱、标牌或首次进入等正式业务触发条件。
+### 2026-09-07 WorldMap 第一阶段室外点击路由
+
+- `WorldMapSceneInteractionRouter` 现在统一裁决邮箱、天使标牌、恶魔标牌、两只室外桌宠、许愿树、三棵苹果树和九个现有 `AppleDropSlot`；场景目标通过序列化引用注册，不依赖对象名查找。
+- 大树 2、3、5 使用现有作者化 `PolygonCollider2D` 命中；许愿树独立打开许愿系统；大树上的旧 `ClickableSceneObject` 已从 `WorldMap_Main.unity` 移除。
+- `AppleDropSlot` 领取后继续复用 Scene `CollectionText`；本阶段只修复点击路由，不改变掉落数量分配、动画触发条件或室内系统。Play 尚未由助手验证。
+### 2026-09-08 WorldMap Collider2D 点击命中修正
+
+- WorldMap 路由目标的 `ContainsWorldPoint` 只使用目标自身启用的 `Collider2D.OverlapPoint`；邮箱、天使/恶魔标牌和两只室外桌宠不再以 `SpriteRenderer.bounds` 作为点击区域。
+- 树木继续使用 Scene 中保存的真实 `PolygonCollider2D`，许愿树和 `AppleDropSlot` 继续使用各自 Collider2D；本次不调整 Collider 几何。
+- 本次只完成静态代码与编译修正，Play 实机点击范围仍待人工确认。
+
+### 2026-09-08 WorldMap 苹果服务入口修正
+
+- `AppleRuntimeBootstrap.EnsureRegistered()` 会复用 Boot 已注册的 `IAppleService`；WorldMap 直启时，如果核心 `IGameClock` 已存在，则注册同一个现有 `AppleService` 实现并加入持久化服务注册表，不创建第二个货币权威。
+- `AppleTreeDropController.TryBeginHarvest()` 在读取 `IAppleService` 前调用该幂等入口；树点击仍由 `WorldMapSceneInteractionRouter` 和三棵树自身的 `PolygonCollider2D` 命中，成熟判断、掉落分配和苹果领取逻辑不变。
+- WorldMap 直启缺少苹果服务时是树点击无掉落的专项风险；没有成熟批次时仍应显示已有“还没成熟哦”反馈。该修正已通过静态检查和程序集编译，Play 实机仍待人工确认。
+
+### 2026-09-08 WorldMap 苹果货币收集逻辑重写
+
+- `AppleService` 重新收口为苹果货币的唯一状态权威：成熟调度、树的待领取总量、一次掉落批次的预留余量、逐个苹果领取和余额增加均由同一服务完成；领取金额超过当前预留余量时直接失败，不再自动截断。
+- `AppleRuntimeBootstrap` 在核心时钟可用后注册服务，并为当前场景已有的三棵目标树建立状态；`AppleTreeDropController` 只分配 Scene 中已有的 1～3 个 `AppleDropSlot`，不创建运行时视觉对象。
+- `AppleDropSlot` 只有服务领取成功后才隐藏苹果、增加余额并显示 `CollectionText`；`AppleTreeFeedback` 使用已有 `StatusText` 显示未成熟提示，持续时间约 2 秒。
+- 3 个 `StatusText`、9 个 `CollectionText` 的 MeshRenderer 与 TMP 覆盖材质已统一改为现有 `NotoSansSC_SDF`，清除了旧 `LiberationSans` 实例材质，修复中文反馈设置成功但不出字的问题；本阶段未进入 Unity Play。
+
+### 2026-09-08 WorldMap 云层范围与室内入口点击
+
+- `WorldMapAmbientAnimationController` 现在使用 `WorldMap_Main.unity` 中 `BaselineLine_云` 的作者化横向范围 `x=-54.563995` 到 `x=20.005005` 驱动云朵往返移动，不再使用过窄的 `1.2` 对称偏移。
+- 外场 `室内` 物体保留原有 SpriteRenderer 和 BoxCollider2D，并通过其 `CabinReturnPortal` 组件登记到 `WorldMapSceneInteractionRouter`；命中自身 Collider2D 后调用 `ISceneFlowService.LoadAsync(SceneId.Apartment)`。
+- 本次不修改 `Apartment_Main.unity`、室内家具、室内状态机、桥面逻辑或动画资源；Play 结果仍需人工确认。
+
+### 2026-09-08 WorldMap 云层范围与移速校正
+
+- 上一版使用 `BaselineLine_云` 的手写范围，现改为显式引用 `WorldMap_Main.unity` 中已有的 `天空` SpriteRenderer；云层移动区间根据天空和云层的真实渲染边界计算。
+- 云层速度恢复为上一版的 `0.12` 参数，并保留原有“中心位置 + 正弦位移，到端点后折返”的运动方式；只把正弦振幅改为天空可见范围的一半。
+- 本次不改 `天空` 或云层的尺寸、位置、Sprite、相机、室内入口、动画资源和其他 WorldMap 交互；Play 结果仍需人工确认。
+
+### 2026-09-08 WorldMap 云层速度再次校正
+
+- 在保留天空派生范围、正弦往返和端点折返方式不变的前提下，`WorldMapAmbientAnimationController` 的 `_cloudMoveSpeed` 从 `0.12` 降为 `0.06`，即当前移动速度减半。
+- 本次不改云层移动范围、折返方式、天空/云层视觉资源或其他 WorldMap 系统；Play 结果仍需人工确认。

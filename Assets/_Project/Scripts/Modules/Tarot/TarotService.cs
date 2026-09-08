@@ -19,6 +19,8 @@ namespace GeminiLab.Modules.Tarot
     /// </summary>
     public sealed class TarotService : ITarotService
     {
+        public const int DefaultSessionCost = 8;
+
         private readonly TarotDeckSO _deck;
         private readonly IAppleService _apple;
         private readonly IGameClock _clock;
@@ -40,7 +42,7 @@ namespace GeminiLab.Modules.Tarot
         }
 
         public TarotDeckSO Deck => _deck;
-        public int SessionCost => 1;
+        public int SessionCost => DefaultSessionCost;
         public bool CanCreateSession => _apple.Balance >= SessionCost;
 
         public TarotSession CreateSession(string? question)

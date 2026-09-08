@@ -33,7 +33,7 @@ namespace GeminiLab.Tests.EditMode
         {
             Restore(@"{""Version"":3,""LastSubmitDateIso"":""2026-08-11"",""Flowers"":[],""Clusters"":[],""PlacementInventories"":[{""EmotionType"":""喜悦"",""Owner"":""angel"",""SingleCount"":2,""ClusterCount"":0}]}");
 
-            Assert.True(_service.TryPlaceFlower("喜悦", "angel", false, 4, 1.25f, -2.5f));
+            Assert.True(_service.TryPlaceFlower("喜悦", "angel", false, 4, 1.25f, -2.5f, "Layer_A"));
             Assert.AreEqual(1, _service.GetPlacementInventory("喜悦", "angel").SingleCount);
 
             string captured = ((IPersistentService)_service).CaptureJson();
@@ -51,6 +51,16 @@ namespace GeminiLab.Tests.EditMode
             Assert.False(placed.IsCluster);
             Assert.AreEqual(1.25f, placed.WorldX);
             Assert.AreEqual(-2.5f, placed.WorldY);
+            Assert.AreEqual("Layer_A", placed.PlacementLayerId);
+        }
+
+        [Test]
+        public void RestoreLegacyPlacedFlower_WithoutLayerIdUsesEmptyCompatibilityValue()
+        {
+            Restore(@"{""Version"":4,""Flowers"":[],""Clusters"":[],""PlacementInventories"":[],""PlacedFlowers"":[{""SlotIndex"":2,""EmotionType"":""喜悦"",""Owner"":""angel"",""IsCluster"":false,""WorldX"":1,""WorldY"":-3}]}");
+
+            Assert.AreEqual(1, _service.GetPlacedFlowers().Count);
+            Assert.AreEqual(string.Empty, _service.GetPlacedFlowers()[0].PlacementLayerId);
         }
 
         [Test]
@@ -74,6 +84,30 @@ namespace GeminiLab.Tests.EditMode
             Assert.AreEqual(1, _service.GetPlacementInventory("喜悦", "angel").SingleCount);
             Assert.AreEqual(1, _service.GetPlacedFlowers().Count);
             Assert.AreEqual(0f, _service.GetPlacedFlowers()[0].WorldX);
+        }
+
+        [Test]
+        public void SubmitEmotion_CreatesAndPersistsDailySummary()
+        {
+            EmotionFlowerData? flower = _service.SubmitEmotion(string.Empty, "今天有点累，但完成了一件重要的事", "angel");
+
+            Assert.True(flower.HasValue);
+            EmotionDailySummaryData? summary = _service.GetTodayDailySummary();
+            Assert.True(summary.HasValue);
+            Assert.AreEqual("2026-08-12", summary.Value.DateIso);
+            StringAssert.Contains("今天有点累", summary.Value.InputSentence);
+            Assert.IsNotEmpty(summary.Value.Summary);
+            Assert.IsNotEmpty(summary.Value.AngelNote);
+            Assert.IsNotEmpty(summary.Value.DevilNote);
+
+            string captured = ((IPersistentService)_service).CaptureJson();
+            Restore(captured);
+
+            EmotionDailySummaryData? restored = _service.GetTodayDailySummary();
+            Assert.True(restored.HasValue);
+            Assert.AreEqual(summary.Value.Summary, restored.Value.Summary);
+            Assert.AreEqual(summary.Value.AngelNote, restored.Value.AngelNote);
+            Assert.AreEqual(summary.Value.DevilNote, restored.Value.DevilNote);
         }
 
         [Test]

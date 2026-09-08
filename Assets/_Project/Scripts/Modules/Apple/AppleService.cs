@@ -10,40 +10,63 @@ namespace GeminiLab.Modules.Apple
 {
     /// <summary>
     /// 苹果资源默认实现。
-    /// - 新档初始 20 个苹果。
-    /// - 每棵树每 6 小时生成 1 个，单树缓存上限 3 个。
-    /// - 生成进度使用 IGameClock.UtcNow，并把时间戳和缓存一起写入存档。
+    ///
+    /// 每棵树独立记录下一轮现实时间生成点、当日已生成轮数和未领取缓存。
+    /// 生成点和缓存均进入存档，因此退出、重启或离开 WorldMap 不会丢失成熟苹果。
     /// </summary>
     public sealed class AppleService : IAppleService
     {
         public const int DefaultInitialBalance = 20;
-        public const int DefaultGenerationIntervalMinutes = 360;
-        public const int DefaultMaxPendingPerTree = 3;
+        public const int DefaultGenerationIntervalMinMinutes = 45;
+        public const int DefaultGenerationIntervalMaxMinutes = 90;
+        public const int DefaultMaxRoundsPerDay = 5;
+        public const double GenerationOneAppleProbability = 0.70d;
+
+        // 兼容旧代码/旧检查器的名称；新版使用 Min/Max 两个间隔。
+        public const int DefaultGenerationIntervalMinutes = DefaultGenerationIntervalMinMinutes;
+        public const int DefaultMaxPendingPerTree = int.MaxValue;
+
+        private const int SaveVersion = 3;
+        private const int MaxGenerationCatchUpIterations = 4096;
 
         private readonly IGameClock _clock;
         private readonly EventBus? _eventBus;
         private readonly Dictionary<string, AppleTreeState> _trees = new(StringComparer.Ordinal);
+        private readonly System.Random _random;
 
         public AppleService(
             IGameClock clock,
             EventBus? eventBus,
             int initialBalance = DefaultInitialBalance,
-            int generationIntervalMinutes = DefaultGenerationIntervalMinutes,
-            int maxPendingPerTree = DefaultMaxPendingPerTree)
+            int generationIntervalMinutes = DefaultGenerationIntervalMinMinutes,
+            int maxPendingPerTree = DefaultMaxPendingPerTree,
+            int generationIntervalMaxMinutes = DefaultGenerationIntervalMaxMinutes,
+            int maxRoundsPerDay = DefaultMaxRoundsPerDay,
+            int? randomSeed = null)
         {
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _eventBus = eventBus;
+            _random = randomSeed.HasValue ? new System.Random(randomSeed.Value) : new System.Random();
+
             InitialBalance = Mathf.Max(0, initialBalance);
             Balance = InitialBalance;
-            GenerationIntervalMinutes = Mathf.Max(1, generationIntervalMinutes);
-            MaxPendingPerTree = Mathf.Max(1, maxPendingPerTree);
+            GenerationIntervalMinMinutes = Mathf.Max(1, generationIntervalMinutes);
+            GenerationIntervalMaxMinutes = Mathf.Max(GenerationIntervalMinMinutes, generationIntervalMaxMinutes);
+            MaxRoundsPerDay = Mathf.Max(1, maxRoundsPerDay);
         }
 
         public string Key => "apple";
         public int Balance { get; private set; }
         public int InitialBalance { get; }
-        public int GenerationIntervalMinutes { get; }
-        public int MaxPendingPerTree { get; }
+
+        // Kept for consumers that only need a representative interval.
+        public int GenerationIntervalMinutes => GenerationIntervalMinMinutes;
+        public int GenerationIntervalMinMinutes { get; }
+        public int GenerationIntervalMaxMinutes { get; }
+        public int MaxRoundsPerDay { get; }
+
+        // The new requirement has no pending-cache cap. This property remains for API compatibility.
+        public int MaxPendingPerTree => int.MaxValue;
 
         public void Add(int amount)
         {
@@ -66,10 +89,14 @@ namespace GeminiLab.Modules.Apple
             string normalized = treeId.Trim();
             if (_trees.ContainsKey(normalized)) return;
 
+            DateTime now = _clock.UtcNow;
             var state = new AppleTreeState
             {
                 TreeId = normalized,
-                LastGeneratedUtcTicks = _clock.UtcNow.Ticks,
+                LastGeneratedUtcTicks = now.Ticks,
+                NextGenerationUtcTicks = SafeAddTicks(now.Ticks, NextIntervalTicks()),
+                GenerationDayKey = DayKey(now),
+                GeneratedRoundsToday = 0,
                 PendingCount = 0,
                 TotalCollected = 0
             };
@@ -88,18 +115,109 @@ namespace GeminiLab.Modules.Apple
             return state.PendingCount;
         }
 
+        /// <summary>
+        /// Reserves the current cached amount for one visible tree-shake
+        /// interaction. The amount is not added to the balance until the
+        /// authored ground apples are collected one by one.
+        /// </summary>
+        public bool TryBeginHarvest(string treeId, out int total)
+        {
+            total = 0;
+            if (string.IsNullOrWhiteSpace(treeId)) return false;
+
+            EnsureTree(treeId);
+            string normalized = treeId.Trim();
+            var state = _trees[normalized];
+            GeneratePending(ref state);
+
+            if (state.HarvestRemaining > 0)
+            {
+                total = state.HarvestRemaining;
+                _trees[normalized] = state;
+                return true;
+            }
+
+            if (state.PendingCount <= 0)
+            {
+                _trees[normalized] = state;
+                _eventBus?.Publish(new AppleTreeChangedEvent(state));
+                return false;
+            }
+
+            total = state.PendingCount;
+            state.PendingCount = 0;
+            state.HarvestRemaining = total;
+            state.HarvestTotal = total;
+            _trees[normalized] = state;
+            _eventBus?.Publish(new AppleTreeChangedEvent(state));
+            return true;
+        }
+
+        /// <summary>
+        /// Collects at most one authored drop from the active harvest session.
+        /// The service is the single authority for the fixed batch total.
+        /// </summary>
+        public bool TryCollectHarvest(string treeId, int amount)
+        {
+            if (string.IsNullOrWhiteSpace(treeId) || amount <= 0) return false;
+
+            EnsureTree(treeId);
+            string normalized = treeId.Trim();
+            var state = _trees[normalized];
+            int collected = Mathf.Min(amount, state.HarvestRemaining);
+            if (collected <= 0) return false;
+
+            state.HarvestRemaining -= collected;
+            state.TotalCollected = SafeAdd(state.TotalCollected, collected);
+            if (state.HarvestRemaining == 0)
+            {
+                state.HarvestTotal = 0;
+            }
+
+            _trees[normalized] = state;
+            Add(collected);
+            _eventBus?.Publish(new AppleTreeChangedEvent(state));
+            return true;
+        }
+
+        public int GetHarvestRemaining(string treeId)
+        {
+            if (string.IsNullOrWhiteSpace(treeId)) return 0;
+            EnsureTree(treeId);
+            string normalized = treeId.Trim();
+            return _trees[normalized].HarvestRemaining;
+        }
+
         public int ShakeTree(string treeId)
         {
             if (string.IsNullOrWhiteSpace(treeId)) return 0;
             EnsureTree(treeId);
             string normalized = treeId.Trim();
             var state = _trees[normalized];
+
+            // Keep the legacy API safe for existing callers: if a new
+            // incremental harvest is already active, collect its remainder
+            // as one legacy operation instead of starting a second batch.
+            if (state.HarvestRemaining > 0)
+            {
+                int active = state.HarvestRemaining;
+                state.HarvestRemaining = 0;
+                state.HarvestTotal = 0;
+                state.TotalCollected = SafeAdd(state.TotalCollected, active);
+                _trees[normalized] = state;
+                Add(active);
+                _eventBus?.Publish(new AppleTreeChangedEvent(state));
+                _eventBus?.Publish(new AppleTreeShakenEvent(normalized, active));
+                return active;
+            }
+
             GeneratePending(ref state);
 
             int collected = state.PendingCount;
             if (collected <= 0)
             {
                 _trees[normalized] = state;
+                _eventBus?.Publish(new AppleTreeChangedEvent(state));
                 return 0;
             }
 
@@ -133,7 +251,7 @@ namespace GeminiLab.Modules.Apple
 
             return JsonUtility.ToJson(new SavePayload
             {
-                Version = 1,
+                Version = SaveVersion,
                 Balance = Mathf.Max(0, Balance),
                 Trees = states
             });
@@ -156,11 +274,7 @@ namespace GeminiLab.Modules.Apple
                         if (string.IsNullOrWhiteSpace(saved.TreeId)) continue;
                         var state = saved;
                         state.TreeId = state.TreeId.Trim();
-                        state.LastGeneratedUtcTicks = state.LastGeneratedUtcTicks > 0
-                            ? state.LastGeneratedUtcTicks
-                            : _clock.UtcNow.Ticks;
-                        state.PendingCount = Mathf.Clamp(state.PendingCount, 0, MaxPendingPerTree);
-                        state.TotalCollected = Mathf.Max(0, state.TotalCollected);
+                        NormalizeRestoredState(ref state, payload.Version);
                         _trees[state.TreeId] = state;
                     }
                 }
@@ -181,29 +295,133 @@ namespace GeminiLab.Modules.Apple
 
         private void GeneratePending(ref AppleTreeState state)
         {
-            long nowTicks = _clock.UtcNow.Ticks;
-            if (state.LastGeneratedUtcTicks <= 0)
+            DateTime now = _clock.UtcNow;
+            EnsureGenerationSchedule(ref state, now);
+
+            // A development clock can be advanced and later reset. In that
+            // case an empty tree may contain a schedule entirely in the
+            // future relative to the current clock and would otherwise stay
+            // blocked until the real clock catches up. Do not touch a
+            // pending or active harvest: those are player-owned progress.
+            if (state.PendingCount <= 0 &&
+                state.HarvestRemaining <= 0 &&
+                state.LastGeneratedUtcTicks > now.Ticks)
             {
-                state.LastGeneratedUtcTicks = nowTicks;
-                return;
+                state.GenerationDayKey = DayKey(now);
+                state.GeneratedRoundsToday = 0;
+                state.LastGeneratedUtcTicks = now.Ticks;
+                state.NextGenerationUtcTicks = now.Ticks;
+                Debug.LogWarning(
+                    $"[AppleService][ClockRollback] tree={state.TreeId} " +
+                    $"scheduleReanchored={now:O}");
             }
 
-            long elapsedTicks = nowTicks - state.LastGeneratedUtcTicks;
-            long intervalTicks = TimeSpan.FromMinutes(GenerationIntervalMinutes).Ticks;
-            if (elapsedTicks < intervalTicks || intervalTicks <= 0) return;
+            // A debug day advance is expected to make a tree usable on the new
+            // calendar day. If the previous day ended with no cached or active
+            // harvest, make the first round of the new day due immediately;
+            // normal 45-90 minute scheduling continues after that round.
+            if (state.PendingCount <= 0 &&
+                state.HarvestRemaining <= 0 &&
+                state.LastGeneratedUtcTicks > 0 &&
+                new DateTime(state.LastGeneratedUtcTicks, DateTimeKind.Utc).Date < now.Date)
+            {
+                state.GenerationDayKey = DayKey(now);
+                state.GeneratedRoundsToday = 0;
+                state.NextGenerationUtcTicks = now.Ticks;
+                Debug.Log($"[AppleService][DayBoundary] tree={state.TreeId} dueNow={now:O}");
+            }
 
-            long generatedIntervals = elapsedTicks / intervalTicks;
-            state.LastGeneratedUtcTicks = SafeAddTicks(state.LastGeneratedUtcTicks, generatedIntervals * intervalTicks);
-            state.PendingCount = Mathf.Clamp(
-                SafeAdd(state.PendingCount, generatedIntervals > int.MaxValue ? int.MaxValue : (int)generatedIntervals),
-                0,
-                MaxPendingPerTree);
+            long nextTicks = state.NextGenerationUtcTicks;
+            int iterations = 0;
+            while (nextTicks > 0 && nextTicks <= now.Ticks && iterations++ < MaxGenerationCatchUpIterations)
+            {
+                DateTime dueAt = new DateTime(nextTicks, DateTimeKind.Utc);
+                string dueDay = DayKey(dueAt);
+                if (!string.Equals(state.GenerationDayKey, dueDay, StringComparison.Ordinal))
+                {
+                    state.GenerationDayKey = dueDay;
+                    state.GeneratedRoundsToday = 0;
+                }
+
+                if (state.GeneratedRoundsToday >= MaxRoundsPerDay)
+                {
+                    DateTime nextDay = dueAt.Date.AddDays(1);
+                    nextTicks = SafeAddTicks(nextDay.Ticks, NextIntervalTicks());
+                    state.NextGenerationUtcTicks = nextTicks;
+                    continue;
+                }
+
+                int quantity = _random.NextDouble() < GenerationOneAppleProbability ? 1 : 2;
+                state.PendingCount = SafeAdd(state.PendingCount, quantity);
+                state.GeneratedRoundsToday++;
+                state.LastGeneratedUtcTicks = dueAt.Ticks;
+                nextTicks = SafeAddTicks(nextTicks, NextIntervalTicks());
+                state.NextGenerationUtcTicks = nextTicks;
+            }
+        }
+
+        private void EnsureGenerationSchedule(ref AppleTreeState state, DateTime now)
+        {
+            if (state.LastGeneratedUtcTicks <= 0)
+            {
+                state.LastGeneratedUtcTicks = now.Ticks;
+            }
+
+            if (string.IsNullOrWhiteSpace(state.GenerationDayKey))
+            {
+                state.GenerationDayKey = DayKey(
+                    state.NextGenerationUtcTicks > 0
+                        ? new DateTime(state.NextGenerationUtcTicks, DateTimeKind.Utc)
+                        : now);
+            }
+
+            if (state.NextGenerationUtcTicks <= 0)
+            {
+                state.NextGenerationUtcTicks = SafeAddTicks(now.Ticks, NextIntervalTicks());
+            }
+        }
+
+        private void NormalizeRestoredState(ref AppleTreeState state, int payloadVersion)
+        {
+            DateTime now = _clock.UtcNow;
+            state.LastGeneratedUtcTicks = state.LastGeneratedUtcTicks > 0
+                ? state.LastGeneratedUtcTicks
+                : now.Ticks;
+            state.PendingCount = Mathf.Max(0, state.PendingCount);
+            state.HarvestRemaining = Mathf.Max(0, state.HarvestRemaining);
+            state.HarvestTotal = Mathf.Max(state.HarvestRemaining, state.HarvestTotal);
+            state.TotalCollected = Mathf.Max(0, state.TotalCollected);
+            state.GeneratedRoundsToday = Mathf.Clamp(state.GeneratedRoundsToday, 0, MaxRoundsPerDay);
+
+            // Version 1 only stored LastGeneratedUtcTicks. Give it a schedule without
+            // resetting the existing pending cache, so old saves migrate once.
+            if (payloadVersion < SaveVersion || state.NextGenerationUtcTicks <= 0)
+            {
+                state.NextGenerationUtcTicks = SafeAddTicks(state.LastGeneratedUtcTicks, NextIntervalTicks());
+            }
+
+            if (string.IsNullOrWhiteSpace(state.GenerationDayKey))
+            {
+                state.GenerationDayKey = DayKey(
+                    new DateTime(state.NextGenerationUtcTicks, DateTimeKind.Utc));
+            }
+        }
+
+        private long NextIntervalTicks()
+        {
+            int minutes = _random.Next(GenerationIntervalMinMinutes, GenerationIntervalMaxMinutes + 1);
+            return TimeSpan.FromMinutes(minutes).Ticks;
+        }
+
+        private static string DayKey(DateTime utc)
+        {
+            return utc.ToUniversalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private static int SafeAdd(int left, int right)
         {
             long sum = (long)left + right;
-            return sum > int.MaxValue ? int.MaxValue : (int)Mathf.Max(0, (float)sum);
+            return sum >= int.MaxValue ? int.MaxValue : (int)Math.Max(0, sum);
         }
 
         private static long SafeAddTicks(long left, long right)

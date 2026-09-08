@@ -181,6 +181,7 @@ namespace GeminiLab.Modules.Pet
         private bool _storedPetSpriteVisible;
         private bool _hasAppliedWorldMapPetCollisionPolicy;
         private bool _externalMovementLocked;
+        private bool _externalAnimationControllerActive;
 
         // 可步行表面检测
         private WalkableSurface[] _walkableSurfaces = System.Array.Empty<WalkableSurface>();
@@ -198,6 +199,21 @@ namespace GeminiLab.Modules.Pet
         /// 不改变 Apartment 的移动配置，也不影响另一只桌宠。
         /// </summary>
         public bool IsMovementLocked => _externalMovementLocked;
+
+        /// <summary>
+        /// Lets a scene-specific animation owner take over Animator playback
+        /// without taking over movement, input, roaming, or bridge traversal.
+        /// </summary>
+        public bool IsExternalAnimationControllerActive => _externalAnimationControllerActive;
+
+        public void SetExternalAnimationControllerActive(bool active)
+        {
+            _externalAnimationControllerActive = active;
+            if (active)
+            {
+                _lastForcedAnimatorStateName = string.Empty;
+            }
+        }
 
         public void SetExternalMovementLock(bool locked)
         {
@@ -2083,7 +2099,7 @@ namespace GeminiLab.Modules.Pet
 
         private void UpdateMovementAnimation()
         {
-            if (_animator == null)
+            if (_externalAnimationControllerActive || _animator == null)
             {
                 return;
             }
@@ -2159,6 +2175,22 @@ namespace GeminiLab.Modules.Pet
             UpdateSideMirror(moveDir, _lastMoveDirection);
         }
 
+        /// <summary>
+        /// Applies the existing side-frame convention for a scene-specific
+        /// animation owner. This only changes SpriteRenderer facing; it does
+        /// not move the pet or alter movement state.
+        /// </summary>
+        public void ApplyExternalAnimationFacing(float horizontalDirection)
+        {
+            if (_spriteRenderer == null || Mathf.Abs(horizontalDirection) <= 0.0001f)
+            {
+                return;
+            }
+
+            bool movingRight = horizontalDirection > 0f;
+            _spriteRenderer.flipX = _sideFramesFaceLeft ? movingRight : !movingRight;
+        }
+
         private static Vector2 ResolvePlayerAnimationDirection(Vector2 rawInput, Vector2 previousDirection)
         {
             bool hasHorizontal = Mathf.Abs(rawInput.x) > 0.0001f;
@@ -2204,7 +2236,7 @@ namespace GeminiLab.Modules.Pet
 
         private void UpdateSideMirror(int moveDir, Vector2 direction)
         {
-            if (_spriteRenderer == null)
+            if (_externalAnimationControllerActive || _spriteRenderer == null)
             {
                 return;
             }
@@ -2676,6 +2708,7 @@ namespace GeminiLab.Modules.Pet
                    Mathf.Abs(previous.Mood - current.Mood) < 0.01f &&
                    Mathf.Abs(previous.Energy - current.Energy) < 0.01f &&
                    Mathf.Abs(previous.Satiety - current.Satiety) < 0.01f &&
+                   Mathf.Abs(previous.Relation - current.Relation) < 0.01f &&
                    previous.WorkRequested == current.WorkRequested &&
                    previous.TargetFurnitureId == current.TargetFurnitureId &&
                    previous.TargetFurnitureCategory == current.TargetFurnitureCategory &&

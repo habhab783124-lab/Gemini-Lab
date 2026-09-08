@@ -1,7 +1,10 @@
 # Gemini-Lab AI memory index
-# Updated: 2026-08-11
+# Updated: 2026-09-09
 
 AGENTS.md
+Assets/_Project/Scripts/Modules/HubUI/ApartmentFurnitureSelectionPresenter.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentFurnitureSelectionAuthoring.cs
+Assets/_Project/Scenes/Apartment/Apartment_Main.unity
 docs/current-task-card.md
 docs/current-task-card.json
 docs/workflow-context-packages.md
@@ -40,6 +43,8 @@ Assets/_Project/Scenes/Boot.unity
 Assets/_Project/Scenes/Apartment/Apartment_Main.unity
 Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity
 Assets/_Project/Scenes/WorldMap/WorldMap_PetAnimationPreview.unity
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs
+Assets/_Project/Scripts/Modules/Pet/PetController.cs
 Assets/_Project/Scenes/Desktop/Desktop_Overlay.unity
 Assets/_Project/Prefabs/README.md
 Assets/_Project/Prefabs/Furniture
@@ -74,6 +79,8 @@ Assets/_Project/Scripts/Modules/EmotionGarden/EmotionFlowerModels.cs
 Assets/_Project/Scripts/Modules/EmotionGarden/EmotionGardenRuntimeBootstrap.cs
 Assets/_Project/Scripts/Modules/EmotionGarden/EmotionFlowerArtCatalog.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapEmotionGardenUIPatch.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWishSystemAuthoring.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapGardenZonePatch.cs
 Assets/_Project/Art/WorldMap/flower/EmotionFlowerArtCatalog.asset
 Assets/_Project/Art/WorldMap/arrange/PlacementGrid.mat
 Assets/_Project/Art/Sprites/Environment/ApartmentScene_Extracted/README.md
@@ -100,16 +107,26 @@ Assets/_Project/Scripts/Modules/Pet/PetClickResponseLibrary.cs
 Assets/_Project/Scripts/Core/DevMode.cs
 Assets/_Project/Scripts/Modules/WorldMap/CabinReturnPortal.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapGardenZone.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishSystemController.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapCameraController.cs
 Assets/_Project/Scripts/Modules/WorldMap/ClickableSceneObject.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapInteractiveObjectFeedback.cs
 Assets/_Project/Scripts/Modules/Apple/AppleService.cs
 Assets/_Project/Scripts/Modules/Apple/IAppleService.cs
+Assets/_Project/Scripts/Modules/Apple/AppleRuntimeBootstrap.cs (idempotent AppleService registration for Boot and direct WorldMap entry)
+Assets/_Project/Scripts/Modules/Apple/AppleService.cs (cc54b1a apple currency and harvest baseline)
+Assets/_Project/Scripts/Modules/Apple/AppleTreeDropController.cs (eb1c300 drop presentation baseline)
+Assets/_Project/Scripts/Modules/Apple/AppleDropSlot.cs (authored collection feedback and Collider2D route adapter)
+Assets/_Project/Scripts/Modules/Apple/AppleTreeFeedback.cs (authored not-mature feedback without null TMP material)
+Assets/_Project/Scripts/Modules/Tarot/TarotRuntimeBootstrap.cs (initializes after AppleRuntimeBootstrap in Boot)
 Assets/_Project/Scripts/Modules/Apple/AppleTreeInteractable.cs
+Assets/_Project/Scripts/Modules/Apple/AppleTreeFeedback.cs
 Assets/_Project/Scripts/Modules/Collection/AppleBalanceDisplay.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/BootAppleBootstrapAuthoring.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAppleTreeAuthoring.cs
 Assets/_Project/Tests/EditMode/AppleResourceServiceTests.cs
+Assets/_Project/Scripts/Modules/Apple/AppleTreeDropController.cs
+Assets/_Project/Scripts/Modules/Apple/AppleDropSlot.cs
 Assets/_Project/Scripts/Modules/WorldMap/BaselineItem.cs
 Assets/_Project/Scripts/Modules/Furniture/README.md
 Assets/_Project/Scripts/Modules/Navigation/README.md
@@ -127,12 +144,26 @@ Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapEmotionGardenUIPatch.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapFlowerPlacementAuthoring.cs
 Assets/_Project/Scripts/Editor/Tools/WorldMapFlowerSoilLayoutWindow.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapFlowerPlacementController.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapFlowerPlacementRegion.cs
 Assets/_Project/Tests/EditMode/EmotionGardenPlacementPersistenceTests.cs
+Assets/_Project/Tests/EditMode/WorldMapFlowerPlacementRegionTests.cs
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapDayNightController.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapDayNightAuthoring.cs
-Assets/_Project/Art/WorldMap/garden/天气（最上层）/夜幕.png
+Assets/_Project/Art/WorldMap/weather/夜幕.png
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationTriggerAuthoring.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherModels.cs
+Assets/_Project/Scripts/Modules/WorldMap/IWeatherProvider.cs
+Assets/_Project/Scripts/Modules/WorldMap/OpenMeteoWeatherProvider.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherService.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWeatherController.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWeatherAuthoring.cs
+Assets/_Project/Art/WorldMap/weather/rain.png
+Assets/_Project/Art/WorldMap/weather/云层.jpg
+Assets/_Project/Art/WorldMap/weather/星星.PNG
+Assets/_Project/Art/WorldMap/weather/WorldMapCloudColorKey.mat
+Assets/_Project/Shaders/WorldMap/WorldMapCloudColorKey.shader
+Assets/_Project/Tests/EditMode/WorldMapWeatherTests.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapInteractiveObjectAuthoring.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationPreviewAuthoring.cs
 Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity#_SceneRoot
@@ -172,7 +203,99 @@ PackageBackups/NuGet-disabled-2026-06-02/README.md
 PackageBackups/NuGet-disabled-2026-06-02/NuGet.meta
 ProjectSettings/ProjectVersion.txt
 .cursor/mcp.json
+UserSettings/AI-Game-Developer-Config.json
+Packages/manifest.json (com.ivanmurzak.unity.mcp 0.88.0)
 tools/check-task-gate.ps1
+tools/task-card-utils.ps1
+tools/check-task-scope.ps1
+tools/verify-task.ps1
 tools/check-scene-visual-contract.ps1
 tools/check-runtime-visual-contract.ps1
+Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryMailboxPanel.cs
+Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryDetailPopup.cs
+Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryDateOption.cs
+Assets/_Project/Tests/EditMode/EmotionGardenDailySummaryTests.cs
+Assets/_Project/Scripts/Modules/EmotionGarden/IEmotionGardenService.cs (GetDailySummaryDates)
+Assets/_Project/Scripts/Modules/EmotionGarden/EmotionGardenService.cs (daily summary date query)
+Assets/_Project/Scripts/Modules/HubUI/Panels/DailySummaryDetailPopup.cs.meta
+Assets/_Project/Art/WorldMap/AI_diary/
+Assets/TextMesh Pro/Resources/Fonts & Materials/LXGWWenKai SDF.asset (AI diary Chinese glyphs)
+Assets/_Project/Scripts/Modules/HubUI/PanelOpenButton.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/DailySummaryMailboxAuthoring.cs
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (WorldMap mailbox -> daily summary routing)
+Assets/_Project/Scripts/Editor/SceneBootstrap/AutoSetup.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorPetAnimationAuthoring.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAmbientAnimationAuthoring.cs
+Assets/_Project/Scripts/Modules/Pet/PetPlayerInputController.cs
+Assets/_Project/Scripts/Modules/Persistence/PersistenceBootstrap.cs
+Assets/_Project/Scripts/Modules/Persistence/AutoSaveManager.cs
 tools/run-unity-editor-method.ps1
+Assets/_Project/Scripts/Modules/ApartmentKeepsake/ApartmentKeepsakeService.cs
+Assets/_Project/Scripts/Modules/ApartmentKeepsake/IApartmentKeepsakeService.cs
+Assets/_Project/Scripts/Modules/HubUI/ApartmentKeepsakePresenter.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentKeepsakeAuthoring.cs
+Assets/_Project/Scenes/Apartment/Apartment_Main.unity (ApartmentKeepsakeWorldPresentation / ApartmentKeepsakeOverlay)
+Assets/_Project/Art/WorldMap/ui1.0/
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (PSD local Transform restoration and Play visual check)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishService.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishSystemController.cs
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishTreeInteractable.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWishSystemAuthoring.cs
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (许愿树入口与许愿系统作者化)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishSystemController.cs (主面板许愿树星位与单一滚动详情页)
+Assets/_Project/Scripts/Modules/EmotionGarden/EmotionGardenService.cs (AI 情绪提交、花朵与每日总结持久化)
+Assets/_Project/Scripts/Modules/EmotionGarden/IEmotionGardenAiProvider.cs
+Assets/_Project/Scripts/Modules/EmotionGarden/EmotionGardenAiModels.cs
+Assets/_Project/Scripts/Modules/AI/EmotionGardenAiProvider.cs (复用 Resources/LLMConfig 的 OpenAI 兼容 AI)
+Assets/_Project/Scripts/Modules/AI/EmotionGardenAiRuntimeBootstrap.cs
+Assets/_Project/Scripts/Modules/HubUI/Panels/EmotionInputPanelStub.cs (异步情绪提交)
+Assets/_Project/Scripts/Modules/HubUI/Panels/WeeklyGardenPanelStub.cs (关键词与花语展示)
+Assets/_Project/Tests/EditMode/EmotionGardenAiTests.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorTutorialAuthoring.cs (WorldMap 室外新手指引 Scene 作者化与占位入口)
+Assets/_Project/Scripts/Modules/HubUI/Panels/SceneAuthoredImageVariantView.cs (Scene 作者化页面显隐与翻页)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (Panel_OutdoorTutorial 七页新手指引)
+Assets/_Project/Art/新手引导/outdoor/ (intro、outdoor1-6、close 页面资源)
+Assets/_Project/Art/新手引导/left.png (新手指引上一页按钮)
+Assets/_Project/Art/新手引导/right.png (新手指引下一页按钮)
+Assets/_Project/Art/WorldMap/weather/WorldMapClouds_Alpha.png (天气云层派生透明 Sprite)
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapWeatherAuthoring.cs (天气云层/星星/雨层 Scene 作者化)
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapAmbientAnimationAuthoring.cs (云层、单花和树绑定作者化)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs (云层移动与单花独立相位旋转)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (WorldMap 双宠特殊动画范围、F键和摆花事件触发)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-08 室外双宠唯一动画仲裁、实际横向位移 Idle/Move、特殊动作优先级与恢复)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 室外双宠交互白名单隔离、旧家具回退点屏蔽与动画位置保持)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 天使玩家F浇水触发、玩家/漫游半径与浇水目标朝向保持)
+Assets/_Project/Animations/WorldMap/Pet/WorldMap_Angel.controller (室外天使 AnimatorController，只读调用)
+Assets/_Project/Animations/WorldMap/Pet/WorldMap_Devil.controller (室外恶魔 AnimatorController，只读调用)
+Assets/_Project/Prefabs/Pet/Pet_Angel.prefab (室内天使 Prefab，本阶段保护对象)
+Assets/_Project/Prefabs/Pet/Pet_Devil.prefab (室内恶魔 Prefab，本阶段保护对象)
+Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationTriggerAuthoring.cs (WorldMap 双宠动画触发对象作者化)
+Assets/_Project/Scripts/Core/ServiceLocator.cs (IWorldMapSceneClickTarget contract)
+Assets/_Project/Scripts/Modules/Apple/AppleTreeInteractable.cs (WorldMap tree click target)
+Assets/_Project/Scripts/Modules/Apple/AppleDropSlot.cs (WorldMap apple collection target)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapSceneInteractionRouter.cs (outdoor click routing)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapWishTreeInteractable.cs (wish tree click target)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (serialized outdoor click target references)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetInteractionController.cs (WorldMap outdoor pet collider hit target)
+Assets/_Project/Scripts/Modules/Pet/PetPlayerInputController.cs (WorldMap disables legacy mouse takeover; indoor default remains enabled)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (WorldMap pet movement/bridge bindings and authored click colliders)
+docs/ai-memory/gemini-lab-memory-main.md (2026-09-08 apple tree runtime initialization timing)
+docs/ai-memory/gemini-lab-project-file-guide.md (2026-09-08 apple tree runtime initialization timing)
+docs/project-structure-overview.md (2026-09-08 apple tree runtime initialization timing)
+Assets/_Project/Scripts/Modules/Apple/AppleService.cs (2026-09-08 full harvest and feedback rewrite)
+Assets/_Project/Scripts/Modules/Apple/AppleDropSlot.cs (2026-09-08 authored collection text visibility)
+Assets/_Project/Scripts/Modules/Apple/AppleTreeFeedback.cs (2026-09-08 authored not-mature feedback visibility)
+Assets/_Project/Art/Fonts/NotoSansSC_SDF.asset (WorldMap apple feedback font)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs (WorldMap cloud full-span movement)
+Assets/_Project/Scripts/Modules/WorldMap/CabinReturnPortal.cs (WorldMap 室内入口 Collider2D click target)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (cloud range and indoor portal router reference)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs (Sky-referenced cloud bounds and restored endpoint-return motion)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (Sky SpriteRenderer serialized into ambient cloud controller)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 玩家控制期间屏蔽漫游特殊动画并清理目标锁存)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapFlowerPlacementController.cs (2026-09-09 作者化 Angel/Demon 区域 Collider 作为唯一有效边界，FlowerPlacementBounds 仅旧场景回退)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 移除普通 Idle/Move 的重复 Animator 控制，交还 PetController)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 室外玩家操控/漫游普通动画唯一控制者、真实横向位移判断与 Any State 重置规避)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 普通移动朝向使用玩家输入/漫游目标并过滤实际位移抖动)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 普通移动朝向收敛为实际横向位移单一来源)
+Assets/_Project/Scripts/Modules/Pet/PetController.cs (2026-09-09 WorldMap 动画控制权隔离接口，移动/漫游/过桥逻辑保持不变)

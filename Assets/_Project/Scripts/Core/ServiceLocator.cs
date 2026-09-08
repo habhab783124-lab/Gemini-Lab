@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace GeminiLab.Core
 {
@@ -59,5 +60,17 @@ namespace GeminiLab.Core
         {
             Services.Clear();
         }
+    }
+
+    /// <summary>
+    /// A Scene-authored click target that can be registered with the WorldMap router.
+    /// </summary>
+    public interface IWorldMapSceneClickTarget
+    {
+        bool IsWorldMapInteractionEnabled { get; }
+        int WorldMapInteractionPriority { get; }
+        Renderer? WorldMapSortingRenderer { get; }
+        bool ContainsWorldPoint(Vector2 worldPoint);
+        void HandleWorldMapClick();
     }
 }

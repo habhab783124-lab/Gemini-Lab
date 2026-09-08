@@ -7,14 +7,27 @@ namespace GeminiLab.Modules.WorldMap
 {
     /// <summary>
     /// 可点击的场景交互入口。
-    /// 当前阶段保留日志和序列化 UnityEvent，具体业务交互由后续任务接入。
+    /// 点击通过场景中作者化的序列化 UnityEvent 接入具体业务。
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
-    public sealed class ClickableSceneObject : MonoBehaviour
+    public sealed class ClickableSceneObject : MonoBehaviour, IWorldMapSceneClickTarget
     {
         [SerializeField] private string _displayName = "场景物";
         [SerializeField] private string _clickMessage = "点击了 {0}";
         [SerializeField] private UnityEvent _onClicked = new();
+        [SerializeField] private int _interactionPriority;
+
+        /// <summary>
+        /// Editor authoring surface for explicit scene click bindings.
+        /// </summary>
+        public UnityEvent OnClicked => _onClicked;
+
+        public bool IsWorldMapInteractionEnabled => isActiveAndEnabled;
+
+        public int WorldMapInteractionPriority => _interactionPriority;
+
+        public Renderer? WorldMapSortingRenderer => GetComponent<SpriteRenderer>();
+
         private Collider2D? _clickCollider;
 
         private void Awake()
@@ -24,6 +37,11 @@ namespace GeminiLab.Modules.WorldMap
 
         private void OnMouseDown()
         {
+            if (WorldMapSceneInteractionRouter.Active is { } router && router.IsRegistered(this))
+            {
+                return;
+            }
+
             if (ClickOcclusionUtility.IsPointerOverUI())
             {
                 return;
@@ -34,6 +52,17 @@ namespace GeminiLab.Modules.WorldMap
                 return;
             }
 
+            HandleWorldMapClick();
+        }
+
+        public bool ContainsWorldPoint(Vector2 worldPoint)
+        {
+            _clickCollider ??= GetComponent<Collider2D>();
+            return _clickCollider != null && _clickCollider.enabled && _clickCollider.OverlapPoint(worldPoint);
+        }
+
+        public void HandleWorldMapClick()
+        {
             Debug.Log($"[ClickableSceneObject] {string.Format(_clickMessage, _displayName)}");
             _onClicked.Invoke();
         }

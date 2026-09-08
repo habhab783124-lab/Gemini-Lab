@@ -24,6 +24,7 @@ namespace GeminiLab.Editor.SceneBootstrap
         private const string ScenePath = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
         private const string ArrangeArtDir = "Assets/_Project/Art/WorldMap/arrange";
         private const string FlowerCodexArtDir = "Assets/_Project/Art/WorldMap/花朵图鉴";
+        private const string PlacementSingleArtDir = FlowerCodexArtDir + "/花朵放置";
         private const string GridMaterialPath = ArrangeArtDir + "/PlacementGrid.mat";
         private const string GridReferencePath = "Assets/_Project/Art/WorldMap/garden/中景/花丛.png";
         private const int PlacementSlotCount = 32;
@@ -105,9 +106,11 @@ namespace GeminiLab.Editor.SceneBootstrap
             }
 
             var surface = EnsurePlacementBounds();
+            var regions = EnsurePlacementRegions(root.transform, surface);
             var grid = EnsurePlacementGrid(root.transform);
             var material = EnsureGridMaterial();
             ConfigureGrid(grid, surface, material);
+            ConfigureFixedBaselineDefinitions(grid, surface, material);
             var previewRoot = EnsurePreviewRoot(root.transform);
             var previewBindings = ConfigurePreview(previewRoot, uiLayer);
             var slots = ConfigurePlacementSlots(root.transform, uiLayer);
@@ -122,6 +125,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             SetObject(so, "_previewRoot", previewRoot);
             SetObject(so, "_placementRoot", root.transform);
             SetObject(so, "_placementSurface", surface);
+            ConfigurePlacementRegions(so, regions);
             SetObject(so, "_statusText", statusText);
             SetObject(so, "_hintBubble", hintBubble);
             so.FindProperty("_gridOrigin")!.vector2Value = Vector2.zero;
@@ -272,7 +276,7 @@ namespace GeminiLab.Editor.SceneBootstrap
 
                 var entry = EnsureFlowerEntry(list, layer, i, displayName,
                     LoadSprite(FlowerCodexArtDir + "/花朵/" + ownerDisplay + "-" + emotion + ".PNG"),
-                    LoadSprite(FlowerCodexArtDir + "/花枝/" + ownerDisplay + "-" + emotion + "（完整）.PNG"),
+                    LoadSprite(PlacementSingleArtDir + "/" + ownerDisplay + "-" + emotion + ".PNG"),
                     LoadSprite(FlowerCodexArtDir + "/花丛/" + ownerDisplay + "-" + emotion + "（花丛）.PNG"));
 
                 var option = options.GetArrayElementAtIndex(i);
@@ -706,17 +710,8 @@ namespace GeminiLab.Editor.SceneBootstrap
                     new Vector3(bounds.min.x, y, 0f), new Vector3(bounds.max.x, y, 0f), material);
             }
 
-            // BaselineItem 层是运行时的实际落位层；水平辅助线使用同一层的基准线，
-            // 相邻层交替半格错位，避免所有层垂直重合。
-            int layerIndex = 0;
-            foreach (BaselineItem baseline in UnityEngine.Object.FindObjectsByType<BaselineItem>(FindObjectsSortMode.None))
-            {
-                if (!baseline.isActiveAndEnabled) continue;
-                float offset = layerIndex++ % 2 == 0 ? 0f : cell.x * 0.5f;
-                CreateGridLine(grid.transform, "BaselineLine_" + baseline.name,
-                    new Vector3(bounds.min.x + offset, baseline.EffectiveBaselineY, 0f),
-                    new Vector3(bounds.max.x + offset, baseline.EffectiveBaselineY, 0f), material);
-            }
+            // 基线由 ConfigureFixedBaselineDefinitions 单独作者化为十一条固定节点。
+            // 这里不能再遍历 BaselineItem 生成线，否则删除物体会错误地删除基线。
             grid.SetActive(false);
         }
 
@@ -766,18 +761,113 @@ namespace GeminiLab.Editor.SceneBootstrap
         private static BoxCollider2D EnsurePlacementBounds()
         {
             var boundsGo = GameObject.Find("FlowerPlacementBounds");
+            bool createdObject = boundsGo == null;
             if (boundsGo == null)
             {
                 boundsGo = new GameObject("FlowerPlacementBounds");
                 boundsGo.transform.position = new Vector3(0f, -3f, 0f);
             }
 
-            var box = GetOrAdd<BoxCollider2D>(boundsGo);
-            box.size = new Vector2(36f, 8.96f);
-            box.offset = Vector2.zero;
+            BoxCollider2D? existingBox = boundsGo.GetComponent<BoxCollider2D>();
+            bool initializeShape = createdObject || existingBox == null;
+            var box = existingBox ?? boundsGo.AddComponent<BoxCollider2D>();
+            if (initializeShape || box.size.sqrMagnitude <= 0.0001f)
+            {
+                box.size = new Vector2(36f, 8.96f);
+                box.offset = Vector2.zero;
+            }
             box.isTrigger = true;
             box.enabled = false;
             return box;
+        }
+
+        private static List<WorldMapFlowerPlacementRegion> EnsurePlacementRegions(
+            Transform parent,
+            Collider2D fallbackSurface)
+        {
+            Bounds fallbackBounds = GetAuthoringBounds(fallbackSurface);
+            float halfWidth = Mathf.Max(0.5f, fallbackBounds.size.x * 0.5f);
+            var regions = new List<WorldMapFlowerPlacementRegion>(2)
+            {
+                EnsurePlacementRegion(parent, "FlowerPlacementRegion_Angel",
+                    EmotionFlowerCatalog.OwnerAngel,
+                    new Vector2(fallbackBounds.min.x + halfWidth * 0.5f, fallbackBounds.center.y),
+                    new Vector2(halfWidth, fallbackBounds.size.y)),
+                EnsurePlacementRegion(parent, "FlowerPlacementRegion_Demon",
+                    EmotionFlowerCatalog.OwnerDemon,
+                    new Vector2(fallbackBounds.min.x + halfWidth + halfWidth * 0.5f, fallbackBounds.center.y),
+                    new Vector2(halfWidth, fallbackBounds.size.y))
+            };
+
+            return regions;
+        }
+
+        private static WorldMapFlowerPlacementRegion EnsurePlacementRegion(
+            Transform parent,
+            string name,
+            string owner,
+            Vector2 defaultCenter,
+            Vector2 defaultSize)
+        {
+            Transform? existing = parent.Find(name);
+            bool createdObject = existing == null;
+            GameObject regionObject = existing != null
+                ? existing.gameObject
+                : EnsureChild(parent, name, 0);
+            WorldMapFlowerPlacementRegion? existingRegion =
+                regionObject.GetComponent<WorldMapFlowerPlacementRegion>();
+            var region = existingRegion ?? GetOrAdd<WorldMapFlowerPlacementRegion>(regionObject);
+            BoxCollider2D? existingBox = regionObject.GetComponent<BoxCollider2D>();
+            var box = existingBox ?? regionObject.AddComponent<BoxCollider2D>();
+
+            Vector3 serializedPosition = regionObject.transform.localPosition;
+            if (regionObject.transform is RectTransform existingRectTransform)
+                serializedPosition = existingRectTransform.anchoredPosition;
+            bool isLegacyZeroOffset = existingRegion != null &&
+                                      existingRegion.DefaultsInitialized &&
+                                      box.offset.sqrMagnitude <= 0.0001f &&
+                                      serializedPosition.sqrMagnitude > 0.0001f;
+            bool initializeShape = createdObject || existingRegion == null ||
+                                   !existingRegion.DefaultsInitialized || isLegacyZeroOffset;
+
+            if (initializeShape || box.size.sqrMagnitude <= 0.0001f)
+            {
+                regionObject.transform.localPosition = Vector3.zero;
+                if (regionObject.transform is RectTransform rectTransform)
+                {
+                    rectTransform.anchorMin = Vector2.zero;
+                    rectTransform.anchorMax = Vector2.zero;
+                    rectTransform.pivot = Vector2.zero;
+                    rectTransform.anchoredPosition = Vector2.zero;
+                }
+                regionObject.transform.rotation = Quaternion.identity;
+                regionObject.transform.localScale = Vector3.one;
+                box.size = defaultSize;
+                Vector3 localCenter = regionObject.transform.InverseTransformPoint(
+                    new Vector3(defaultCenter.x, defaultCenter.y, 0f));
+                box.offset = new Vector2(localCenter.x, localCenter.y);
+            }
+
+            box.isTrigger = true;
+            box.enabled = false;
+            var serialized = new SerializedObject(region);
+            serialized.FindProperty("_owner")!.stringValue = EmotionFlowerCatalog.NormalizeOwner(owner);
+            serialized.FindProperty("_boundsCollider")!.objectReferenceValue = box;
+            serialized.FindProperty("_defaultsInitialized")!.boolValue = true;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(region);
+            EditorUtility.SetDirty(box);
+            return region;
+        }
+
+        private static void ConfigurePlacementRegions(
+            SerializedObject controller,
+            List<WorldMapFlowerPlacementRegion> regions)
+        {
+            var property = controller.FindProperty("_placementRegions")!;
+            property.arraySize = regions.Count;
+            for (int i = 0; i < regions.Count; i++)
+                property.GetArrayElementAtIndex(i)!.objectReferenceValue = regions[i];
         }
 
         private static Material? EnsureGridMaterial()
@@ -816,8 +906,8 @@ namespace GeminiLab.Editor.SceneBootstrap
                     definitions.Add(new FlowerDefinition
                     {
                         Id = owner + "|" + emotion,
-                        SingleSprite = LoadSprite(FlowerCodexArtDir + "/花枝/" +
-                                                   ownerDisplay + "-" + emotion + "（完整）.PNG"),
+                        SingleSprite = LoadSprite(PlacementSingleArtDir + "/" +
+                                                   ownerDisplay + "-" + emotion + ".PNG"),
                         ClusterSprite = LoadSprite(FlowerCodexArtDir + "/花丛/" +
                                                     ownerDisplay + "-" + emotion + "（花丛）.PNG")
                     });
@@ -863,77 +953,223 @@ namespace GeminiLab.Editor.SceneBootstrap
             return new Vector2(3.99f, 2.22f);
         }
 
-        private static void ConfigurePlacementLayers(SerializedObject controller, Collider2D surface)
+        private sealed class FixedBaselineSpec
         {
-            Bounds placementBounds = GetAuthoringBounds(surface);
-            var layers = new List<BaselineItem>();
-            foreach (BaselineItem baseline in UnityEngine.Object.FindObjectsByType<BaselineItem>(FindObjectsSortMode.None))
+            public readonly string Id;
+            public readonly string LineName;
+            public readonly int Slot;
+            public readonly WorldMapBaselineDefinition.BaselineGroup Group;
+            public readonly Color Color;
+            public readonly float BaselineY;
+            public readonly float XOffset;
+            public readonly bool AllowFlowerPlacement;
+
+            public FixedBaselineSpec(string id, string lineName, int slot,
+                WorldMapBaselineDefinition.BaselineGroup group, Color color,
+                float baselineY, float xOffset, bool allowFlowerPlacement)
             {
-                if (!baseline.isActiveAndEnabled) continue;
-                if (baseline.GetComponent<PetController>() != null) continue;
-                // 只把草地区域内的 BaselineItem 作为可吸附层；天空、房屋、宠物等
-                // 场景装饰仍保留自身遮挡层，但不应把摆放点吸附到屏幕外。
-                float baselineY = baseline.EffectiveBaselineY;
-                if (baselineY < placementBounds.min.y || baselineY > placementBounds.max.y)
-                    continue;
-                if (!layers.Contains(baseline)) layers.Add(baseline);
+                Id = id;
+                LineName = lineName;
+                Slot = slot;
+                Group = group;
+                Color = color;
+                BaselineY = baselineY;
+                XOffset = xOffset;
+                AllowFlowerPlacement = allowFlowerPlacement;
+            }
+        }
+
+        private static readonly FixedBaselineSpec[] FixedBaselineSpecs =
+        {
+            new("Environment_Sky", "BaselineLine_天空", 0,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), 5.97f, 0f, false),
+            new("Environment_Stars", "BaselineLine_星星", 1,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), 8.4f, 0f, false),
+            new("Environment_Clouds", "BaselineLine_云", 2,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), 6.8f, 0f, false),
+            new("Environment_Back", "BaselineLine_大树_后", 3,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), 2.3371658f, 0f, false),
+            new("Environment_Front", "BaselineLine_大树_前", 4,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), 1.5571656f, 0f, false),
+            new("Environment_Ground", "BaselineLine_地面", 5,
+                WorldMapBaselineDefinition.BaselineGroup.Environment,
+                new Color(0.55f, 0.88f, 1f, 0.95f), -3.6354f, 0f, false),
+            new("Flower_Back", "BaselineLine_花丛 4", 6,
+                WorldMapBaselineDefinition.BaselineGroup.Flower,
+                Color.white, -2.5628343f, 2.005f, true),
+            new("Flower_MidBack", "BaselineLine_花丛 1", 7,
+                WorldMapBaselineDefinition.BaselineGroup.Flower,
+                Color.white, -2.5728343f, 2.005f, true),
+            new("Character", "BaselineLine_Pet_Angel", 8,
+                WorldMapBaselineDefinition.BaselineGroup.Character,
+                new Color(1f, 0.18f, 0.18f, 0.95f), -3.752758f, 0f, false),
+            new("Flower_MidFront", "BaselineLine_花丛 2", 9,
+                WorldMapBaselineDefinition.BaselineGroup.Flower,
+                Color.white, -3.7528343f, 0f, true),
+            new("Flower_Front", "BaselineLine_花丛 3", 10,
+                WorldMapBaselineDefinition.BaselineGroup.Flower,
+                Color.white, -4.3128343f, 2.005f, true)
+        };
+
+        private static void ConfigureFixedBaselineDefinitions(
+            GameObject grid, Collider2D surface, Material? material)
+        {
+            if (grid == null || grid.name != "FlowerPlacementGrid" ||
+                grid.transform.parent == null || grid.transform.parent.name != "WorldMapPlacedFlowers")
+                return;
+
+            Bounds bounds = GetAuthoringBounds(surface);
+            var retained = new HashSet<string>();
+            for (int i = 0; i < FixedBaselineSpecs.Length; i++)
+            {
+                FixedBaselineSpec spec = FixedBaselineSpecs[i];
+                retained.Add(spec.LineName);
+                GameObject lineObject = EnsureChild(grid.transform, spec.LineName, 0);
+                LineRenderer line = GetOrAdd<LineRenderer>(lineObject);
+                WorldMapBaselineDefinition definition = GetOrAdd<WorldMapBaselineDefinition>(lineObject);
+                bool firstAuthoring = string.IsNullOrEmpty(definition.Id);
+                line.useWorldSpace = true;
+                line.positionCount = 2;
+                if (firstAuthoring)
+                {
+                    line.SetPosition(0, new Vector3(bounds.min.x + spec.XOffset, spec.BaselineY, 0f));
+                    line.SetPosition(1, new Vector3(bounds.max.x + spec.XOffset, spec.BaselineY, 0f));
+                }
+                line.startWidth = 0.025f;
+                line.endWidth = 0.025f;
+                line.startColor = spec.Color;
+                line.endColor = spec.Color;
+                line.sortingLayerName = FlowerSortingLayerName;
+                line.sortingOrder = 112;
+                if (material != null) line.sharedMaterial = material;
+
+                float baselineY = line.GetPosition(0).y;
+                SerializedObject serialized = new SerializedObject(definition);
+                serialized.FindProperty("_id")!.stringValue = spec.Id;
+                serialized.FindProperty("_slotIndex")!.intValue = spec.Slot;
+                SerializedProperty renderOrder = serialized.FindProperty("_renderOrder")!;
+                if (renderOrder.intValue < 0)
+                    renderOrder.intValue = spec.Slot;
+                serialized.FindProperty("_group")!.enumValueIndex = (int)spec.Group;
+                serialized.FindProperty("_editorColor")!.colorValue = spec.Color;
+                serialized.FindProperty("_displayName")!.stringValue = spec.Id;
+                serialized.FindProperty("_allowFlowerPlacement")!.boolValue = spec.AllowFlowerPlacement;
+                serialized.FindProperty("_xOffset")!.floatValue = spec.XOffset;
+                serialized.FindProperty("_minX")!.floatValue = bounds.min.x;
+                serialized.FindProperty("_maxX")!.floatValue = bounds.max.x;
+                serialized.FindProperty("_baselineY")!.floatValue = baselineY;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(definition);
+
+                BindBaselineItems(definition, spec);
             }
 
-            layers.Sort((a, b) => a.SortingOrder.CompareTo(b.SortingOrder));
-            var property = controller.FindProperty("_placementLayers")!;
-            property.arraySize = layers.Count;
-            for (int i = 0; i < layers.Count; i++)
+            // 只清理 FlowerPlacementGrid 下旧的 BaselineLine 节点，绝不触碰场景根对象。
+            for (int i = grid.transform.childCount - 1; i >= 0; i--)
             {
-                var element = property.GetArrayElementAtIndex(i);
-                element.FindPropertyRelative("_id")!.stringValue = layers[i].name;
-                element.FindPropertyRelative("_baselineY")!.floatValue = layers[i].EffectiveBaselineY;
-                element.FindPropertyRelative("_sortingOrder")!.intValue = layers[i].SortingOrder;
-                element.FindPropertyRelative("_xMin")!.floatValue = layers[i].MinX;
-                element.FindPropertyRelative("_xMax")!.floatValue = layers[i].MaxX;
-                element.FindPropertyRelative("_xOffset")!.floatValue = i % 2 == 0 ? 0f : LoadGridCellSize().x * 0.5f;
+                Transform child = grid.transform.GetChild(i);
+                if (child.name.StartsWith("BaselineLine_", StringComparison.Ordinal) &&
+                    !retained.Contains(child.name))
+                    UnityEngine.Object.DestroyImmediate(child.gameObject);
+            }
+        }
+
+        private static void BindBaselineItems(
+            WorldMapBaselineDefinition definition, FixedBaselineSpec spec)
+        {
+            BaselineItem[] items = UnityEngine.Object.FindObjectsByType<BaselineItem>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < items.Length; i++)
+            {
+                BaselineItem item = items[i];
+                if (!item.gameObject.scene.IsValid() || item.gameObject.scene.path != ScenePath)
+                    continue;
+                if (ResolveBaselineSlot(item.name) != spec.Slot) continue;
+
+                SerializedObject serialized = new SerializedObject(item);
+                serialized.FindProperty("_baselineDefinition")!.objectReferenceValue = definition;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                item.RefreshBaselineBinding();
+                EditorUtility.SetDirty(item);
+            }
+        }
+
+        private static int ResolveBaselineSlot(string objectName)
+        {
+            string normalized = objectName.Replace(" ", string.Empty).Replace("_", string.Empty);
+            if (normalized == "天空") return 0;
+            if (normalized == "大树3" || normalized == "大树4" || normalized == "大树5") return 3;
+            if (normalized == "大树1" || normalized == "大树2" || normalized == "邮箱" || normalized == "桥" || normalized == "室内") return 4;
+            if (normalized == "地面") return 5;
+            if (normalized == "花丛4") return 6;
+            if (normalized == "花丛1") return 7;
+            if (normalized == "PetAngel" || normalized == "PetDevil" || normalized == "天使1" || normalized == "天使2" || normalized == "天使3") return 8;
+            if (normalized == "花丛2") return 9;
+            if (normalized == "花丛3") return 10;
+            return -1;
+        }
+
+        private static void ConfigurePlacementLayers(SerializedObject controller, Collider2D surface)
+        {
+            GameObject? grid = GameObject.Find("FlowerPlacementGrid");
+            if (grid == null) return;
+
+            var definitions = new List<WorldMapBaselineDefinition>();
+            foreach (WorldMapBaselineDefinition definition in
+                     grid.GetComponentsInChildren<WorldMapBaselineDefinition>(true))
+            {
+                if (definition.Group == WorldMapBaselineDefinition.BaselineGroup.Flower &&
+                    definition.AllowFlowerPlacement)
+                    definitions.Add(definition);
+            }
+            definitions.Sort((left, right) => left.SlotIndex.CompareTo(right.SlotIndex));
+
+            SerializedProperty property = controller.FindProperty("_placementLayers")!;
+            property.arraySize = definitions.Count;
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                WorldMapBaselineDefinition definition = definitions[i];
+                SerializedProperty element = property.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("_sourceBaselineDefinition")!.objectReferenceValue = definition;
             }
         }
 
         private static void EnsureWorldMapPetBaselines()
         {
+            WorldMapBaselineDefinition? characterDefinition = null;
+            GameObject? grid = GameObject.Find("FlowerPlacementGrid");
+            if (grid != null)
+            {
+                foreach (WorldMapBaselineDefinition candidate in
+                         grid.GetComponentsInChildren<WorldMapBaselineDefinition>(true))
+                {
+                    if (candidate.Group == WorldMapBaselineDefinition.BaselineGroup.Character)
+                    {
+                        characterDefinition = candidate;
+                        break;
+                    }
+                }
+            }
+
             foreach (string petName in new[] { "Pet_Angel", "Pet_Devil" })
             {
                 GameObject? pet = GameObject.Find(petName);
                 if (pet == null) continue;
 
                 BaselineItem baseline = GetOrAdd<BaselineItem>(pet);
-                Collider2D? collider = pet.GetComponent<Collider2D>();
-                float baselineY = collider != null ? collider.bounds.min.y : pet.transform.position.y;
-                int sortingOrder = ResolveNearestBaselineSortingOrder(baseline, baselineY);
-
                 var serialized = new SerializedObject(baseline);
-                serialized.FindProperty("_baselineY")!.floatValue = baselineY;
-                serialized.FindProperty("_minX")!.floatValue = -10f;
-                serialized.FindProperty("_maxX")!.floatValue = 10f;
-                serialized.FindProperty("_sortingOrder")!.intValue = sortingOrder;
+                serialized.FindProperty("_baselineDefinition")!.objectReferenceValue = characterDefinition;
                 serialized.FindProperty("_allowDrag")!.boolValue = false;
                 serialized.FindProperty("_solidCollider")!.boolValue = true;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
+                baseline.RefreshSortingOrder();
                 EditorUtility.SetDirty(baseline);
             }
-        }
-
-        private static int ResolveNearestBaselineSortingOrder(BaselineItem petBaseline, float baselineY)
-        {
-            int sortingOrder = 0;
-            float bestDistance = float.PositiveInfinity;
-            foreach (BaselineItem candidate in UnityEngine.Object.FindObjectsByType<BaselineItem>(FindObjectsSortMode.None))
-            {
-                if (candidate == petBaseline || candidate.GetComponent<PetController>() != null) continue;
-
-                float distance = Mathf.Abs(candidate.EffectiveBaselineY - baselineY);
-                if (distance >= bestDistance) continue;
-
-                bestDistance = distance;
-                sortingOrder = candidate.SortingOrder;
-            }
-
-            return sortingOrder;
         }
 
         private static Sprite? LoadSprite(string path)

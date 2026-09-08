@@ -1,5 +1,8 @@
 #nullable enable
 #if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using GeminiLab.Modules.WorldMap;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -44,12 +47,23 @@ namespace GeminiLab.Editor.SceneBootstrap
                     continue;
                 }
 
-                changed |= EnsureCollider(go, target.Name);
+                if (IsSilhouetteTree(target.Name))
+                {
+                    changed |= EnsureSilhouetteCollider(go, target.Name);
+                }
+                else
+                {
+                    changed |= EnsureCollider(go, target.Name);
+                }
                 changed |= EnsureFeedback(go, target.Name);
 
                 if (target.IsCabin)
                 {
                     changed |= EnsureCabinPortal(go);
+                }
+                else if (target.Name == "大树 1")
+                {
+                    changed |= RemoveClickable(go);
                 }
                 else
                 {
@@ -63,7 +77,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                 EditorSceneManager.SaveScene(scene);
             }
 
-            Debug.Log("[WorldMapInteractiveObjectAuthoring] 室内、邮箱和 5 棵大树的悬停缩放与点击入口已作者化");
+            Debug.Log("[WorldMapInteractiveObjectAuthoring] 室内、邮箱和大树 2～5 的悬停缩放与点击入口已作者化；大树 1 仅保留悬停反馈");
         }
 
         private static bool EnsureCollider(GameObject go, string displayName)
@@ -85,6 +99,147 @@ namespace GeminiLab.Editor.SceneBootstrap
             }
 
             return false;
+        }
+
+        private static bool IsSilhouetteTree(string displayName)
+        {
+            return displayName == "大树 2" ||
+                   displayName == "大树 3" ||
+                   displayName == "大树 4" ||
+                   displayName == "大树 5";
+        }
+
+        private static bool EnsureSilhouetteCollider(GameObject go, string displayName)
+        {
+            var spriteRenderer = go.GetComponent<SpriteRenderer>();
+            if (spriteRenderer == null || spriteRenderer.sprite == null)
+            {
+                Debug.LogError($"[WorldMapInteractiveObjectAuthoring] {displayName} 缺少 SpriteRenderer 或 Sprite，无法生成轮廓碰撞体");
+                return false;
+            }
+
+            Vector2[][]? generatedPaths = GenerateSpriteOutline(spriteRenderer.sprite);
+            var validPaths = new List<Vector2[]>();
+            if (generatedPaths != null)
+            {
+                foreach (var generatedPath in generatedPaths)
+                {
+                    if (generatedPath == null || generatedPath.Length < 3)
+                    {
+                        continue;
+                    }
+
+                    var path = new Vector2[generatedPath.Length];
+                    for (int i = 0; i < generatedPath.Length; i++)
+                    {
+                        Vector2 point = generatedPath[i];
+                        if (spriteRenderer.flipX)
+                        {
+                            point.x = -point.x;
+                        }
+
+                        if (spriteRenderer.flipY)
+                        {
+                            point.y = -point.y;
+                        }
+
+                        path[i] = point;
+                    }
+
+                    validPaths.Add(path);
+                }
+            }
+
+            if (validPaths.Count == 0)
+            {
+                Debug.LogError($"[WorldMapInteractiveObjectAuthoring] {displayName} 的 Sprite 未生成有效透明轮廓，保留现有碰撞体");
+                return false;
+            }
+
+            var polygon = go.GetComponent<PolygonCollider2D>();
+            bool changed = false;
+            if (polygon == null)
+            {
+                polygon = Undo.AddComponent<PolygonCollider2D>(go);
+                changed = true;
+            }
+
+            if (polygon.isTrigger)
+            {
+                polygon.isTrigger = false;
+                changed = true;
+            }
+
+            polygon.pathCount = validPaths.Count;
+            for (int i = 0; i < validPaths.Count; i++)
+            {
+                polygon.SetPath(i, validPaths[i]);
+            }
+
+            EditorUtility.SetDirty(polygon);
+            changed = true;
+
+            var box = go.GetComponent<BoxCollider2D>();
+            if (box != null)
+            {
+                Undo.DestroyObjectImmediate(box);
+                changed = true;
+            }
+
+            Debug.Log($"[WorldMapInteractiveObjectAuthoring] {displayName} 已作者化 Sprite 轮廓 PolygonCollider2D（{validPaths.Count} 个路径）");
+            return changed;
+        }
+
+        private static Vector2[][]? GenerateSpriteOutline(Sprite sprite)
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException exception)
+                {
+                    types = exception.Types;
+                }
+
+                foreach (var utilityType in types)
+                {
+                    if (utilityType == null || utilityType.FullName == null ||
+                        utilityType.FullName.IndexOf("SpriteUtility", StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+
+                    var methods = utilityType.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    foreach (var method in methods)
+                    {
+                        if (method.Name.IndexOf("GenerateOutline", StringComparison.OrdinalIgnoreCase) < 0)
+                        {
+                            continue;
+                        }
+
+                        var parameters = method.GetParameters();
+                        if (parameters.Length != 4 ||
+                            parameters[0].ParameterType != typeof(Sprite) ||
+                            parameters[1].ParameterType != typeof(float) ||
+                            parameters[3].ParameterType != typeof(bool))
+                        {
+                            continue;
+                        }
+
+                        object alphaTolerance = parameters[2].ParameterType == typeof(byte)
+                            ? (object)(byte)8
+                            : 8;
+                        object? result = method.Invoke(null, new object[] { sprite, 0.02f, alphaTolerance, true });
+                        return result as Vector2[][];
+                    }
+                }
+            }
+
+            Debug.LogError("[WorldMapInteractiveObjectAuthoring] 未找到可用的 Sprite 轮廓 API");
+            return null;
         }
 
         private static bool EnsureFeedback(GameObject go, string displayName)
@@ -137,7 +292,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             var oldClickable = go.GetComponent<ClickableSceneObject>();
             if (oldClickable != null)
             {
-                Object.DestroyImmediate(oldClickable);
+                UnityEngine.Object.DestroyImmediate(oldClickable);
             }
 
             if (go.GetComponent<CabinReturnPortal>() != null)
@@ -184,6 +339,18 @@ namespace GeminiLab.Editor.SceneBootstrap
             }
 
             return created || changed;
+        }
+
+        private static bool RemoveClickable(GameObject go)
+        {
+            var clickable = go.GetComponent<ClickableSceneObject>();
+            if (clickable == null)
+            {
+                return false;
+            }
+
+            Undo.DestroyObjectImmediate(clickable);
+            return true;
         }
     }
 }

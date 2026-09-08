@@ -11,13 +11,17 @@ namespace GeminiLab.Editor.SceneBootstrap
     public static class AutoSetup
     {
         private const string SetupDoneKey = "GeminiLab.AutoSetupDone";
-        private const int ExpectedVersion = 65;
+        private const int ExpectedVersion = 71;
 
         static AutoSetup()
         {
             EditorApplication.delayCall += () =>
             {
                 int currentVersion = EditorPrefs.GetInt(SetupDoneKey, 0);
+                // 已完成的迁移不能再根据场景文本做“自动返修”。Scene/Prefab
+                // 才是作者化结果的唯一来源；重复 Patch 会覆盖用户在 Inspector、
+                // Animator 与场景中的手工调整。只有显式提升 ExpectedVersion（或
+                // 用户主动 Reset）时，才执行一次对应版本迁移。
                 if (currentVersion >= ExpectedVersion) return;
 
                 if (EditorApplication.isPlayingOrWillChangePlaymode || Application.isPlaying)
@@ -446,6 +450,28 @@ namespace GeminiLab.Editor.SceneBootstrap
                         ApartmentAppleBalanceAuthoring.Patch();
                     }
 
+                    if (currentVersion < 66)
+                    {
+                        DailySummaryMailboxAuthoring.Patch();
+                        WorldMapOutdoorPetAnimationAuthoring.Patch();
+                    }
+
+                    if (currentVersion < 69)
+                    {
+                        ApartmentFurnitureSelectionAuthoring.Patch();
+                    }
+
+                    if (currentVersion < 70)
+                    {
+                        WorldMapAppleTreeAuthoring.Patch();
+                    }
+
+                    if (currentVersion < 71)
+                    {
+                        // 只应用本次 UI 增量，避免重建已有场景层级和花朵对象。
+                        WorldMapEmotionGardenUIPatch.PatchUiTaskMinimizedAll();
+                    }
+
                     EditorPrefs.SetInt(SetupDoneKey, ExpectedVersion);
                     Debug.Log($"[AutoSetup] 升级到版本 {ExpectedVersion} 完成。");
                 }
@@ -528,6 +554,45 @@ namespace GeminiLab.Editor.SceneBootstrap
             so.FindProperty("_moveSpeed").floatValue = 1.2f;
             so.FindProperty("_horizontalOnly").boolValue = true;
             so.ApplyModifiedProperties();
+        }
+
+        private static bool RequiresLatestAuthoring()
+        {
+            const string apartmentScene = "Assets/_Project/Scenes/Apartment/Apartment_Main.unity";
+            const string worldMapScene = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
+            if (!System.IO.File.Exists(apartmentScene) || !System.IO.File.Exists(worldMapScene))
+            {
+                return true;
+            }
+
+            string apartmentText = System.IO.File.ReadAllText(apartmentScene);
+            string worldMapText = System.IO.File.ReadAllText(worldMapScene);
+            int freeControlCount = worldMapText.Split(
+                new[] { "_preferControlOnEnable: 0" },
+                System.StringSplitOptions.None).Length - 1;
+            int gardenZoneScriptCount = CountOccurrences(worldMapText, "guid: e808b994ed5a1844f8fd069d9c18ff9d");
+            return !apartmentText.Contains("MailboxButton", System.StringComparison.Ordinal) ||
+                   !worldMapText.Contains("c24671ba6d25cb246bdc627378a8fa9e", System.StringComparison.Ordinal) ||
+                   freeControlCount < 2 ||
+                   !worldMapText.Contains("WorldMapAppleDrops", System.StringComparison.Ordinal) ||
+                   !worldMapText.Contains("AppleTreeDropController", System.StringComparison.Ordinal) ||
+                   !worldMapText.Contains("InputVisual_Focused", System.StringComparison.Ordinal) ||
+                   !worldMapText.Contains("WishInputFocusedVisual", System.StringComparison.Ordinal) ||
+                   gardenZoneScriptCount < 4;
+        }
+
+        private static int CountOccurrences(string text, string value)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(value)) return 0;
+            int count = 0;
+            int offset = 0;
+            while ((offset = text.IndexOf(value, offset, System.StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                offset += value.Length;
+            }
+
+            return count;
         }
 
         public static void Reset()

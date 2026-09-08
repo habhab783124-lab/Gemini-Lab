@@ -1,6 +1,6 @@
 # Gemini-Lab 上下文包
 
-Updated: 2026-05-12
+Updated: 2026-08-21
 
 ## 这份文档的定位
 这份文档定义 Gemini-Lab 当前推荐的“作用域上下文组装”方式。
@@ -105,6 +105,24 @@ Updated: 2026-05-12
 
 如果这 6 项还没写清楚，就不进入“执行”阶段。
 
+### Step 0.5. 通过兼容性机器闸门
+
+当前任务卡在保留原字段的基础上还应声明：
+
+- `workflow_contract_version`
+- `task_id`
+- `human_approved`
+- `approval_source`
+- `plan_hash`
+
+确认任务卡后按顺序执行：
+
+1. `tools/check-task-gate.ps1 -Mode write`
+2. `tools/check-task-scope.ps1 -Mode CreateBaseline`
+3. 再进入实际脚本、资源或场景写入。
+
+这里的 `human_approved` 由用户原本的“执行”确认语义映射而来，不增加新的用户操作；`plan_hash` 只覆盖任务意图、边界、验收标准和允许文件，不覆盖执行状态。
+
 ### Step 1. 选择主上下文包
 根据当前任务类型，先选择一个主包：
 - Git / PR / Upstream 包
@@ -134,3 +152,13 @@ Updated: 2026-05-12
 1. 重写 `docs/current-task-card.md`
 2. 重新选包
 3. 再进入下一轮探索 / 规划 / 行动
+
+### Step 5. 统一收尾验证
+
+任务完成前运行：
+
+```powershell
+tools/verify-task.ps1 -JsonOnly
+```
+
+它会组合 review 闸门、任务范围、`git diff --check` 和 PowerShell 语法检查。任一检查失败时，任务不能进入 `done`；原有 Unity 编译、测试和视觉契约检查仍按任务卡范围执行。

@@ -7,6 +7,8 @@ using GeminiLab.Modules.Apple;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace GeminiLab.Modules.EmotionGarden
@@ -17,7 +19,7 @@ namespace GeminiLab.Modules.EmotionGarden
     /// </summary>
     public sealed class EmotionGardenService : MonoBehaviour, IEmotionGardenService, IPersistentService
     {
-        private const int SaveVersion = 4;
+        private const int SaveVersion = 5;
         private const int PlacementInventorySaveVersion = 3;
         private const int PlacedFlowersSaveVersion = 4;
 
@@ -25,10 +27,12 @@ namespace GeminiLab.Modules.EmotionGarden
         private EventBus? _eventBus;
 
         private string _lastSubmitDateIso = string.Empty;
+        private string _pendingSubmitDateIso = string.Empty;
         private readonly List<EmotionFlowerData> _flowers = new();
         private readonly Dictionary<string, ClusterProgress> _clusters = new(); // key: "emotionType|owner"
         private readonly Dictionary<string, PlacementFlowerInventory> _placementInventories = new();
         private readonly List<PlacedEmotionFlower> _placedFlowers = new();
+        private readonly List<EmotionDailySummaryData> _dailySummaries = new();
 
         string IPersistentService.Key => "emotion-garden";
 
@@ -43,7 +47,8 @@ namespace GeminiLab.Modules.EmotionGarden
         public bool CanSubmitToday()
         {
             if (_clock == null) return false;
-            return _lastSubmitDateIso != _clock.TodayIso;
+            string today = _clock.TodayIso;
+            return _lastSubmitDateIso != today && _pendingSubmitDateIso != today;
         }
 
         public EmotionFlowerData? SubmitEmotion(string emotionType, string emotionDetail, string owner)
@@ -51,14 +56,103 @@ namespace GeminiLab.Modules.EmotionGarden
             if (_clock == null) return null;
             if (!CanSubmitToday()) return null;
 
-            var resolvedEmotionType = EmotionFlowerCatalog.IsKnownEmotionType(emotionType)
+            string resolvedEmotionType = EmotionFlowerCatalog.IsKnownEmotionType(emotionType)
                 ? EmotionFlowerCatalog.NormalizeEmotionType(emotionType)
                 : EmotionFlowerCatalog.ClassifyEmotion(emotionDetail);
             var normalizedOwner = EmotionFlowerCatalog.NormalizeOwner(owner);
-            var flowerName = EmotionFlowerCatalog.ResolveFlowerName(resolvedEmotionType, normalizedOwner);
+            EmotionGardenAiResult fallback = BuildFallbackAiResult(
+                _clock.TodayIso,
+                emotionDetail,
+                resolvedEmotionType,
+                normalizedOwner);
+            fallback.ResultSource = EmotionGardenResultSources.LocalRule;
+            Debug.Log($"{EmotionGardenResultSources.LocalRule} role={ResolveLogRole(normalizedOwner)} feature=Emotion inputEmpty={string.IsNullOrWhiteSpace(emotionDetail)} reason=SyncApi");
+
+            return CommitEmotion(emotionDetail, normalizedOwner, fallback);
+        }
+
+        public async Task<EmotionFlowerData?> SubmitEmotionAsync(
+            string emotionType,
+            string emotionDetail,
+            string owner,
+            CancellationToken cancellationToken = default)
+        {
+            if (_clock == null || !CanSubmitToday()) return null;
+
+            string today = _clock.TodayIso;
+            string normalizedOwner = EmotionFlowerCatalog.NormalizeOwner(owner);
+            string localEmotion = EmotionFlowerCatalog.IsKnownEmotionType(emotionType)
+                ? EmotionFlowerCatalog.NormalizeEmotionType(emotionType)
+                : EmotionFlowerCatalog.ClassifyEmotion(emotionDetail);
+            EmotionGardenAiResult fallback = BuildFallbackAiResult(
+                today,
+                emotionDetail,
+                localEmotion,
+                normalizedOwner);
+            Debug.Log($"{EmotionGardenResultSources.LocalRule} role={ResolveLogRole(normalizedOwner)} feature=Emotion inputEmpty={string.IsNullOrWhiteSpace(emotionDetail)} candidate={localEmotion}");
+
+            _pendingSubmitDateIso = today;
+            try
+            {
+                EmotionGardenAiResult selected = fallback;
+                if (ServiceLocator.TryResolve<IEmotionGardenAiProvider>(out var provider) && provider != null)
+                {
+                    try
+                    {
+                        EmotionGardenAiResult? generated = await provider.GenerateAsync(
+                            today,
+                            string.IsNullOrWhiteSpace(emotionDetail) ? "今天还没有写下具体心情。" : emotionDetail.Trim(),
+                            fallback.EmotionType,
+                            normalizedOwner,
+                            EmotionFlowerCatalog.ResolveFlowerName(fallback.EmotionType, normalizedOwner),
+                            fallback.FlowerDescription,
+                            cancellationToken);
+                        selected = MergeAiResult(fallback, generated, normalizedOwner, emotionDetail);
+                        if (generated == null)
+                        {
+                            Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={ResolveLogRole(normalizedOwner)} feature=Emotion reason=ProviderReturnedNull");
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={ResolveLogRole(normalizedOwner)} feature=Emotion reason=ServiceException:{ex.GetType().Name}");
+                        Debug.LogWarning($"[EmotionGarden] AI 生成失败，使用本地兜底：{ex.Message}");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={ResolveLogRole(normalizedOwner)} feature=Emotion reason=ProviderNotRegistered");
+                }
+
+                return CommitEmotion(emotionDetail, normalizedOwner, selected);
+            }
+            finally
+            {
+                if (_pendingSubmitDateIso == today)
+                {
+                    _pendingSubmitDateIso = string.Empty;
+                }
+            }
+        }
+
+        private EmotionFlowerData? CommitEmotion(
+            string emotionDetail,
+            string normalizedOwner,
+            EmotionGardenAiResult aiResult)
+        {
+            // SubmitEmotionAsync reserves the day while waiting for the provider. The
+            // commit itself must therefore only check the final committed date; the
+            // public entry points already perform the duplicate-submit guard.
+            if (_clock == null || _lastSubmitDateIso == _clock.TodayIso) return null;
 
             var today = _clock.TodayIso;
             var weekId = ComputeWeekIdFromIso(today);
+            string resolvedEmotionType = EmotionFlowerCatalog.NormalizeEmotionType(aiResult.EmotionType);
+            string flowerName = EmotionFlowerCatalog.ResolveFlowerName(resolvedEmotionType, normalizedOwner);
 
             var flower = new EmotionFlowerData
             {
@@ -68,6 +162,9 @@ namespace GeminiLab.Modules.EmotionGarden
                 EmotionType = resolvedEmotionType,
                 FlowerName = flowerName,
                 EmotionDetail = emotionDetail,
+                EmotionKeywords = EmotionGardenAiValidation.NormalizeKeywords(aiResult.EmotionKeywords),
+                FlowerDescription = EmotionGardenAiValidation.NormalizeText(aiResult.FlowerDescription, 120),
+                FlowerLanguage = EmotionGardenAiValidation.NormalizeText(aiResult.FlowerLanguage, 160),
                 Owner = normalizedOwner,
                 State = GrowthState.Growing,
                 IsCollected = false,
@@ -77,7 +174,14 @@ namespace GeminiLab.Modules.EmotionGarden
             _lastSubmitDateIso = today;
             _flowers.Add(flower);
 
+            UpsertDailySummary(BuildDailySummary(flower, aiResult));
+
             _eventBus?.Publish(new EmotionFlowerSubmittedEvent(flower));
+
+            string source = string.IsNullOrWhiteSpace(aiResult.ResultSource)
+                ? (aiResult.IsFallback ? EmotionGardenResultSources.Fallback : EmotionGardenResultSources.Ai)
+                : aiResult.ResultSource;
+            Debug.Log($"{source} role={ResolveLogRole(flower.Owner)} feature=Emotion result=Committed flower={flower.FlowerName} emotion={flower.EmotionType}");
 
             Debug.Log($"[EmotionGarden] 提交情绪: {flower.FlowerName} ({flower.EmotionType}/{flower.Owner})");
             return flower;
@@ -92,6 +196,43 @@ namespace GeminiLab.Modules.EmotionGarden
                 if (_flowers[i].DateIso == today) return _flowers[i];
             }
             return null;
+        }
+
+        public EmotionDailySummaryData? GetDailySummary(string dateIso)
+        {
+            if (string.IsNullOrWhiteSpace(dateIso)) return null;
+
+            for (int i = _dailySummaries.Count - 1; i >= 0; i--)
+            {
+                if (string.Equals(_dailySummaries[i].DateIso, dateIso, StringComparison.Ordinal))
+                {
+                    return _dailySummaries[i];
+                }
+            }
+
+            return null;
+        }
+
+        public IReadOnlyList<string> GetDailySummaryDates()
+        {
+            var dates = new List<string>(_dailySummaries.Count);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var summary in _dailySummaries)
+            {
+                if (!string.IsNullOrWhiteSpace(summary.DateIso) && seen.Add(summary.DateIso))
+                {
+                    dates.Add(summary.DateIso);
+                }
+            }
+
+            dates.Sort(StringComparer.Ordinal);
+            dates.Reverse();
+            return dates;
+        }
+
+        public EmotionDailySummaryData? GetTodayDailySummary()
+        {
+            return _clock == null ? null : GetDailySummary(_clock.TodayIso);
         }
 
         public int GetCurrentWeekId()
@@ -181,7 +322,7 @@ namespace GeminiLab.Modules.EmotionGarden
             _placementInventories[PlacementInventoryKey(f.EmotionType, f.Owner)] = inventory;
             if (ServiceLocator.TryResolve(out IAppleService? apples) && apples is not null)
             {
-                apples.Add(1);
+                apples.Add(12);
             }
             _eventBus?.Publish(new EmotionFlowerBloomedEvent(f.FlowerId));
             PublishPlacementInventoryChanged(inventory);
@@ -259,7 +400,8 @@ namespace GeminiLab.Modules.EmotionGarden
             bool isCluster,
             int slotIndex,
             float worldX,
-            float worldY)
+            float worldY,
+            string placementLayerId = "")
         {
             if (slotIndex < 0 || float.IsNaN(worldX) || float.IsInfinity(worldX) ||
                 float.IsNaN(worldY) || float.IsInfinity(worldY))
@@ -294,7 +436,8 @@ namespace GeminiLab.Modules.EmotionGarden
                 Owner = inventory.Owner,
                 IsCluster = isCluster,
                 WorldX = worldX,
-                WorldY = worldY
+                WorldY = worldY,
+                PlacementLayerId = placementLayerId ?? string.Empty
             };
 
             _placementInventories[PlacementInventoryKey(inventory.EmotionType, inventory.Owner)] = inventory;
@@ -329,6 +472,7 @@ namespace GeminiLab.Modules.EmotionGarden
             _clusters.Clear();
             _placementInventories.Clear();
             _placedFlowers.Clear();
+            _dailySummaries.Clear();
             _lastSubmitDateIso = string.Empty;
             _eventBus?.Publish(new EmotionFlowerPlacementInventoryChangedEvent(default));
             _eventBus?.Publish(new EmotionFlowerPlacementsChangedEvent());
@@ -347,7 +491,8 @@ namespace GeminiLab.Modules.EmotionGarden
                 Flowers = new List<EmotionFlowerData>(_flowers),
                 Clusters = new List<ClusterProgress>(_clusters.Values),
                 PlacementInventories = new List<PlacementFlowerInventory>(_placementInventories.Values),
-                PlacedFlowers = new List<PlacedEmotionFlower>(_placedFlowers)
+                PlacedFlowers = new List<PlacedEmotionFlower>(_placedFlowers),
+                DailySummaries = new List<EmotionDailySummaryData>(_dailySummaries)
             };
             return JsonUtility.ToJson(save);
         }
@@ -376,6 +521,18 @@ namespace GeminiLab.Modules.EmotionGarden
                     if (string.IsNullOrWhiteSpace(f.FlowerName))
                     {
                         f.FlowerName = EmotionFlowerCatalog.ResolveFlowerName(f.EmotionType, f.Owner);
+                    }
+                    if (f.EmotionKeywords == null || f.EmotionKeywords.Length == 0)
+                    {
+                        f.EmotionKeywords = new[] { EmotionFlowerCatalog.ResolveEmotionDisplayName(f.EmotionType) };
+                    }
+                    if (string.IsNullOrWhiteSpace(f.FlowerDescription))
+                    {
+                        f.FlowerDescription = $"这是一朵记录{EmotionFlowerCatalog.ResolveEmotionDisplayName(f.EmotionType)}的{f.FlowerName}，把今天的心情留在花园里。";
+                    }
+                    if (string.IsNullOrWhiteSpace(f.FlowerLanguage))
+                    {
+                        f.FlowerLanguage = $"{f.FlowerName}的花语是：把今天的心意轻轻安放，愿你在下一次呼吸里找到新的力量。";
                     }
 
                     var recomputed = ComputeWeekIdFromIso(f.DateIso);
@@ -429,6 +586,33 @@ namespace GeminiLab.Modules.EmotionGarden
                         _placedFlowers.Add(normalized);
                         occupiedSlots.Add(normalized.SlotIndex);
                     }
+                }
+
+                _dailySummaries.Clear();
+                if (save.DailySummaries != null)
+                {
+                    var seenDates = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var summary in save.DailySummaries)
+                    {
+                        if (string.IsNullOrWhiteSpace(summary.DateIso) || !seenDates.Add(summary.DateIso))
+                        {
+                            continue;
+                        }
+
+                        _dailySummaries.Add(summary);
+                    }
+                }
+
+                // 兼容在每日小结功能加入前已经存在的情绪花：下次打开邮箱时也能看到可读的小结。
+                for (int i = 0; i < _flowers.Count; i++)
+                {
+                    EmotionFlowerData flower = _flowers[i];
+                    if (string.IsNullOrWhiteSpace(flower.DateIso) || GetDailySummary(flower.DateIso).HasValue)
+                    {
+                        continue;
+                    }
+
+                    UpsertDailySummary(BuildDailySummary(flower));
                 }
 
                 _eventBus?.Publish(new EmotionFlowerPlacementInventoryChangedEvent(default));
@@ -533,6 +717,7 @@ namespace GeminiLab.Modules.EmotionGarden
 
             placed.EmotionType = EmotionFlowerCatalog.NormalizeEmotionType(placed.EmotionType);
             placed.Owner = EmotionFlowerCatalog.NormalizeOwner(placed.Owner);
+            placed.PlacementLayerId ??= string.Empty;
             normalized = placed;
             return true;
         }
@@ -540,6 +725,135 @@ namespace GeminiLab.Modules.EmotionGarden
         private void PublishPlacementInventoryChanged(PlacementFlowerInventory inventory)
         {
             _eventBus?.Publish(new EmotionFlowerPlacementInventoryChangedEvent(inventory));
+        }
+
+        private void UpsertDailySummary(EmotionDailySummaryData summary)
+        {
+            for (int i = 0; i < _dailySummaries.Count; i++)
+            {
+                if (!string.Equals(_dailySummaries[i].DateIso, summary.DateIso, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                _dailySummaries[i] = summary;
+                return;
+            }
+
+            _dailySummaries.Add(summary);
+        }
+
+        private static string ResolveLogRole(string owner)
+        {
+            return EmotionFlowerCatalog.NormalizeOwner(owner) == EmotionFlowerCatalog.OwnerDemon
+                ? "Devil"
+                : "Angel";
+        }
+
+        private static EmotionGardenAiResult BuildFallbackAiResult(
+            string dateIso,
+            string inputSentence,
+            string emotionType,
+            string owner)
+        {
+            string input = string.IsNullOrWhiteSpace(inputSentence)
+                ? "今天还没有写下具体心情。"
+                : inputSentence.Trim();
+            string emotion = EmotionFlowerCatalog.ResolveEmotionDisplayName(emotionType);
+            string flowerName = EmotionFlowerCatalog.ResolveFlowerName(emotion, owner);
+            string description = $"这是一朵记录{emotion}的{flowerName}，把今天的心情留在花园里。";
+
+            return new EmotionGardenAiResult
+            {
+                EmotionType = emotion,
+                EmotionKeywords = new[] { emotion },
+                FlowerDescription = TrimSummary(description, 120),
+                FlowerLanguage = $"{flowerName}的花语是：把今天的心意轻轻安放，愿你在下一次呼吸里找到新的力量。",
+                Summary = TrimSummary($"今天记录了{emotion}的心情：“{input}”。{flowerName}把这份感受收进花园，陪你慢慢走过今天。", 60),
+                AngelNote = TrimSummary($"天使日记：我看见你愿意认真说出“{input}”。{flowerName}替你收好这份心意，今天辛苦了，明天也可以慢慢来。", 80),
+                DevilNote = TrimSummary($"恶魔日记：别急着给今天下结论。你已经把“{input}”说出来了，这就足够让{flowerName}替你守住一点勇气，继续往前走。", 80),
+                ResultSource = EmotionGardenResultSources.Fallback,
+                IsFallback = true
+            };
+        }
+
+        private static EmotionGardenAiResult MergeAiResult(
+            EmotionGardenAiResult fallback,
+            EmotionGardenAiResult? generated,
+            string owner,
+            string inputSentence)
+        {
+            if (generated == null)
+            {
+                return fallback;
+            }
+
+            if (!EmotionGardenAiValidation.IsCompleteResult(generated, out string validationReason))
+            {
+                fallback.ResultSource = EmotionGardenResultSources.Fallback;
+                fallback.IsFallback = true;
+                Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={ResolveLogRole(owner)} feature=Emotion reason=InvalidProviderResult:{validationReason}");
+                return fallback;
+            }
+
+            EmotionGardenAiResult merged = generated.Clone();
+            merged.EmotionType = EmotionFlowerCatalog.NormalizeEmotionType(merged.EmotionType);
+            merged.EmotionKeywords = EmotionGardenAiValidation.NormalizeKeywords(merged.EmotionKeywords);
+            merged.FlowerDescription = EmotionGardenAiValidation.NormalizeText(merged.FlowerDescription, 120);
+            merged.FlowerLanguage = EmotionGardenAiValidation.NormalizeText(merged.FlowerLanguage, 160);
+            merged.Summary = EmotionGardenAiValidation.NormalizeText(merged.Summary, 60);
+            merged.AngelNote = EmotionGardenAiValidation.NormalizeText(merged.AngelNote, 80);
+            merged.DevilNote = EmotionGardenAiValidation.NormalizeText(merged.DevilNote, 80);
+            merged.ResultSource = EmotionGardenResultSources.Ai;
+            merged.IsFallback = false;
+            return merged;
+        }
+
+        private EmotionDailySummaryData BuildDailySummary(
+            EmotionFlowerData flower,
+            EmotionGardenAiResult? aiResult = null)
+        {
+            string input = string.IsNullOrWhiteSpace(flower.EmotionDetail)
+                ? "今天还没有写下具体心情。"
+                : flower.EmotionDetail.Trim();
+            string emotion = EmotionFlowerCatalog.ResolveEmotionDisplayName(flower.EmotionType);
+            string flowerName = string.IsNullOrWhiteSpace(flower.FlowerName)
+                ? EmotionFlowerCatalog.ResolveFlowerName(flower.EmotionType, flower.Owner)
+                : flower.FlowerName;
+            EmotionGardenAiResult fallback = BuildFallbackAiResult(
+                flower.DateIso,
+                input,
+                emotion,
+                flower.Owner);
+            EmotionGardenAiResult selected = aiResult == null
+                ? fallback
+                : MergeAiResult(fallback, aiResult, flower.Owner, input);
+            string description = string.IsNullOrWhiteSpace(flower.FlowerDescription)
+                ? selected.FlowerDescription
+                : flower.FlowerDescription;
+
+            return new EmotionDailySummaryData
+            {
+                DateIso = flower.DateIso,
+                InputSentence = TrimSummary(input, 120),
+                EmotionType = emotion,
+                FlowerName = flowerName,
+                FlowerDescription = TrimSummary(description, 120),
+                Summary = selected.Summary,
+                AngelNote = selected.AngelNote,
+                DevilNote = selected.DevilNote,
+                GeneratedAtUtcTicks = _clock?.UtcNow.Ticks ?? DateTime.UtcNow.Ticks
+            };
+        }
+
+        private static string TrimSummary(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+            {
+                return value;
+            }
+
+            return value.Substring(0, Math.Max(1, maxLength - 1)) + "…";
         }
 
         private static string ClusterKey(string emotionType, string owner) => $"{emotionType}|{owner}";
@@ -556,6 +870,7 @@ namespace GeminiLab.Modules.EmotionGarden
             public List<ClusterProgress> Clusters = new();
             public List<PlacementFlowerInventory> PlacementInventories = new();
             public List<PlacedEmotionFlower> PlacedFlowers = new();
+            public List<EmotionDailySummaryData> DailySummaries = new();
         }
     }
 }

@@ -2,7 +2,9 @@
   "name": "GeminiLab.Modules.Persistence",
   "rootNamespace": "GeminiLab.Modules.Persistence",
   "references": [
-    "GeminiLab.Core"
+    "GeminiLab.Core",
+    "GeminiLab.Modules.EmotionGarden",
+    "GeminiLab.Modules.ApartmentKeepsake"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

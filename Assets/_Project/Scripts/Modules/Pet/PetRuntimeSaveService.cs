@@ -42,6 +42,7 @@ namespace GeminiLab.Modules.Pet
             public float mood;
             public float energy;
             public float satiety;
+            public float relation;
             public float runtimeTime;
             public int travelCompletedCount;
             public string currentState;
@@ -76,6 +77,7 @@ namespace GeminiLab.Modules.Pet
                     mood = d.Mood,
                     energy = d.Energy,
                     satiety = d.Satiety,
+                    relation = d.Relation,
                     runtimeTime = d.RuntimeTimeSeconds,
                     travelCompletedCount = d.TravelCompletedCount,
                     currentState = d.CurrentState,
@@ -118,6 +120,12 @@ namespace GeminiLab.Modules.Pet
                     d.Mood = ApplyOfflineMoodRegression(e.mood, regressionPoints);
                     d.Energy = e.energy; // §20：离线不进行自然精力衰减，原样恢复。
                     d.Satiety = e.satiety;
+                    // v1 没有 relation 字段。缺字段时 JsonUtility 会给 0，
+                    // 因此只有 v2+ 才覆盖当前默认值，避免旧存档把亲密度意外清零。
+                    if (payload.version >= 2)
+                    {
+                        d.Relation = e.relation;
+                    }
                     d.RuntimeTimeSeconds = e.runtimeTime;
                     d.TravelCompletedCount = e.travelCompletedCount;
                     d.CurrentState = e.currentState ?? "None";
