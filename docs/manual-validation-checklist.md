@@ -13,6 +13,31 @@
 | 天使与恶魔移动、玩家操纵、漫游、过桥和过桥后恢复保持可用 | 待人工 Play | 重点检查动画状态机重写没有删除或绕过 `WalkableSurface` 桥面适配 |
 | Scene/Prefab 中两只室外 Animator 引用、室内 Prefab/Animator 引用、Animation Clip/Controller/关键帧/Motion 未被本阶段修改 | 已通过静态检查 | 最终视觉与实际触发时序仍需 Unity Play；不把静态结果当作实机通过 |
 
+## B46. WorldMap 室外双宠动画交互白名单与位置保持（2026-09-09）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 天使只对苹果树、许愿树和天使区域已成功摆放花触发动画；恶魔只对苹果树、恶魔标牌和恶魔区域已成功摆放花触发动画 | 待 Unity MCP Play / 人工 Play | 恶魔靠近许愿树、天使标牌或天使花，天使靠近恶魔标牌或恶魔花及其他物体时均不应触发特殊动画 |
+| 恶魔在许愿树附近不会播放旧家具动画、不会跳到回退世界坐标；两只桌宠播放特殊动画时保持开始时位置 | 待 Unity MCP Play / 人工 Play | 观察动画开始前后 Transform 位置；确认不出现 `Interact_*` 家具状态或交互姿势位移 |
+| 室外旧家具交互组件不会响应 F 键、漫游碰撞或家具回退点；室内桌宠家具交互仍可用 | 待 Unity MCP Play / 人工 Play | 只验证 WorldMap 两只室外桌宠被隔离，不能把室内 Prefab 或室内脚本作为本轮修改对象 |
+| 室外移动、玩家操纵、漫游、过桥和过桥后恢复未被白名单修复破坏 | 待 Unity MCP Play / 人工 Play | 重点验证桥面 `WalkableSurface` 轮廓、过桥完成回调和动画结束后的 Idle/Move 恢复 |
+
+## B47. WorldMap 天使玩家 F 浇水与目标朝向（2026-09-09）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 玩家控制天使靠近天使区域已成功摆放花朵，按一次 F 能播放浇水动画 | 待 Unity MCP Play / 人工 Play | 按住 F 不应重复触发；预览、空槽位、恶魔花和其他物体不应响应 |
+| 玩家 F 浇水和漫游浇水都朝向最近有效花朵 | 待 Unity MCP Play / 人工 Play | 分别从花朵左右两侧触发，确认 `flipX` 与花朵相对方向一致；正上/正下方按当前朝向保持 |
+| 玩家 F 浇水使用玩家交互半径，漫游浇水使用漫游半径 | 已通过静态代码检查 | 两条路径均复用成功摆放花朵、占用槽位和落脚区域最近点 |
+
+## B48. WorldMap 玩家控制移动不被漫游动画打断（2026-09-09）
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 玩家控制天使移动经过有效天使花朵时，不会自动插入浇水动画；玩家移动动画不被覆盖 | 待 Unity MCP Play / 人工 Play | 只验证玩家移动过程；需要与上一阶段的玩家按 F 浇水分开检查 |
+| 玩家控制恶魔移动经过苹果树或恶魔标牌时，不会自动插入睡觉/施法动画 | 待 Unity MCP Play / 人工 Play | 天使目标、许愿树、邮箱和其他非白名单物体也不应触发恶魔特殊动作 |
+| 玩家控制期间不会消费漫游进入边沿；释放控制后仍在目标范围时，才按对应桌宠自己的漫游规则重新判断 | 待 Unity MCP Play / 人工 Play | 不把玩家控制中的经过目标误判为漫游触发 |
+| 玩家按 F 的有效白名单交互仍可触发，按住 F 不会重复启动 | 待 Unity MCP Play / 人工 Play | 天使花朵浇水、苹果树/许愿树；恶魔苹果树/恶魔标牌 |
+
 ## WorldMap UI 点击优先级（2026-09-08）
 
 | 检查项 | 结果 | 备注 |
@@ -31,6 +56,14 @@
 | 场景中存在 `ApartmentFurnitureSelection`、`FurnitureSelectionHighlight`、`FurnitureSelectionMessage` | 已通过静态契约 | 原 9 个目标加现有 `家具_装饰_储物的家具_恶魔_01` 共 10 个目标已落盘；仍需 Play 目视确认点击反馈 |
 
 Updated: 2026-08-22
+
+## B49. WorldMap 作者化 Angel/Demon 花朵区域边界（2026-09-09）
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 选择恶魔花朵后，允许落位的范围与 `FlowerPlacementRegion_Demon` Collider2D 一致，不会被 `FlowerPlacementBounds` 右边界截断 | 待 Unity MCP Play / 人工 Play | 重点验证恶魔区域右侧和下侧边界 |
+| 选择天使花朵后，只能在 `FlowerPlacementRegion_Angel` Collider2D 内落位，不会跨入恶魔区域 | 待 Unity MCP Play / 人工 Play | 验证 Angel/Demon owner 分区互不混用 |
+| 花朵完整 footprint 越过对应区域边界时仍判定无效 | 待 Unity MCP Play / 人工 Play | 可放置中心范围比 Collider 外框缩小是预期行为 |
+| 未配置作者化区域的旧场景仍能使用 `FlowerPlacementBounds` 回退 | 待定向测试 | 当前 WorldMap 已配置两个作者化区域，本项用于兼容性回归 |
 
 ## B18 Play verification addendum (2026-08-18)
 

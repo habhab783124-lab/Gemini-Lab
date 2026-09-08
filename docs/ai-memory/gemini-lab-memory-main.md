@@ -1,5 +1,15 @@
 # Gemini-Lab Memory Main
 
+## 2026-09-09 WorldMap 玩家控制期间屏蔽漫游特殊动画
+
+- 玩家控制期间，`WorldMapPetAnimationTriggerController` 不再评估或接受任何 `TriggerSource.Roaming` 特殊动作；天使和恶魔各自的漫游目标锁存也会被清理，避免玩家移动经过花朵、苹果树或标牌时被自动动画打断。
+- 玩家控制释放后仍由各桌宠自己的白名单和漫游冷却重新判断；玩家按 F 的 `PlayerInput` 触发路径不受本次屏蔽影响。移动、过桥、场景切换和室内桌宠逻辑未修改。
+
+## 2026-09-09 WorldMap 作者化花朵区域作为唯一边界
+
+- `WorldMap_Main.unity` 已绑定 `FlowerPlacementRegion_Angel` / `FlowerPlacementRegion_Demon`；修复前 `WorldMapFlowerPlacementController.IsValidPlacement()` 即使存在作者化区域，仍会叠加旧 `FlowerPlacementBounds`，导致恶魔区域被总范围右边界截断。
+- 现在只要作者化区域配置有效，就由所选 owner 的区域 Collider2D 裁决完整花朵 footprint；只有没有区域配置的旧场景才使用 `FlowerPlacementBounds` 回退。未修改区域 Collider、Scene 序列化引用、槽位资源或其他系统。
+
 ## 2026-09-08 WorldMap 室外双宠动画状态机最终阶段
 
 - `WorldMapPetAnimationTriggerController` 已重写为 WorldMap 室外天使/恶魔动画的唯一最终仲裁入口：每个特殊动作在 `PetAction` 中固定归属一个桌宠，并由 `StateNameFor` 映射到已有 `Outdoor_*` 状态；天使和恶魔不会共享无来源的特殊触发器。
@@ -8,6 +18,8 @@
 - 漫游特殊动作使用目标进入锁存、随机概率和冷却；玩家 F 使用按键边沿；特殊 Clip 按当前 Animator 状态长度只播放一遍，不改动资源中已有的循环设置。
 - 桥能力未从动画改动中移除：`PetController`、`RandomWander`、`PetPlayerInputController`、`WalkableSurface`、桥面检测、外部移动锁接口和过桥后的恢复逻辑均未修改。`WorldMap_Main.unity` 的桌宠 Animator、移动/桥引用也未由本阶段写入。
 - 本阶段未修改 Animation Clip、Animator Controller、关键帧、Motion、循环方式、Sprite、室内桌宠脚本或室内 Prefab。受影响程序集静态编译通过；Unity MCP Play 验证已获授权但当前 Unity 编辑器进程无响应，仍需恢复编辑器后验证，不能把静态结果当作最终实机确认。
+- 本次白名单修复确认室外特殊动画 Clip 没有位置曲线；位置跳变来源是两只室外桌宠仍启用的 `PetPlayerFurnitureInteractionController`，其家具绑定会使用回退世界坐标并应用交互姿势。`WorldMapPetAnimationTriggerController` 现在只对显式绑定的两只室外桌宠在运行时隔离该旧组件，停用适配器时恢复原始 `enabled` 状态；天使仅允许苹果树、许愿树和天使区域已成功摆放花，恶魔仅允许苹果树、恶魔标牌和恶魔区域已成功摆放花。移动、玩家操纵、漫游、桥面/过桥和室内系统未修改。
+- 2026-09-09 补充：玩家控制天使按 F 的路径现在也查询最近有效天使花朵，并使用玩家交互半径触发 `AngelWater`；漫游路径继续使用漫游半径。`ActiveAnimation` 会在特殊动作期间持续维护目标 `flipX`，确保浇水动作面向花朵，结束时恢复动作开始前朝向。该补充未改变花朵资源、槽位或动画资源。
 
 ## 2026-09-08 WorldMap UI 点击优先级修正
 

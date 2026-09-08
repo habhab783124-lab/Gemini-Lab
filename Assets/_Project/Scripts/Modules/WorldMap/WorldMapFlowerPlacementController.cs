@@ -995,18 +995,6 @@ namespace GeminiLab.Modules.WorldMap
             Rect placement = new(new Vector2(center.x - size.x * 0.5f, center.y), size);
             PlacementLayer layer = ResolvePlacementLayer(center.y);
 
-            // FlowerPlacementBounds is the scene-authored grass anchor area.
-            // Region colliders additionally split the area between angel and
-            // demon; both checks must pass so a stale wide region cannot
-            // accept a flower above or below the grass.
-            if (_placementSurface != null)
-            {
-                Bounds surface = GetPlacementBounds();
-                if (placement.xMin < surface.min.x || placement.xMax > surface.max.x ||
-                    center.y < surface.min.y || center.y > surface.max.y)
-                    return false;
-            }
-
             if (HasPlacementRegionBindings)
             {
                 WorldMapFlowerPlacementRegion? selectedRegion = ResolveSelectedPlacementRegion();

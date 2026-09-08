@@ -1,11 +1,23 @@
 # Gemini-Lab Project File Guide
 
+## 2026-09-09 WorldMap 玩家控制期间屏蔽漫游特殊动画
+
+- `WorldMapPetAnimationTriggerController` 在玩家控制模式下提前清理天使/恶魔各自的漫游目标锁存并跳过漫游邻近触发；`RequestAction` 另有来源校验，确保 `TriggerSource.Roaming` 不能绕过该规则。
+- 玩家 F 键仍通过 `TriggerSource.PlayerInput` 走原有白名单交互；`PetController`、`PetPlayerInputController`、`RandomWander`、`WalkableSurface` 和过桥链路未修改。
+
+## 2026-09-09 WorldMap 作者化花朵区域作为唯一边界
+
+- `WorldMapFlowerPlacementController` 的 `_placementRegions` 已绑定 WorldMap 两个 owner 区域；有效区域存在时，`IsValidPlacement()` 不再同时套用旧 `_placementSurface`，避免 `FlowerPlacementBounds` 把 `FlowerPlacementRegion_Demon` 截断。
+- `FlowerPlacementBounds` 仅在完全没有作者化区域时回退使用；选中 owner 的完整 footprint 仍必须包含在其区域 Collider2D 内。
+
 ## 2026-09-08 WorldMap 室外双宠动画状态机最终阶段
 
 - `Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs` 挂在 `WorldMap_Main.unity/_SceneRoot`，现在同时负责室外普通 `Idle/Move` 最终裁决、七个特殊动作请求、触发优先级、移动锁、单次 Clip 播放和按真实横向位移恢复。
 - 其目标输入来自 Scene 序列化的两只桌宠、三棵苹果树、许愿树和两块阵营标牌；距离判断使用目标 Collider2D 最近点。花朵目标从 EmotionGarden 成功摆放记录和已占用的 `WorldMapPlacementSlot` 落脚区域解析，不读取预览或空槽位。
 - `PetController.cs`、`RandomWander.cs`、`PetPlayerInputController.cs` 和 `WalkableSurface.cs` 仍是移动、漫游、玩家输入和桥面适配的事实源；动画控制器不能删除或替换这些接口。室内 `Pet_Angel.prefab`、`Pet_Devil.prefab` 及 `Assets/_Project/Animations/Pet/` 不在本阶段范围。
 - `Assets/_Project/Animations/WorldMap/Pet/` 下的两个 AnimatorController 与 `Outdoor_*.anim` 只被读取和调用，未修改 Clip、Controller、参数、关键帧、Motion 或循环设置。当前受影响程序集静态编译通过，Unity MCP Play 仍待编辑器恢复后验证。
+- 室外桌宠不要再把 `PetPlayerFurnitureInteractionController` 当作动画触发入口：该旧组件包含室内家具绑定和回退世界坐标姿势。`WorldMapPetAnimationTriggerController` 运行时只对显式引用的 `Pet_Angel` / `Pet_Devil` 暂停该组件，并恢复其原始启用状态；动画白名单保持为天使的苹果树/许愿树/天使花与恶魔的苹果树/恶魔标牌/恶魔花。该修复不改 `PetController`、移动/过桥核心或任何场景序列化引用。
+- 2026-09-09：天使玩家 F 浇水也复用 `TryGetNearestAngelFlower` 的成功摆放花朵与 `WorldMapPlacementSlot` 落脚区域解析，只把玩家交互半径作为距离参数；漫游浇水使用漫游半径。目标朝向保存在室外动画实例中并在动作期间持续应用，不修改 AnimatorController 或 Clip。
 
 ## 2026-09-08 WorldMap UI 点击优先级修正
 

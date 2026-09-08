@@ -1,11 +1,23 @@
 # Gemini-Lab 项目结构总览
 
+## 2026-09-09 WorldMap 玩家控制期间屏蔽漫游特殊动画
+
+- 室外桌宠处于玩家控制时，`WorldMapPetAnimationTriggerController` 只保留玩家主动 F 键交互，屏蔽天使/恶魔各自的漫游特殊动画触发并清理邻近目标锁存；这保证玩家移动经过有效目标时不会被浇水、坐地、睡觉、祈祷或施法打断。
+- 该修复只改变室外动画触发适配层，保留桌宠移动、玩家控制、漫游、过桥和过桥后恢复逻辑。
+
+## 2026-09-09 WorldMap 作者化花朵区域作为唯一边界
+
+- WorldMap 花朵摆放在 `_placementRegions` 有效时，按所选 owner 的 `FlowerPlacementRegion_Angel` / `FlowerPlacementRegion_Demon` Collider2D 判定完整 footprint；不再被旧 `FlowerPlacementBounds` 强制取交集。
+- `FlowerPlacementBounds` 只为没有作者化区域的旧场景保留回退，Scene 中的区域 Collider 尺寸和序列化引用仍由作者直接调整。
+
 ## 2026-09-08 WorldMap 室外双宠动画状态机最终阶段
 
 - `_SceneRoot/WorldMapPetAnimationTriggerController` 是室外天使与恶魔 Animator 的唯一最终仲裁入口。它只读取现有 WorldMap Animator 状态和动画资源，按实际横向位移裁决 `Idle/Move`，按明确来源触发坐地、祈祷、浇水、开心、睡觉、施法和得意。
 - 特殊动作通过现有 `PetController.SetExternalMovementLock` 暂停受影响桌宠；动作结束时根据最新真实位移恢复普通状态。移动、玩家控制、漫游、桥面 `WalkableSurface` 和过桥流程仍由原脚本负责。
 - 交互目标使用 `WorldMap_Main.unity` 中已有序列化引用和 Collider2D 最近点；花朵触发使用 EmotionGarden 成功记录及已占用的 WorldMap 摆花槽落脚区域。室内桌宠、动画资产和 Scene/Prefab 序列化引用不属于本阶段修改对象。
 - 静态编译已通过；Unity MCP Play 验证因当前编辑器进程无响应尚未完成，不能视为用户最终实机确认。
+- 室外动画适配器还负责隔离两只室外桌宠上的旧家具交互组件，防止家具绑定的 fallback 世界坐标或交互姿势把桌宠移动到白名单之外；它只对显式绑定的室外宠物生效，禁用时恢复旧组件状态。室外动画对象按桌宠分开白名单：天使为苹果树、许愿树、天使花，恶魔为苹果树、恶魔标牌、恶魔花。
+- 2026-09-09：天使玩家控制模式按 F 可对最近有效天使花朵触发浇水；漫游浇水期间持续面向花朵的 Collider/落脚区域最近点，动作结束后交还普通动画状态。
 
 ## 2026-09-08 WorldMap UI 点击优先级修正
 

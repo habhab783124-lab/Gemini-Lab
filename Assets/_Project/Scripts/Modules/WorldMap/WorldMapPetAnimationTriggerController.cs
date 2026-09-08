@@ -10,11 +10,11 @@ using UnityEngine;
 namespace GeminiLab.Modules.WorldMap
 {
     /// <summary>
-    /// Drives the outdoor pet special-animation state machine.
+    /// WorldMap 室外双宠动画唯一裁决入口。
     ///
-    /// PetController remains the owner of the normal Idle/Move states.  This
-    /// component only owns a temporary special action, locks that pet while the
-    /// action is playing, then releases it back to PetController.
+    /// PetController 继续负责移动、玩家操纵、漫游和 WalkableSurface 过桥；
+    /// 本组件只负责 WorldMap 室外 Animator 的最终状态、特殊动作请求和恢复。
+    /// 室内桌宠不引用本组件。
     /// </summary>
     [DefaultExecutionOrder(1000)]
     [DisallowMultipleComponent]
@@ -31,6 +31,14 @@ namespace GeminiLab.Modules.WorldMap
             DevilProud
         }
 
+        private enum TriggerSource
+        {
+            Roaming,
+            PlayerInput,
+            Debug,
+            PlacementSuccess
+        }
+
         [Serializable]
         public sealed class DebugAnimationBinding
         {
@@ -42,7 +50,12 @@ namespace GeminiLab.Modules.WorldMap
 
             public DebugAnimationBinding() { }
 
-            public DebugAnimationBinding(int keyNumber, PetId petId, string label, string animationStateName, float durationSeconds)
+            public DebugAnimationBinding(
+                int keyNumber,
+                PetId petId,
+                string label,
+                string animationStateName,
+                float durationSeconds)
             {
                 _keyNumber = Mathf.Clamp(keyNumber, 1, 9);
                 _petId = petId;
@@ -60,41 +73,84 @@ namespace GeminiLab.Modules.WorldMap
 
         private sealed class ActiveAnimation
         {
-            public ActiveAnimation(PetController pet, Animator animator, PetAction action, string stateName,
-                float durationSeconds, float clipLengthSeconds, SpriteRenderer? renderer, bool originalFlipX)
+            public ActiveAnimation(
+                PetController pet,
+                Animator animator,
+                PetAction action,
+                string stateName,
+                float playbackSeconds,
+                SpriteRenderer? renderer,
+                bool originalFlipX,
+                bool holdTargetFacing,
+                bool targetFlipX)
             {
                 Pet = pet;
                 Animator = animator;
                 Action = action;
                 StateName = stateName;
-                DurationSeconds = Mathf.Max(0.1f, durationSeconds);
-                ClipLengthSeconds = Mathf.Max(0.01f, clipLengthSeconds);
+                PlaybackSeconds = Mathf.Max(0.01f, playbackSeconds);
                 Renderer = renderer;
                 OriginalFlipX = originalFlipX;
+                HoldTargetFacing = holdTargetFacing;
+                TargetFlipX = targetFlipX;
             }
 
             public PetController Pet { get; }
             public Animator Animator { get; }
             public PetAction Action { get; }
             public string StateName { get; }
-            public float DurationSeconds { get; }
-            public float ClipLengthSeconds { get; }
+            public float PlaybackSeconds { get; }
             public SpriteRenderer? Renderer { get; }
             public bool OriginalFlipX { get; }
+            public bool HoldTargetFacing { get; }
+            public bool TargetFlipX { get; }
             public float ElapsedSeconds { get; set; }
         }
 
-        private readonly struct PendingAnimation
+        private readonly struct AnimationRequest
         {
-            public PendingAnimation(PetAction action, Transform? target)
+            public AnimationRequest(
+                PetController pet,
+                PetAction action,
+                TriggerSource source,
+                Transform? target,
+                Vector3? targetPosition,
+                float fallbackDuration)
             {
+                Pet = pet;
                 Action = action;
+                Source = source;
                 Target = target;
+                TargetPosition = targetPosition;
+                FallbackDuration = fallbackDuration;
             }
 
+            public PetController Pet { get; }
             public PetAction Action { get; }
+            public TriggerSource Source { get; }
             public Transform? Target { get; }
+            public Vector3? TargetPosition { get; }
+            public float FallbackDuration { get; }
         }
+
+        private readonly struct FlowerCandidate
+        {
+            public FlowerCandidate(Transform target, Vector2 closestPoint, float distanceSquared)
+            {
+                Target = target;
+                ClosestPoint = closestPoint;
+                DistanceSquared = distanceSquared;
+            }
+
+            public Transform Target { get; }
+            public Vector2 ClosestPoint { get; }
+            public float DistanceSquared { get; }
+        }
+
+        private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
+        private static readonly int MoveXHash = Animator.StringToHash("MoveX");
+        private static readonly int MoveYHash = Animator.StringToHash("MoveY");
+        private static readonly int MoveDirHash = Animator.StringToHash("MoveDir");
 
         private static readonly KeyCode[] NumberKeys =
         {
@@ -108,27 +164,12 @@ namespace GeminiLab.Modules.WorldMap
             KeyCode.Keypad5, KeyCode.Keypad6, KeyCode.Keypad7, KeyCode.Keypad8, KeyCode.Keypad9
         };
 
-        private static readonly string[] AppleTreeNames =
-        {
-            "大树 2", "大树 3", "大树 4", "大树 5", "苹果树", "苹果树 2", "苹果树 3", "苹果树 4", "苹果树 5"
-        };
-
-        private static readonly string[] AngelSignNames =
-        {
-            "天使标牌", "天使区域标牌", "天使区域的标牌", "标牌_天使", "AngelSign", "AngelSignboard"
-        };
-
-        private static readonly string[] DevilSignNames =
-        {
-            "恶魔标牌", "恶魔区域标牌", "恶魔区域的标牌", "标牌_恶魔", "DevilSign", "DevilSignboard"
-        };
-
         [Header("Pets")]
         [SerializeField] private PetController? _angelPet;
         [SerializeField] private PetController? _devilPet;
 
         [Header("Explicit scene targets")]
-        [Tooltip("Apple trees that can trigger Sit/Sleep. 大树 1 (wishing tree) is intentionally excluded.")]
+        [Tooltip("Only these serialized WorldMap targets are used. Missing Collider2D disables that proximity trigger.")]
         [SerializeField] private Transform[] _appleTreeTargets = Array.Empty<Transform>();
         [SerializeField] private Transform? _wishTreeTarget;
         [SerializeField] private Transform? _angelSignTarget;
@@ -146,20 +187,25 @@ namespace GeminiLab.Modules.WorldMap
         [SerializeField, Min(0.1f)] private float _sleepDurationSeconds = 2.5f;
         [SerializeField, Min(0.1f)] private float _castDurationSeconds = 2f;
         [SerializeField, Min(0.1f)] private float _proudDurationSeconds = 2f;
+        [SerializeField, Min(0.00001f)] private float _horizontalMotionEpsilon = 0.0001f;
         [SerializeField] private DebugAnimationBinding[] _bindings = Array.Empty<DebugAnimationBinding>();
 
         private readonly Dictionary<PetId, ActiveAnimation> _activeAnimations = new();
-        private readonly Dictionary<PetId, PendingAnimation> _pendingAnimations = new();
-        private readonly Dictionary<string, bool> _proximityLatches = new(StringComparer.Ordinal);
+        private readonly Dictionary<PetId, AnimationRequest> _pendingRequests = new();
+        private readonly Dictionary<string, int> _rangeLatches = new(StringComparer.Ordinal);
         private readonly Dictionary<PetId, float> _nextRoamingTriggerTime = new();
+        private readonly Dictionary<PetId, float> _lastHorizontalPositions = new();
+        private readonly Dictionary<PetId, float> _horizontalDeltas = new();
         private readonly HashSet<string> _knownPlacementKeys = new(StringComparer.Ordinal);
+        private readonly Dictionary<PetPlayerFurnitureInteractionController, bool>
+            _suspendedOutdoorFurnitureInteractions = new();
 
         private IEmotionGardenService? _gardenService;
         private EventBus? _eventBus;
         private IDisposable? _placementsChangedSubscription;
         private IDisposable? _gardenClearedSubscription;
         private bool _placementSnapshotInitialized;
-        private bool _sceneTargetsResolved;
+        private bool _sceneTargetsValidated;
         private bool _isShuttingDown;
 
         public IReadOnlyList<DebugAnimationBinding> Bindings => _bindings;
@@ -167,8 +213,9 @@ namespace GeminiLab.Modules.WorldMap
         private void OnEnable()
         {
             _isShuttingDown = false;
-            _sceneTargetsResolved = false;
+            _sceneTargetsValidated = false;
             EnsureDependencies();
+            SuspendLegacyOutdoorFurnitureInteractions();
         }
 
         private void OnDisable()
@@ -176,7 +223,8 @@ namespace GeminiLab.Modules.WorldMap
             _isShuttingDown = true;
             ReleaseAllAnimations(false);
             DisposeEventSubscriptions();
-            _proximityLatches.Clear();
+            _rangeLatches.Clear();
+            RestoreLegacyOutdoorFurnitureInteractions();
         }
 
         private void OnDestroy()
@@ -184,11 +232,14 @@ namespace GeminiLab.Modules.WorldMap
             _isShuttingDown = true;
             ReleaseAllAnimations(false);
             DisposeEventSubscriptions();
+            RestoreLegacyOutdoorFurnitureInteractions();
         }
 
         private void Update()
         {
             EnsureDependencies();
+            SampleActualHorizontalMotion(_angelPet);
+            SampleActualHorizontalMotion(_devilPet);
             TickActiveAnimations();
 
             if (TryReadNumberKey(out int keyNumber))
@@ -198,6 +249,7 @@ namespace GeminiLab.Modules.WorldMap
 
             HandlePlayerFInput();
             EvaluateProximityTriggers();
+            ApplyOutdoorBaseAnimations();
         }
 
         /// <summary>Called by the editor authoring pass to bind the two pets and debug mappings.</summary>
@@ -205,6 +257,7 @@ namespace GeminiLab.Modules.WorldMap
         {
             _angelPet = angelPet;
             _devilPet = devilPet;
+            SuspendLegacyOutdoorFurnitureInteractions();
             _bindings = new[]
             {
                 new DebugAnimationBinding(1, PetId.Angel, "天使 - 坐地", "Outdoor_Sit", _sitDurationSeconds),
@@ -218,11 +271,67 @@ namespace GeminiLab.Modules.WorldMap
         }
 
         /// <summary>
-        /// Binds authored scene targets. Empty optional target arguments preserve an
-        /// existing Inspector assignment so an unrecognized sign is still editable.
+        /// WorldMap owns the outdoor pet animation interaction whitelist. The
+        /// legacy furniture adapter has scene bindings and fallback world points
+        /// intended for indoor furniture, so it must not remain an alternate
+        /// trigger source on either explicitly bound outdoor pet.
         /// </summary>
-        public void ConfigureSceneTargets(Transform[]? appleTrees, Transform? wishTree,
-            Transform? angelSign, Transform? devilSign)
+        private void SuspendLegacyOutdoorFurnitureInteractions()
+        {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+
+            SuspendLegacyOutdoorFurnitureInteraction(_angelPet);
+            SuspendLegacyOutdoorFurnitureInteraction(_devilPet);
+        }
+
+        private void SuspendLegacyOutdoorFurnitureInteraction(PetController? pet)
+        {
+            if (pet == null)
+            {
+                return;
+            }
+
+            PetPlayerFurnitureInteractionController? interactionController =
+                pet.GetComponent<PetPlayerFurnitureInteractionController>();
+            if (interactionController == null ||
+                _suspendedOutdoorFurnitureInteractions.ContainsKey(interactionController))
+            {
+                return;
+            }
+
+            _suspendedOutdoorFurnitureInteractions.Add(interactionController, interactionController.enabled);
+            interactionController.enabled = false;
+            Debug.Log(
+                $"[WorldMapPetAnimation] Disabled legacy furniture interaction on outdoor pet '{pet.name}'. " +
+                "Only the explicit WorldMap pet whitelist may trigger outdoor pet animation.",
+                pet);
+        }
+
+        private void RestoreLegacyOutdoorFurnitureInteractions()
+        {
+            foreach (KeyValuePair<PetPlayerFurnitureInteractionController, bool> pair in
+                     _suspendedOutdoorFurnitureInteractions)
+            {
+                if (pair.Key != null)
+                {
+                    pair.Key.enabled = pair.Value;
+                }
+            }
+
+            _suspendedOutdoorFurnitureInteractions.Clear();
+        }
+
+        /// <summary>
+        /// Binds authored scene targets. Runtime proximity never searches by object name.
+        /// </summary>
+        public void ConfigureSceneTargets(
+            Transform[]? appleTrees,
+            Transform? wishTree,
+            Transform? angelSign,
+            Transform? devilSign)
         {
             if (appleTrees != null && appleTrees.Length > 0)
             {
@@ -232,7 +341,7 @@ namespace GeminiLab.Modules.WorldMap
             if (wishTree != null) _wishTreeTarget = wishTree;
             if (angelSign != null) _angelSignTarget = angelSign;
             if (devilSign != null) _devilSignTarget = devilSign;
-            _sceneTargetsResolved = false;
+            _sceneTargetsValidated = false;
         }
 
         /// <summary>Retains the existing number-key debug entry point for animation QA.</summary>
@@ -248,22 +357,32 @@ namespace GeminiLab.Modules.WorldMap
             PetController? pet = binding.PetId == PetId.Angel ? _angelPet : _devilPet;
             if (pet == null)
             {
-                Debug.LogWarning($"[WorldMapPetAnimation] Missing {binding.PetId} pet for debug key {binding.KeyNumber}.", this);
+                Debug.LogWarning(
+                    $"[WorldMapPetAnimation] Missing {binding.PetId} pet for debug key {binding.KeyNumber}.",
+                    this);
                 return false;
             }
 
             if (!TryResolveAction(binding.AnimationStateName, out PetAction action))
             {
-                Debug.LogWarning($"[WorldMapPetAnimation] Unsupported debug state '{binding.AnimationStateName}'.", this);
+                Debug.LogWarning(
+                    $"[WorldMapPetAnimation] Unsupported debug state '{binding.AnimationStateName}'.",
+                    this);
                 return false;
             }
 
-            return TryStartAction(pet, action, null, binding.DurationSeconds, false);
+            return RequestAction(
+                pet,
+                action,
+                TriggerSource.Debug,
+                null,
+                null,
+                binding.DurationSeconds);
         }
 
         private void EnsureDependencies()
         {
-            ResolveSceneTargetsFallbacks();
+            ValidateSceneTargets();
 
             if (_gardenService == null)
             {
@@ -285,34 +404,37 @@ namespace GeminiLab.Modules.WorldMap
             }
         }
 
-        private void ResolveSceneTargetsFallbacks()
+        private void ValidateSceneTargets()
         {
-            if (_sceneTargetsResolved) return;
+            if (_sceneTargetsValidated) return;
+            _sceneTargetsValidated = true;
 
             if (_appleTreeTargets == null || _appleTreeTargets.Length == 0)
             {
-                _appleTreeTargets = FindTransforms(AppleTreeNames);
+                Debug.LogWarning(
+                    "[WorldMapPetAnimation] No serialized apple-tree targets; Sit/Sleep proximity triggers are disabled.",
+                    this);
             }
-
-            _wishTreeTarget ??= FindFirstTransform(new[] { "许愿树", "WishingTree" });
-            _angelSignTarget ??= FindFirstTransform(AngelSignNames);
-            _devilSignTarget ??= FindFirstTransform(DevilSignNames);
-            _sceneTargetsResolved = true;
-
-            if (_appleTreeTargets.Length == 0)
+            else
             {
-                Debug.LogWarning("[WorldMapPetAnimation] No apple-tree targets found; Sit/Sleep proximity triggers are disabled.", this);
+                for (int i = 0; i < _appleTreeTargets.Length; i++)
+                {
+                    LogMissingColliderIfNeeded(_appleTreeTargets[i], "apple-tree");
+                }
             }
 
-            if (_wishTreeTarget == null)
-            {
-                Debug.LogWarning("[WorldMapPetAnimation] No wishing-tree target found; Pray proximity trigger is disabled.", this);
-            }
+            LogMissingColliderIfNeeded(_wishTreeTarget, "wishing-tree");
+            LogMissingColliderIfNeeded(_angelSignTarget, "angel sign");
+            LogMissingColliderIfNeeded(_devilSignTarget, "devil sign");
+        }
 
-            if (_angelSignTarget == null || _devilSignTarget == null)
-            {
-                Debug.Log("[WorldMapPetAnimation] Sign targets are optional; assign missing angel/devil sign references in Inspector.", this);
-            }
+        private static void LogMissingColliderIfNeeded(Transform? target, string label)
+        {
+            if (target == null) return;
+            if (TryGetClosestPoint(target, target.position, out _)) return;
+            Debug.LogWarning(
+                $"[WorldMapPetAnimation] Serialized {label} target '{target.name}' has no enabled Collider2D; its proximity trigger is disabled.",
+                target);
         }
 
         private void HandlePlayerFInput()
@@ -320,31 +442,91 @@ namespace GeminiLab.Modules.WorldMap
             if (!Input.GetKeyDown(KeyCode.F)) return;
 
             PetController? controlledPet = null;
-            if (_angelPet != null && _angelPet.IsPlayerControlEnabled) controlledPet = _angelPet;
-            else if (_devilPet != null && _devilPet.IsPlayerControlEnabled) controlledPet = _devilPet;
+            if (_angelPet != null && _angelPet.IsPlayerControlEnabled)
+            {
+                controlledPet = _angelPet;
+            }
+            else if (_devilPet != null && _devilPet.IsPlayerControlEnabled)
+            {
+                controlledPet = _devilPet;
+            }
+
             if (controlledPet == null || _activeAnimations.ContainsKey(controlledPet.PetId)) return;
 
             if (controlledPet.PetId == PetId.Angel)
             {
-                if (TryGetNearestTarget(controlledPet, _appleTreeTargets, _playerInteractionRadius, out Transform? appleTree))
+                if (TryGetNearestColliderTarget(
+                        controlledPet,
+                        _appleTreeTargets,
+                        _playerInteractionRadius,
+                        out Transform? appleTree,
+                        out Vector3 applePoint))
                 {
-                    TryStartAction(controlledPet, PetAction.AngelSit, appleTree, _sitDurationSeconds, true);
+                    RequestAction(
+                        controlledPet,
+                        PetAction.AngelSit,
+                        TriggerSource.PlayerInput,
+                        appleTree,
+                        applePoint,
+                        _sitDurationSeconds);
                 }
-                else if (IsWithinRadius(controlledPet.transform.position, _wishTreeTarget, _playerInteractionRadius))
+                else if (TryGetNearestAngelFlower(
+                             controlledPet,
+                             _playerInteractionRadius,
+                             out Transform? flowerTarget,
+                             out Vector3 flowerPoint))
                 {
-                    TryStartAction(controlledPet, PetAction.AngelPray, _wishTreeTarget, _prayDurationSeconds, true);
+                    RequestAction(
+                        controlledPet,
+                        PetAction.AngelWater,
+                        TriggerSource.PlayerInput,
+                        flowerTarget,
+                        flowerPoint,
+                        _waterDurationSeconds);
+                }
+                else if (TryGetTargetClosestPoint(
+                             controlledPet,
+                             _wishTreeTarget,
+                             _playerInteractionRadius,
+                             out Vector3 wishPoint))
+                {
+                    RequestAction(
+                        controlledPet,
+                        PetAction.AngelPray,
+                        TriggerSource.PlayerInput,
+                        _wishTreeTarget,
+                        wishPoint,
+                        _prayDurationSeconds);
                 }
             }
-            else
+            else if (TryGetNearestColliderTarget(
+                         controlledPet,
+                         _appleTreeTargets,
+                         _playerInteractionRadius,
+                         out Transform? appleTree,
+                         out Vector3 applePoint))
             {
-                if (TryGetNearestTarget(controlledPet, _appleTreeTargets, _playerInteractionRadius, out Transform? appleTree))
-                {
-                    TryStartAction(controlledPet, PetAction.DevilSleep, appleTree, _sleepDurationSeconds, true);
-                }
-                else if (IsWithinRadius(controlledPet.transform.position, _devilSignTarget, _playerInteractionRadius))
-                {
-                    TryStartAction(controlledPet, PetAction.DevilCast, _devilSignTarget, _castDurationSeconds, true);
-                }
+                RequestAction(
+                    controlledPet,
+                    PetAction.DevilSleep,
+                    TriggerSource.PlayerInput,
+                    appleTree,
+                    applePoint,
+                    _sleepDurationSeconds);
+            }
+            else if (TryGetTargetClosestPoint(
+                         controlledPet,
+                         _devilSignTarget,
+                         _playerInteractionRadius,
+                         out Vector3 devilSignPoint))
+            {
+                RequestAction(
+                    controlledPet,
+                    PetAction.DevilCast,
+                    TriggerSource.PlayerInput,
+                    _devilSignTarget,
+                    devilSignPoint,
+                    _castDurationSeconds);
             }
         }
 
@@ -358,65 +540,198 @@ namespace GeminiLab.Modules.WorldMap
         {
             if (pet == null) return;
 
-            bool hasFlower = TryGetNearestAngelFlower(pet, out Vector3 flowerPosition);
-            bool enteredWaterRange = UpdateProximityLatch(pet.PetId, PetAction.AngelWater, hasFlower);
-            if (enteredWaterRange && !_activeAnimations.ContainsKey(pet.PetId))
+            if (pet.IsPlayerControlEnabled)
             {
-                TryStartAction(pet, PetAction.AngelWater, null, _waterDurationSeconds, true, flowerPosition);
+                UpdateRangeLatch(pet.PetId, PetAction.AngelWater, null, false);
+                UpdateRangeLatch(pet.PetId, PetAction.AngelSit, null, false);
+                UpdateRangeLatch(pet.PetId, PetAction.AngelPray, null, false);
                 return;
             }
 
-            bool nearAppleTree = TryGetNearestTarget(pet, _appleTreeTargets, _proximityRadius, out Transform? appleTree);
-            if (TryRoamingTrigger(pet, PetAction.AngelSit, nearAppleTree, appleTree, _sitDurationSeconds)) return;
+            bool hasFlower = TryGetNearestAngelFlower(
+                pet,
+                _proximityRadius,
+                out Transform? flowerTarget,
+                out Vector3 flowerPoint);
+            bool enteredWaterRange = UpdateRangeLatch(
+                pet.PetId,
+                PetAction.AngelWater,
+                flowerTarget,
+                hasFlower);
+            if (enteredWaterRange && !_activeAnimations.ContainsKey(pet.PetId))
+            {
+                RequestAction(
+                    pet,
+                    PetAction.AngelWater,
+                    TriggerSource.Roaming,
+                    flowerTarget,
+                    flowerPoint,
+                    _waterDurationSeconds);
+                return;
+            }
 
-            bool nearWishTree = IsWithinRadius(pet.transform.position, _wishTreeTarget, _proximityRadius);
-            if (TryRoamingTrigger(pet, PetAction.AngelPray, nearWishTree, _wishTreeTarget, _prayDurationSeconds)) return;
+            bool nearAppleTree = TryGetNearestColliderTarget(
+                pet,
+                _appleTreeTargets,
+                _proximityRadius,
+                out Transform? appleTree,
+                out Vector3 applePoint);
+            if (TryRoamingTrigger(
+                    pet,
+                    PetAction.AngelSit,
+                    nearAppleTree,
+                    appleTree,
+                    applePoint,
+                    _sitDurationSeconds))
+            {
+                return;
+            }
+
+            bool nearWishTree = TryGetTargetClosestPoint(
+                pet,
+                _wishTreeTarget,
+                _proximityRadius,
+                out Vector3 wishPoint);
+            TryRoamingTrigger(
+                pet,
+                PetAction.AngelPray,
+                nearWishTree,
+                _wishTreeTarget,
+                wishPoint,
+                _prayDurationSeconds);
         }
 
         private void EvaluateDevilProximity(PetController? pet)
         {
             if (pet == null) return;
 
-            bool nearAppleTree = TryGetNearestTarget(pet, _appleTreeTargets, _proximityRadius, out Transform? appleTree);
-            if (TryRoamingTrigger(pet, PetAction.DevilSleep, nearAppleTree, appleTree, _sleepDurationSeconds)) return;
+            if (pet.IsPlayerControlEnabled)
+            {
+                UpdateRangeLatch(pet.PetId, PetAction.DevilSleep, null, false);
+                UpdateRangeLatch(pet.PetId, PetAction.DevilCast, null, false);
+                return;
+            }
 
-            bool nearDevilSign = IsWithinRadius(pet.transform.position, _devilSignTarget, _proximityRadius);
-            TryRoamingTrigger(pet, PetAction.DevilCast, nearDevilSign, _devilSignTarget, _castDurationSeconds);
+            bool nearAppleTree = TryGetNearestColliderTarget(
+                pet,
+                _appleTreeTargets,
+                _proximityRadius,
+                out Transform? appleTree,
+                out Vector3 applePoint);
+            if (TryRoamingTrigger(
+                    pet,
+                    PetAction.DevilSleep,
+                    nearAppleTree,
+                    appleTree,
+                    applePoint,
+                    _sleepDurationSeconds))
+            {
+                return;
+            }
+
+            bool nearDevilSign = TryGetTargetClosestPoint(
+                pet,
+                _devilSignTarget,
+                _proximityRadius,
+                out Vector3 devilSignPoint);
+            TryRoamingTrigger(
+                pet,
+                PetAction.DevilCast,
+                nearDevilSign,
+                _devilSignTarget,
+                devilSignPoint,
+                _castDurationSeconds);
         }
 
-        private bool TryRoamingTrigger(PetController pet, PetAction action, bool inRange, Transform? target, float duration)
+        private bool TryRoamingTrigger(
+            PetController pet,
+            PetAction action,
+            bool inRange,
+            Transform? target,
+            Vector3 targetPoint,
+            float fallbackDuration)
         {
-            bool entered = UpdateProximityLatch(pet.PetId, action, inRange);
-            if (!entered || pet.IsPlayerControlEnabled || _activeAnimations.ContainsKey(pet.PetId)) return false;
+            if (pet.IsPlayerControlEnabled)
+            {
+                UpdateRangeLatch(pet.PetId, action, null, false);
+                return false;
+            }
+
+            bool entered = UpdateRangeLatch(pet.PetId, action, target, inRange);
+            if (!entered || _activeAnimations.ContainsKey(pet.PetId))
+            {
+                return false;
+            }
 
             if (!CanRollRoamingTrigger(pet.PetId)) return false;
             if (UnityEngine.Random.value > Mathf.Clamp01(_roamingTriggerChance)) return false;
 
-            _nextRoamingTriggerTime[pet.PetId] = Time.time + Mathf.Max(0.1f, _roamingCooldownSeconds);
-            return TryStartAction(pet, action, target, duration, true);
+            bool started = RequestAction(
+                pet,
+                action,
+                TriggerSource.Roaming,
+                target,
+                inRange ? targetPoint : null,
+                fallbackDuration);
+            if (started)
+            {
+                _nextRoamingTriggerTime[pet.PetId] =
+                    Time.time + Mathf.Max(0.1f, _roamingCooldownSeconds);
+            }
+
+            return started;
         }
 
-        private bool CanRollRoamingTrigger(PetId petId)
-        {
-            return !_nextRoamingTriggerTime.TryGetValue(petId, out float nextTime) || Time.time >= nextTime;
-        }
-
-        private bool UpdateProximityLatch(PetId petId, PetAction action, bool inRange)
-        {
-            string key = $"{petId}:{action}";
-            bool wasInRange = _proximityLatches.TryGetValue(key, out bool previous) && previous;
-            _proximityLatches[key] = inRange;
-            return inRange && !wasInRange;
-        }
-
-        private bool TryStartAction(PetController pet, PetAction action, Transform? target, float duration,
-            bool queueIfBusy, Vector3? explicitTargetPosition = null)
+        private bool RequestAction(
+            PetController pet,
+            PetAction action,
+            TriggerSource source,
+            Transform? target,
+            Vector3? targetPosition,
+            float fallbackDuration)
         {
             if (!IsActionForPet(action, pet.PetId)) return false;
+            if (source == TriggerSource.Roaming && pet.IsPlayerControlEnabled)
+            {
+                return false;
+            }
+
+            var request = new AnimationRequest(
+                pet,
+                action,
+                source,
+                target,
+                targetPosition,
+                fallbackDuration);
 
             if (_activeAnimations.ContainsKey(pet.PetId))
             {
-                if (queueIfBusy) _pendingAnimations[pet.PetId] = new PendingAnimation(action, target);
+                // Roaming is an edge-triggered opportunity, not a delayed command.
+                // Only a deliberate input or a successful placement may wait for the
+                // current special action to finish.
+                return source != TriggerSource.Roaming && EnqueuePendingRequest(request);
+            }
+
+            return StartAction(request);
+        }
+
+        private bool EnqueuePendingRequest(AnimationRequest request)
+        {
+            if (!_pendingRequests.TryGetValue(request.Pet.PetId, out AnimationRequest current) ||
+                PriorityFor(request.Source) > PriorityFor(current.Source))
+            {
+                _pendingRequests[request.Pet.PetId] = request;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool StartAction(AnimationRequest request)
+        {
+            PetController pet = request.Pet;
+            if (pet == null || pet.IsMovementLocked)
+            {
                 return false;
             }
 
@@ -427,38 +742,72 @@ namespace GeminiLab.Modules.WorldMap
                 return false;
             }
 
-            var animatorController = animator.runtimeAnimatorController;
-            if (animatorController == null)
+            RuntimeAnimatorController? controller = animator.runtimeAnimatorController;
+            if (controller == null)
             {
                 Debug.LogWarning($"[WorldMapPetAnimation] '{pet.name}' Animator has no controller.", pet);
                 return false;
             }
 
-            string requestedState = StateNameFor(action);
+            string requestedState = StateNameFor(request.Action);
             if (!TryResolveStateName(animator, requestedState, out string resolvedStateName))
             {
-                Debug.LogWarning($"[WorldMapPetAnimation] State '{requestedState}' is missing from '{animatorController.name}'.", pet);
+                Debug.LogWarning(
+                    $"[WorldMapPetAnimation] State '{requestedState}' is missing from '{controller.name}'.",
+                    pet);
                 return false;
             }
 
             SpriteRenderer? renderer = pet.GetComponentInChildren<SpriteRenderer>(true);
             bool originalFlipX = renderer != null && renderer.flipX;
-            Vector3? targetPosition = explicitTargetPosition;
-            if (!targetPosition.HasValue && target != null) targetPosition = target.position;
-            if (renderer != null && targetPosition.HasValue)
+            bool holdTargetFacing = false;
+            bool targetFlipX = originalFlipX;
+            if (renderer != null && request.TargetPosition is Vector3 targetPosition)
             {
-                renderer.flipX = targetPosition.Value.x < pet.transform.position.x;
+                holdTargetFacing = true;
+                float horizontalDirection = targetPosition.x - pet.transform.position.x;
+                if (Mathf.Abs(horizontalDirection) > 0.00001f)
+                {
+                    targetFlipX = ResolveFacingFlip(horizontalDirection);
+                }
+
+                renderer.flipX = targetFlipX;
             }
 
+            // Lock movement before entering the special state. This keeps the
+            // PetController from applying a normal movement/pose update in the
+            // same frame as this animation request.
+            pet.SetExternalMovementLock(true);
+
+            // The WorldMap controller has movement AnyState transitions. Clear the
+            // movement condition before entering a special state so it cannot win
+            // over this explicit Play call on the next Animator evaluation.
+            animator.SetBool(IsMovingHash, false);
             animator.speed = 1f;
             animator.Play(resolvedStateName, 0, 0f);
             animator.Update(0f);
-            float clipLength = animator.GetCurrentAnimatorStateInfo(0).length;
-            pet.SetExternalMovementLock(true);
-            _activeAnimations[pet.PetId] = new ActiveAnimation(
-                pet, animator, action, resolvedStateName, duration, clipLength, renderer, originalFlipX);
 
-            Debug.Log($"[WorldMapPetAnimation] {pet.PetId} started {action} ({resolvedStateName}).", pet);
+            AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+            float clipLength = stateInfo.length;
+            float playbackSeconds = clipLength > 0.0001f
+                ? clipLength
+                : Mathf.Max(0.1f, request.FallbackDuration);
+
+            _activeAnimations[pet.PetId] = new ActiveAnimation(
+                pet,
+                animator,
+                request.Action,
+                resolvedStateName,
+                playbackSeconds,
+                renderer,
+                originalFlipX,
+                holdTargetFacing,
+                targetFlipX);
+
+            Debug.Log(
+                $"[WorldMapPetAnimation] {pet.PetId} started {request.Action} ({resolvedStateName}) " +
+                $"source={request.Source}, oneShotSeconds={playbackSeconds:0.###}.",
+                pet);
             return true;
         }
 
@@ -476,8 +825,25 @@ namespace GeminiLab.Modules.WorldMap
                     continue;
                 }
 
+                active.Animator.speed = 1f;
+                active.Animator.SetBool(IsMovingHash, false);
+                if (active.HoldTargetFacing && active.Renderer != null)
+                {
+                    active.Renderer.flipX = active.TargetFlipX;
+                }
+
+                AnimatorStateInfo stateInfo = active.Animator.GetCurrentAnimatorStateInfo(0);
+                if (!stateInfo.IsName(active.StateName))
+                {
+                    float normalizedTime = active.PlaybackSeconds <= 0.0001f
+                        ? 0f
+                        : Mathf.Clamp01(active.ElapsedSeconds / active.PlaybackSeconds);
+                    active.Animator.Play(active.StateName, 0, normalizedTime);
+                    active.Animator.Update(0f);
+                }
+
                 active.ElapsedSeconds += Time.deltaTime;
-                if (active.ElapsedSeconds >= active.DurationSeconds)
+                if (active.ElapsedSeconds + 0.0001f >= active.PlaybackSeconds)
                 {
                     ReleaseAnimation(petId, true);
                 }
@@ -489,33 +855,46 @@ namespace GeminiLab.Modules.WorldMap
             if (!_activeAnimations.TryGetValue(petId, out ActiveAnimation? active)) return;
 
             active.Animator.speed = 1f;
-            if (active.Renderer != null) active.Renderer.flipX = active.OriginalFlipX;
+            if (active.Renderer != null)
+            {
+                // PetController remains the normal movement mirror owner. Restore
+                // the pre-action facing here; the next movement tick will apply its
+                // existing serialized side-frame convention if movement resumes.
+                active.Renderer.flipX = active.OriginalFlipX;
+            }
+
             if (active.Pet != null) active.Pet.SetExternalMovementLock(false);
             _activeAnimations.Remove(petId);
 
-            if (processPending && !_isShuttingDown && _pendingAnimations.TryGetValue(petId, out PendingAnimation pending))
+            bool startedPending = false;
+            if (processPending && !_isShuttingDown &&
+                _pendingRequests.TryGetValue(petId, out AnimationRequest pending))
             {
-                _pendingAnimations.Remove(petId);
-                PetController? pet = petId == PetId.Angel ? _angelPet : _devilPet;
-                if (pet != null) TryStartAction(pet, pending.Action, pending.Target, DurationFor(pending.Action), true);
+                _pendingRequests.Remove(petId);
+                startedPending = StartAction(pending);
+            }
+
+            if (!startedPending)
+            {
+                ApplyOutdoorBaseAnimation(active.Pet);
             }
         }
 
         private void ReleaseAllAnimations(bool processPending)
         {
             var petIds = new List<PetId>(_activeAnimations.Keys);
-            foreach (PetId petId in petIds) ReleaseAnimation(petId, processPending);
+            foreach (PetId petId in petIds)
+            {
+                ReleaseAnimation(petId, processPending);
+            }
+
             _activeAnimations.Clear();
-            _pendingAnimations.Clear();
+            _pendingRequests.Clear();
         }
 
         private void HandlePlacementsChanged()
         {
-            if (_gardenService == null)
-            {
-                EnsureDependencies();
-            }
-
+            if (_gardenService == null) EnsureDependencies();
             RefreshPlacementSnapshot(true);
         }
 
@@ -537,18 +916,31 @@ namespace GeminiLab.Modules.WorldMap
                 string key = PlacementKey(placement);
                 currentKeys.Add(key);
 
-                if (triggerNewPlacements && _placementSnapshotInitialized && !_knownPlacementKeys.Contains(key))
+                if (!triggerNewPlacements || !_placementSnapshotInitialized || _knownPlacementKeys.Contains(key))
                 {
-                    PetId petId = EmotionFlowerCatalog.NormalizeOwner(placement.Owner) == EmotionFlowerCatalog.OwnerDemon
-                        ? PetId.Devil
-                        : PetId.Angel;
-                    PetController? pet = petId == PetId.Angel ? _angelPet : _devilPet;
-                    if (pet != null)
-                    {
-                        PetAction action = petId == PetId.Angel ? PetAction.AngelHappy : PetAction.DevilProud;
-                        TryStartAction(pet, action, null, DurationFor(action), true);
-                    }
+                    continue;
                 }
+
+                PetId petId = EmotionFlowerCatalog.NormalizeOwner(placement.Owner) ==
+                              EmotionFlowerCatalog.OwnerDemon
+                    ? PetId.Devil
+                    : PetId.Angel;
+                PetController? pet = petId == PetId.Angel ? _angelPet : _devilPet;
+                if (pet == null) continue;
+
+                PetAction action = petId == PetId.Angel
+                    ? PetAction.AngelHappy
+                    : PetAction.DevilProud;
+                // This event is published only after TryPlaceFlower has accepted
+                // the record. The visual slot may be activated later in the same
+                // frame, so Happy/Proud does not depend on a preview or slot lookup.
+                RequestAction(
+                    pet,
+                    action,
+                    TriggerSource.PlacementSuccess,
+                    null,
+                    null,
+                    DurationFor(action));
             }
 
             _knownPlacementKeys.Clear();
@@ -556,87 +948,348 @@ namespace GeminiLab.Modules.WorldMap
             _placementSnapshotInitialized = true;
         }
 
-        private bool TryGetNearestAngelFlower(PetController pet, out Vector3 position)
+        private bool TryGetNearestAngelFlower(
+            PetController pet,
+            float radius,
+            out Transform? target,
+            out Vector3 closestPoint)
         {
-            position = default;
+            target = null;
+            closestPoint = default;
             if (_gardenService == null) return false;
 
             IReadOnlyList<PlacedEmotionFlower> placements = _gardenService.GetPlacedFlowers();
-            float bestDistance = float.PositiveInfinity;
-            bool found = false;
-            for (int i = 0; i < placements.Count; i++)
-            {
-                PlacedEmotionFlower placement = placements[i];
-                if (EmotionFlowerCatalog.NormalizeOwner(placement.Owner) != EmotionFlowerCatalog.OwnerAngel) continue;
+            WorldMapPlacementSlot[] slots = UnityEngine.Object.FindObjectsByType<WorldMapPlacementSlot>(
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.None);
+            var usedSlots = new HashSet<WorldMapPlacementSlot>();
+            var flowerCandidates = new List<FlowerCandidate>();
+            float maxDistanceSquared = radius * radius;
 
-                Vector3 candidate = new(placement.WorldX, placement.WorldY, pet.transform.position.z);
-                float distance = (candidate - pet.transform.position).sqrMagnitude;
-                if (distance > _proximityRadius * _proximityRadius || distance >= bestDistance) continue;
-                bestDistance = distance;
-                position = candidate;
+            for (int placementIndex = 0; placementIndex < placements.Count; placementIndex++)
+            {
+                PlacedEmotionFlower placement = placements[placementIndex];
+                if (EmotionFlowerCatalog.NormalizeOwner(placement.Owner) !=
+                    EmotionFlowerCatalog.OwnerAngel)
+                {
+                    continue;
+                }
+
+                string flowerId = EmotionFlowerCatalog.NormalizeOwner(placement.Owner) + "|" +
+                                  EmotionFlowerCatalog.NormalizeEmotionType(placement.EmotionType);
+                WorldMapFlowerPlacementController.PlacementVisualType visualType = placement.IsCluster
+                    ? WorldMapFlowerPlacementController.PlacementVisualType.Cluster
+                    : WorldMapFlowerPlacementController.PlacementVisualType.Single;
+                WorldMapPlacementSlot? matchedSlot = null;
+                Rect matchedRect = default;
+                float bestRecordDistance = float.PositiveInfinity;
+
+                for (int slotIndex = 0; slotIndex < slots.Length; slotIndex++)
+                {
+                    WorldMapPlacementSlot slot = slots[slotIndex];
+                    if (slot == null || usedSlots.Contains(slot) || !slot.IsOccupied ||
+                        !slot.gameObject.activeInHierarchy)
+                    {
+                        continue;
+                    }
+
+                    Collider2D? occupancyCollider = slot.GetComponent<Collider2D>();
+                    if (occupancyCollider == null || !occupancyCollider.enabled ||
+                        !occupancyCollider.gameObject.activeInHierarchy)
+                    {
+                        continue;
+                    }
+
+                    WorldMapPlacedFlower? metadata = slot.GetComponent<WorldMapPlacedFlower>();
+                    if (metadata == null || metadata.FlowerId != flowerId ||
+                        metadata.VisualType != visualType)
+                    {
+                        continue;
+                    }
+
+                    Rect occupiedRect = slot.GetOccupiedRect();
+                    if (occupiedRect.width <= 0.0001f || occupiedRect.height <= 0.0001f)
+                    {
+                        continue;
+                    }
+
+                    Vector2 savedPosition = new(placement.WorldX, placement.WorldY);
+                    float recordDistance = ((Vector2)occupiedRect.center - savedPosition).sqrMagnitude;
+                    if (recordDistance >= bestRecordDistance) continue;
+                    bestRecordDistance = recordDistance;
+                    matchedSlot = slot;
+                    matchedRect = occupiedRect;
+                }
+
+                if (matchedSlot == null) continue;
+                usedSlots.Add(matchedSlot);
+
+                Vector2 petPosition = pet.transform.position;
+                Vector2 point = new(
+                    Mathf.Clamp(petPosition.x, matchedRect.xMin, matchedRect.xMax),
+                    Mathf.Clamp(petPosition.y, matchedRect.yMin, matchedRect.yMax));
+                float distanceSquared = (point - petPosition).sqrMagnitude;
+                if (distanceSquared > maxDistanceSquared) continue;
+
+                flowerCandidates.Add(new FlowerCandidate(matchedSlot.transform, point, distanceSquared));
+            }
+
+            FlowerCandidate? nearest = null;
+            for (int i = 0; i < flowerCandidates.Count; i++)
+            {
+                FlowerCandidate candidate = flowerCandidates[i];
+                if (!nearest.HasValue || candidate.DistanceSquared < nearest.Value.DistanceSquared)
+                {
+                    nearest = candidate;
+                }
+            }
+
+            if (!nearest.HasValue) return false;
+            target = nearest.Value.Target;
+            closestPoint = nearest.Value.ClosestPoint;
+            return true;
+        }
+
+        private static bool TryGetNearestColliderTarget(
+            PetController pet,
+            Transform[]? targets,
+            float radius,
+            out Transform? nearest,
+            out Vector3 closestPoint)
+        {
+            nearest = null;
+            closestPoint = default;
+            if (targets == null || targets.Length == 0) return false;
+
+            Vector2 source = pet.transform.position;
+            float bestDistanceSquared = radius * radius;
+            for (int i = 0; i < targets.Length; i++)
+            {
+                Transform? target = targets[i];
+                if (!TryGetClosestPoint(target, source, out Vector2 candidatePoint)) continue;
+
+                float distanceSquared = (candidatePoint - source).sqrMagnitude;
+                if (distanceSquared > bestDistanceSquared) continue;
+                bestDistanceSquared = distanceSquared;
+                nearest = target;
+                closestPoint = candidatePoint;
+            }
+
+            return nearest != null;
+        }
+
+        private static bool TryGetTargetClosestPoint(
+            PetController pet,
+            Transform? target,
+            float radius,
+            out Vector3 closestPoint)
+        {
+            closestPoint = default;
+            if (!TryGetClosestPoint(target, pet.transform.position, out Vector2 candidatePoint))
+            {
+                return false;
+            }
+
+            if (((Vector2)pet.transform.position - candidatePoint).sqrMagnitude > radius * radius)
+            {
+                return false;
+            }
+
+            closestPoint = candidatePoint;
+            return true;
+        }
+
+        private static bool TryGetClosestPoint(
+            Transform? target,
+            Vector2 source,
+            out Vector2 closestPoint)
+        {
+            closestPoint = default;
+            if (target == null) return false;
+
+            Collider2D[] colliders = target.GetComponentsInChildren<Collider2D>(true);
+            float bestDistanceSquared = float.PositiveInfinity;
+            bool found = false;
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider2D collider = colliders[i];
+                if (collider == null || !collider.enabled || !collider.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                Vector2 candidatePoint = collider.ClosestPoint(source);
+                float distanceSquared = (candidatePoint - source).sqrMagnitude;
+                if (distanceSquared >= bestDistanceSquared) continue;
+                bestDistanceSquared = distanceSquared;
+                closestPoint = candidatePoint;
                 found = true;
             }
 
             return found;
         }
 
-        private static bool TryGetNearestTarget(PetController pet, Transform[]? targets, float radius, out Transform? nearest)
+        private bool UpdateRangeLatch(
+            PetId petId,
+            PetAction action,
+            Transform? target,
+            bool inRange)
         {
-            nearest = null;
-            if (targets == null || targets.Length == 0) return false;
+            string key = $"{petId}:{action}";
+            int previousTargetId = _rangeLatches.TryGetValue(key, out int previous) ? previous : 0;
+            int currentTargetId = inRange && target != null ? target.GetInstanceID() : 0;
+            _rangeLatches[key] = currentTargetId;
+            return currentTargetId != 0 && currentTargetId != previousTargetId;
+        }
 
-            float bestDistance = radius * radius;
-            for (int i = 0; i < targets.Length; i++)
+        private void SampleActualHorizontalMotion(PetController? pet)
+        {
+            if (pet == null) return;
+
+            PetId petId = pet.PetId;
+            float currentX = pet.transform.position.x;
+            if (!_lastHorizontalPositions.TryGetValue(petId, out float previousX))
             {
-                Transform? target = targets[i];
-                if (target == null) continue;
-                float distance = (target.position - pet.transform.position).sqrMagnitude;
-                if (distance <= bestDistance)
+                _horizontalDeltas[petId] = 0f;
+            }
+            else
+            {
+                _horizontalDeltas[petId] = currentX - previousX;
+            }
+
+            _lastHorizontalPositions[petId] = currentX;
+        }
+
+        private bool HasActualHorizontalMovement(PetId petId)
+        {
+            return _horizontalDeltas.TryGetValue(petId, out float delta) &&
+                   Mathf.Abs(delta) > Mathf.Max(0.00001f, _horizontalMotionEpsilon);
+        }
+
+        private void ApplyOutdoorBaseAnimations()
+        {
+            ApplyOutdoorBaseAnimation(_angelPet);
+            ApplyOutdoorBaseAnimation(_devilPet);
+        }
+
+        private void ApplyOutdoorBaseAnimation(PetController? pet)
+        {
+            if (pet == null || _activeAnimations.ContainsKey(pet.PetId)) return;
+
+            Animator? animator = pet.GetComponentInChildren<Animator>(true);
+            RuntimeAnimatorController? runtimeController = animator != null
+                ? animator.runtimeAnimatorController
+                : null;
+            if (animator == null || runtimeController == null) return;
+
+            bool isMoving = HasActualHorizontalMovement(pet.PetId);
+            animator.SetBool(IsMovingHash, isMoving);
+            float horizontalDelta = _horizontalDeltas.TryGetValue(pet.PetId, out float sampledDelta)
+                ? sampledDelta
+                : 0f;
+            animator.SetFloat(MoveXHash, Mathf.Sign(horizontalDelta));
+            animator.SetFloat(MoveYHash, 0f);
+            animator.SetInteger(MoveDirHash, 2);
+
+            string requestedState = isMoving ? "Move_Side" : "Idle_Side";
+            if (!TryResolveStateName(animator, requestedState, out string resolvedStateName)) return;
+
+            AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+            if (!stateInfo.IsName(resolvedStateName))
+            {
+                animator.Play(resolvedStateName, 0, 0f);
+                animator.Update(0f);
+            }
+
+        }
+
+        private static bool ResolveFacingFlip(float horizontalDirection)
+        {
+            if (Mathf.Abs(horizontalDirection) <= 0.00001f) return false;
+
+            // Both outdoor pets currently have the serialized PetController
+            // side-frame convention "face left": moving right flips the sprite.
+            // Keep target-facing consistent with that existing authoring value.
+            return horizontalDirection > 0f;
+        }
+
+        private static int PriorityFor(TriggerSource source)
+        {
+            return source switch
+            {
+                TriggerSource.PlacementSuccess => 300,
+                TriggerSource.PlayerInput => 200,
+                TriggerSource.Debug => 150,
+                TriggerSource.Roaming => 100,
+                _ => 0
+            };
+        }
+
+        private bool CanRollRoamingTrigger(PetId petId)
+        {
+            return !_nextRoamingTriggerTime.TryGetValue(petId, out float nextTime) ||
+                   Time.time >= nextTime;
+        }
+
+        private void DisposeEventSubscriptions()
+        {
+            _placementsChangedSubscription?.Dispose();
+            _gardenClearedSubscription?.Dispose();
+            _placementsChangedSubscription = null;
+            _gardenClearedSubscription = null;
+            _eventBus = null;
+        }
+
+        private static bool TryReadNumberKey(out int keyNumber)
+        {
+            for (int number = 1; number <= 9; number++)
+            {
+                if (Input.GetKeyDown(NumberKeys[number]) || Input.GetKeyDown(KeypadNumberKeys[number]))
                 {
-                    bestDistance = distance;
-                    nearest = target;
+                    keyNumber = number;
+                    return true;
                 }
             }
 
-            return nearest != null;
+            keyNumber = 0;
+            return false;
         }
 
-        private static bool IsWithinRadius(Vector3 source, Transform? target, float radius)
+        private DebugAnimationBinding? FindBinding(int keyNumber)
         {
-            return target != null && (target.position - source).sqrMagnitude <= radius * radius;
-        }
-
-        private static Transform[] FindTransforms(string[] names)
-        {
-            var found = new List<Transform>();
-            for (int i = 0; i < names.Length; i++)
+            for (int i = 0; i < _bindings.Length; i++)
             {
-                Transform? target = FindFirstTransform(new[] { names[i] });
-                if (target != null && !found.Contains(target)) found.Add(target);
-            }
-
-            return found.ToArray();
-        }
-
-        private static Transform? FindFirstTransform(string[] names)
-        {
-            for (int i = 0; i < names.Length; i++)
-            {
-                GameObject? target = GameObject.Find(names[i]);
-                if (target != null) return target.transform;
+                DebugAnimationBinding? binding = _bindings[i];
+                if (binding != null && binding.KeyNumber == keyNumber) return binding;
             }
 
             return null;
         }
 
-        private static string PlacementKey(PlacedEmotionFlower placement)
+        private static bool TryResolveStateName(
+            Animator animator,
+            string requestedStateName,
+            out string resolvedStateName)
         {
-            return $"{placement.SlotIndex}|{placement.EmotionType}|{placement.Owner}|{placement.IsCluster}";
+            resolvedStateName = requestedStateName;
+            if (string.IsNullOrWhiteSpace(requestedStateName)) return false;
+
+            if (animator.HasState(0, Animator.StringToHash(requestedStateName))) return true;
+
+            string baseLayerStateName = $"Base Layer.{requestedStateName}";
+            if (animator.HasState(0, Animator.StringToHash(baseLayerStateName)))
+            {
+                resolvedStateName = baseLayerStateName;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool IsActionForPet(PetAction action, PetId petId)
         {
-            bool angelAction = action is PetAction.AngelSit or PetAction.AngelPray or PetAction.AngelWater or PetAction.AngelHappy;
+            bool angelAction = action is PetAction.AngelSit or PetAction.AngelPray or
+                PetAction.AngelWater or PetAction.AngelHappy;
             return angelAction ? petId == PetId.Angel : petId == PetId.Devil;
         }
 
@@ -688,57 +1341,12 @@ namespace GeminiLab.Modules.WorldMap
                 or "Outdoor_Sleep" or "Outdoor_Cast" or "Outdoor_Proud";
         }
 
-        private DebugAnimationBinding? FindBinding(int keyNumber)
+        private static string PlacementKey(PlacedEmotionFlower placement)
         {
-            for (int i = 0; i < _bindings.Length; i++)
-            {
-                DebugAnimationBinding? binding = _bindings[i];
-                if (binding != null && binding.KeyNumber == keyNumber) return binding;
-            }
-
-            return null;
-        }
-
-        private void DisposeEventSubscriptions()
-        {
-            _placementsChangedSubscription?.Dispose();
-            _gardenClearedSubscription?.Dispose();
-            _placementsChangedSubscription = null;
-            _gardenClearedSubscription = null;
-            _eventBus = null;
-        }
-
-        private static bool TryReadNumberKey(out int keyNumber)
-        {
-            for (int number = 1; number <= 9; number++)
-            {
-                if (Input.GetKeyDown(NumberKeys[number]) || Input.GetKeyDown(KeypadNumberKeys[number]))
-                {
-                    keyNumber = number;
-                    return true;
-                }
-            }
-
-            keyNumber = 0;
-            return false;
-        }
-
-        private static bool TryResolveStateName(Animator animator, string requestedStateName, out string resolvedStateName)
-        {
-            resolvedStateName = requestedStateName;
-            if (string.IsNullOrWhiteSpace(requestedStateName)) return false;
-
-            int requestedHash = Animator.StringToHash(requestedStateName);
-            if (animator.HasState(0, requestedHash)) return true;
-
-            string baseLayerStateName = $"Base Layer.{requestedStateName}";
-            if (animator.HasState(0, Animator.StringToHash(baseLayerStateName)))
-            {
-                resolvedStateName = baseLayerStateName;
-                return true;
-            }
-
-            return false;
+            return $"{placement.SlotIndex}|" +
+                   $"{EmotionFlowerCatalog.NormalizeEmotionType(placement.EmotionType)}|" +
+                   $"{EmotionFlowerCatalog.NormalizeOwner(placement.Owner)}|" +
+                   placement.IsCluster;
         }
     }
 }
