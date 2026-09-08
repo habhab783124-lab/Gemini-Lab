@@ -35,11 +35,11 @@ namespace GeminiLab.Tests.EditMode
         }
 
         [Test]
-        public async Task SubmitEmotionAsync_StoresAiFlowerFieldsAndDailySummary()
+        public void SubmitEmotionAsync_StoresAiFlowerFieldsAndDailySummary()
         {
             const string summary = "今天把忙乱的心情写下来，也为自己留出了一点喘息空间，新的花朵替你收好这份温柔。";
-            const string angelNote = "天使看见你认真记录今天的感受，并把这份勇气变成花语，愿你在平静里继续向前。";
-            const string devilNote = "恶魔记下你没有逃避今天的情绪，先承认它，再带着这点清醒去做下一件真正重要的事。";
+            const string angelNote = "天使看见你认真记录今天的感受，并把这份勇气变成花语，愿你在平静里继续向前，也相信明天会有新的可能。";
+            const string devilNote = "恶魔记下你没有逃避今天的情绪，先承认它，再带着这点清醒去做下一件真正重要的事，别停在原地。";
             var aiResult = new EmotionGardenAiResult
             {
                 EmotionType = "喜悦",
@@ -52,10 +52,10 @@ namespace GeminiLab.Tests.EditMode
             };
             ServiceLocator.Register<IEmotionGardenAiProvider>(new FakeProvider(aiResult));
 
-            EmotionFlowerData? submitted = await _service.SubmitEmotionAsync(
+            EmotionFlowerData? submitted = _service.SubmitEmotionAsync(
                 string.Empty,
-                "今天完成了重要的事情，心里很轻松。",
-                EmotionFlowerCatalog.OwnerAngel);
+                "今天特别开心，完成了重要的事情，心里很轻松。",
+                EmotionFlowerCatalog.OwnerAngel).GetAwaiter().GetResult();
 
             Assert.True(submitted.HasValue);
             Assert.AreEqual("喜悦", submitted.Value.EmotionType);
@@ -71,7 +71,7 @@ namespace GeminiLab.Tests.EditMode
         }
 
         [Test]
-        public async Task SubmitEmotionAsync_InvalidAiEmotionFallsBackToLocalClassification()
+        public void SubmitEmotionAsync_InvalidAiEmotionFallsBackToLocalClassification()
         {
             ServiceLocator.Register<IEmotionGardenAiProvider>(new FakeProvider(new EmotionGardenAiResult
             {
@@ -82,10 +82,10 @@ namespace GeminiLab.Tests.EditMode
                 DevilNote = "太短"
             }));
 
-            EmotionFlowerData? submitted = await _service.SubmitEmotionAsync(
+            EmotionFlowerData? submitted = _service.SubmitEmotionAsync(
                 string.Empty,
-                "今天完成了重要的事情，心里很轻松。",
-                EmotionFlowerCatalog.OwnerDemon);
+                "今天特别开心，完成了重要的事情，心里很轻松。",
+                EmotionFlowerCatalog.OwnerDemon).GetAwaiter().GetResult();
 
             Assert.True(submitted.HasValue);
             Assert.AreEqual("喜悦", submitted.Value.EmotionType);

@@ -4,6 +4,14 @@ using System.Collections.Generic;
 
 namespace GeminiLab.Modules.EmotionGarden
 {
+    public static class EmotionGardenResultSources
+    {
+        public const string Ai = "[AI]";
+        public const string LocalRule = "[LocalRule]";
+        public const string Mock = "[Mock]";
+        public const string Fallback = "[Fallback]";
+    }
+
     /// <summary>
     /// 一次情绪提交所需的 AI 生成结果。字段同时覆盖每日总结和每周培育信息。
     /// </summary>
@@ -17,6 +25,7 @@ namespace GeminiLab.Modules.EmotionGarden
         public string Summary = string.Empty;
         public string AngelNote = string.Empty;
         public string DevilNote = string.Empty;
+        public string ResultSource = EmotionGardenResultSources.Fallback;
         public bool IsFallback;
 
         public EmotionGardenAiResult Clone()
@@ -32,12 +41,13 @@ namespace GeminiLab.Modules.EmotionGarden
                 Summary = Summary,
                 AngelNote = AngelNote,
                 DevilNote = DevilNote,
+                ResultSource = ResultSource,
                 IsFallback = IsFallback
             };
         }
     }
 
-    /// <summary>AI 返回字段的边界校验，避免非法内容写入存档或 UI。</summary>
+    /// <summary>AI 返回字段的结构校验与长度归一化，避免非法内容写入存档或 UI。</summary>
     public static class EmotionGardenAiValidation
     {
         public static bool IsValidEmotion(string emotionType)
@@ -74,11 +84,59 @@ namespace GeminiLab.Modules.EmotionGarden
             return result.ToArray();
         }
 
-        public static bool IsInRange(string value, int minLength, int maxLength)
+        public static bool IsCompleteResult(EmotionGardenAiResult? result, out string reason)
         {
-            if (string.IsNullOrWhiteSpace(value)) return false;
-            int length = value.Trim().Length;
-            return length >= minLength && length <= maxLength;
+            if (result == null)
+            {
+                reason = "result-null";
+                return false;
+            }
+
+            if (!IsValidEmotion(result.EmotionType))
+            {
+                reason = "invalid-emotion";
+                return false;
+            }
+
+            string[] keywords = NormalizeKeywords(result.EmotionKeywords);
+            if (keywords.Length < 2)
+            {
+                reason = "invalid-keywords";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(result.FlowerDescription))
+            {
+                reason = "empty-flower-description";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(result.FlowerLanguage))
+            {
+                reason = "empty-flower-language";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(result.Summary))
+            {
+                reason = "empty-summary";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(result.AngelNote))
+            {
+                reason = "empty-angel-note";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(result.DevilNote))
+            {
+                reason = "empty-devil-note";
+                return false;
+            }
+
+            reason = string.Empty;
+            return true;
         }
     }
 }

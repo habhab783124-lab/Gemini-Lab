@@ -65,6 +65,8 @@ namespace GeminiLab.Modules.EmotionGarden
                 emotionDetail,
                 resolvedEmotionType,
                 normalizedOwner);
+            fallback.ResultSource = EmotionGardenResultSources.LocalRule;
+            Debug.Log($"{EmotionGardenResultSources.LocalRule} role={ResolveLogRole(normalizedOwner)} feature=Emotion inputEmpty={string.IsNullOrWhiteSpace(emotionDetail)} reason=SyncApi");
 
             return CommitEmotion(emotionDetail, normalizedOwner, fallback);
         }
@@ -87,6 +89,7 @@ namespace GeminiLab.Modules.EmotionGarden
                 emotionDetail,
                 localEmotion,
                 normalizedOwner);
+            Debug.Log($"{EmotionGardenResultSources.LocalRule} role={ResolveLogRole(normalizedOwner)} feature=Emotion inputEmpty={string.IsNullOrWhiteSpace(emotionDetail)} candidate={localEmotion}");
 
             _pendingSubmitDateIso = today;
             try
@@ -105,6 +108,10 @@ namespace GeminiLab.Modules.EmotionGarden
                             fallback.FlowerDescription,
                             cancellationToken);
                         selected = MergeAiResult(fallback, generated, normalizedOwner, emotionDetail);
+                        if (generated == null)
+                        {
+                            Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={ResolveLogRole(normalizedOwner)} feature=Emotion reason=ProviderReturnedNull");
+                        }
                     }
                     catch (OperationCanceledException)
                     {
@@ -112,8 +119,13 @@ namespace GeminiLab.Modules.EmotionGarden
                     }
                     catch (Exception ex)
                     {
+                        Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={ResolveLogRole(normalizedOwner)} feature=Emotion reason=ServiceException:{ex.GetType().Name}");
                         Debug.LogWarning($"[EmotionGarden] AI 生成失败，使用本地兜底：{ex.Message}");
                     }
+                }
+                else
+                {
+                    Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={ResolveLogRole(normalizedOwner)} feature=Emotion reason=ProviderNotRegistered");
                 }
 
                 return CommitEmotion(emotionDetail, normalizedOwner, selected);
@@ -165,6 +177,11 @@ namespace GeminiLab.Modules.EmotionGarden
             UpsertDailySummary(BuildDailySummary(flower, aiResult));
 
             _eventBus?.Publish(new EmotionFlowerSubmittedEvent(flower));
+
+            string source = string.IsNullOrWhiteSpace(aiResult.ResultSource)
+                ? (aiResult.IsFallback ? EmotionGardenResultSources.Fallback : EmotionGardenResultSources.Ai)
+                : aiResult.ResultSource;
+            Debug.Log($"{source} role={ResolveLogRole(flower.Owner)} feature=Emotion result=Committed flower={flower.FlowerName} emotion={flower.EmotionType}");
 
             Debug.Log($"[EmotionGarden] 提交情绪: {flower.FlowerName} ({flower.EmotionType}/{flower.Owner})");
             return flower;
@@ -726,6 +743,13 @@ namespace GeminiLab.Modules.EmotionGarden
             _dailySummaries.Add(summary);
         }
 
+        private static string ResolveLogRole(string owner)
+        {
+            return EmotionFlowerCatalog.NormalizeOwner(owner) == EmotionFlowerCatalog.OwnerDemon
+                ? "Devil"
+                : "Angel";
+        }
+
         private static EmotionGardenAiResult BuildFallbackAiResult(
             string dateIso,
             string inputSentence,
@@ -748,6 +772,7 @@ namespace GeminiLab.Modules.EmotionGarden
                 Summary = TrimSummary($"今天记录了{emotion}的心情：“{input}”。{flowerName}把这份感受收进花园，陪你慢慢走过今天。", 60),
                 AngelNote = TrimSummary($"天使日记：我看见你愿意认真说出“{input}”。{flowerName}替你收好这份心意，今天辛苦了，明天也可以慢慢来。", 80),
                 DevilNote = TrimSummary($"恶魔日记：别急着给今天下结论。你已经把“{input}”说出来了，这就足够让{flowerName}替你守住一点勇气，继续往前走。", 80),
+                ResultSource = EmotionGardenResultSources.Fallback,
                 IsFallback = true
             };
         }
@@ -763,34 +788,23 @@ namespace GeminiLab.Modules.EmotionGarden
                 return fallback;
             }
 
-            string emotion = EmotionGardenAiValidation.IsValidEmotion(generated.EmotionType)
-                ? EmotionFlowerCatalog.NormalizeEmotionType(generated.EmotionType)
-                : fallback.EmotionType;
-            EmotionGardenAiResult merged = BuildFallbackAiResult(
-                string.Empty,
-                inputSentence,
-                emotion,
-                owner);
-
-            merged.EmotionKeywords = EmotionGardenAiValidation.NormalizeKeywords(generated.EmotionKeywords);
-            if (merged.EmotionKeywords.Length == 0)
+            if (!EmotionGardenAiValidation.IsCompleteResult(generated, out string validationReason))
             {
-                merged.EmotionKeywords = fallback.EmotionKeywords;
+                fallback.ResultSource = EmotionGardenResultSources.Fallback;
+                fallback.IsFallback = true;
+                Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={ResolveLogRole(owner)} feature=Emotion reason=InvalidProviderResult:{validationReason}");
+                return fallback;
             }
 
-            string description = EmotionGardenAiValidation.NormalizeText(generated.FlowerDescription, 120);
-            if (!string.IsNullOrWhiteSpace(description)) merged.FlowerDescription = description;
-
-            string language = EmotionGardenAiValidation.NormalizeText(generated.FlowerLanguage, 160);
-            if (!string.IsNullOrWhiteSpace(language)) merged.FlowerLanguage = language;
-
-            if (EmotionGardenAiValidation.IsInRange(generated.Summary, 30, 60))
-                merged.Summary = generated.Summary.Trim();
-            if (EmotionGardenAiValidation.IsInRange(generated.AngelNote, 40, 80))
-                merged.AngelNote = generated.AngelNote.Trim();
-            if (EmotionGardenAiValidation.IsInRange(generated.DevilNote, 40, 80))
-                merged.DevilNote = generated.DevilNote.Trim();
-
+            EmotionGardenAiResult merged = generated.Clone();
+            merged.EmotionType = EmotionFlowerCatalog.NormalizeEmotionType(merged.EmotionType);
+            merged.EmotionKeywords = EmotionGardenAiValidation.NormalizeKeywords(merged.EmotionKeywords);
+            merged.FlowerDescription = EmotionGardenAiValidation.NormalizeText(merged.FlowerDescription, 120);
+            merged.FlowerLanguage = EmotionGardenAiValidation.NormalizeText(merged.FlowerLanguage, 160);
+            merged.Summary = EmotionGardenAiValidation.NormalizeText(merged.Summary, 60);
+            merged.AngelNote = EmotionGardenAiValidation.NormalizeText(merged.AngelNote, 80);
+            merged.DevilNote = EmotionGardenAiValidation.NormalizeText(merged.DevilNote, 80);
+            merged.ResultSource = EmotionGardenResultSources.Ai;
             merged.IsFallback = false;
             return merged;
         }
