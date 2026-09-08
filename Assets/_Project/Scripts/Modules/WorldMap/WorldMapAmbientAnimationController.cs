@@ -79,12 +79,12 @@ namespace GeminiLab.Modules.WorldMap
 
         [Header("作者化引用")]
         [SerializeField] private SpriteRenderer? _cloudRenderer;
+        [SerializeField] private SpriteRenderer? _skyRenderer;
         [SerializeField] private Transform? _flowerVisualRoot;
         [SerializeField] private TreeBinding[] _treeBindings = Array.Empty<TreeBinding>();
 
         [Header("云层")]
-        [SerializeField, Min(0f)] private float _cloudMoveSpeed = 0.8f;
-        [SerializeField, Min(0f)] private float _cloudMoveRange = 1.2f;
+        [SerializeField, Min(0f)] private float _cloudMoveSpeed = 0.12f;
 
         [Header("单朵花")]
         [SerializeField, Range(0f, 15f)] private float _singleFlowerRotationAngle = 8f;
@@ -94,7 +94,15 @@ namespace GeminiLab.Modules.WorldMap
         [SerializeField, Range(0f, 8f)] private float _treeRotationAngle = 2.6f;
         [SerializeField, Min(0f)] private float _treeRotationSpeed = 0.5f;
 
+        // The previous authored motion used a 1.2-unit sinusoidal range. Keep
+        // that peak displacement speed after expanding the travel interval.
+        private const float PreviousCloudMoveRange = 1.2f;
+
         private Vector3 _cloudBaseLocalPosition;
+        private float _cloudMoveMinLocalX;
+        private float _cloudMoveMaxLocalX;
+        private float _cloudAngularSpeed;
+        private bool _cloudMotionConfigured;
         private readonly List<FlowerPose> _flowerPoses = new();
         private readonly List<TreePose> _treePoses = new();
 
@@ -141,6 +149,7 @@ namespace GeminiLab.Modules.WorldMap
             _cloudBaseLocalPosition = _cloudRenderer != null
                 ? _cloudRenderer.transform.localPosition
                 : Vector3.zero;
+            CacheCloudMotionBounds();
 
             _flowerPoses.Clear();
             if (_flowerVisualRoot != null)
@@ -177,12 +186,52 @@ namespace GeminiLab.Modules.WorldMap
             }
         }
 
+        private void CacheCloudMotionBounds()
+        {
+            _cloudMotionConfigured = false;
+            if (_cloudRenderer == null || _skyRenderer == null) return;
+
+            Bounds skyBounds = _skyRenderer.bounds;
+            Bounds cloudBounds = _cloudRenderer.bounds;
+            float cloudHalfWidth = cloudBounds.extents.x;
+            float minWorldX = skyBounds.min.x + cloudHalfWidth;
+            float maxWorldX = skyBounds.max.x - cloudHalfWidth;
+            if (maxWorldX <= minWorldX) return;
+
+            Transform? cloudParent = _cloudRenderer.transform.parent;
+            Vector3 minWorldPoint = _cloudRenderer.transform.position;
+            minWorldPoint.x = minWorldX;
+            Vector3 maxWorldPoint = _cloudRenderer.transform.position;
+            maxWorldPoint.x = maxWorldX;
+
+            if (cloudParent == null)
+            {
+                _cloudMoveMinLocalX = minWorldPoint.x;
+                _cloudMoveMaxLocalX = maxWorldPoint.x;
+            }
+            else
+            {
+                _cloudMoveMinLocalX = cloudParent.InverseTransformPoint(minWorldPoint).x;
+                _cloudMoveMaxLocalX = cloudParent.InverseTransformPoint(maxWorldPoint).x;
+            }
+
+            float halfRange = (_cloudMoveMaxLocalX - _cloudMoveMinLocalX) * 0.5f;
+            float previousPeakSpeed = _cloudMoveSpeed * PreviousCloudMoveRange;
+            _cloudAngularSpeed = halfRange > Mathf.Epsilon
+                ? previousPeakSpeed / halfRange
+                : 0f;
+            _cloudMotionConfigured = true;
+        }
+
         private void AnimateCloud(float time)
         {
-            if (_cloudRenderer == null) return;
+            if (_cloudRenderer == null || !_cloudMotionConfigured) return;
 
             Vector3 position = _cloudBaseLocalPosition;
-            position.x += Mathf.Sin(time * _cloudMoveSpeed) * _cloudMoveRange;
+            float normalized = (_cloudAngularSpeed <= 0f
+                ? 0.5f
+                : (Mathf.Sin(time * _cloudAngularSpeed) + 1f) * 0.5f);
+            position.x = Mathf.Lerp(_cloudMoveMinLocalX, _cloudMoveMaxLocalX, normalized);
             _cloudRenderer.transform.localPosition = position;
         }
 

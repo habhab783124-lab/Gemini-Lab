@@ -682,3 +682,15 @@ WorldMap 苹果树点击后由 `AppleTreeDropController` 播放快速晃动并�
 - `AppleRuntimeBootstrap` 在核心时钟可用后注册服务，并为当前场景已有的三棵目标树建立状态；`AppleTreeDropController` 只分配 Scene 中已有的 1～3 个 `AppleDropSlot`，不创建运行时视觉对象。
 - `AppleDropSlot` 只有服务领取成功后才隐藏苹果、增加余额并显示 `CollectionText`；`AppleTreeFeedback` 使用已有 `StatusText` 显示未成熟提示，持续时间约 2 秒。
 - 3 个 `StatusText`、9 个 `CollectionText` 的 MeshRenderer 与 TMP 覆盖材质已统一改为现有 `NotoSansSC_SDF`，清除了旧 `LiberationSans` 实例材质，修复中文反馈设置成功但不出字的问题；本阶段未进入 Unity Play。
+
+### 2026-09-08 WorldMap 云层范围与室内入口点击
+
+- `WorldMapAmbientAnimationController` 现在使用 `WorldMap_Main.unity` 中 `BaselineLine_云` 的作者化横向范围 `x=-54.563995` 到 `x=20.005005` 驱动云朵往返移动，不再使用过窄的 `1.2` 对称偏移。
+- 外场 `室内` 物体保留原有 SpriteRenderer 和 BoxCollider2D，并通过其 `CabinReturnPortal` 组件登记到 `WorldMapSceneInteractionRouter`；命中自身 Collider2D 后调用 `ISceneFlowService.LoadAsync(SceneId.Apartment)`。
+- 本次不修改 `Apartment_Main.unity`、室内家具、室内状态机、桥面逻辑或动画资源；Play 结果仍需人工确认。
+
+### 2026-09-08 WorldMap 云层范围与移速校正
+
+- 上一版使用 `BaselineLine_云` 的手写范围，现改为显式引用 `WorldMap_Main.unity` 中已有的 `天空` SpriteRenderer；云层移动区间根据天空和云层的真实渲染边界计算。
+- 云层速度恢复为上一版的 `0.12` 参数，并按旧版 `1.2` 单位振幅校准扩展后的正弦相位速度，避免仅因移动跨度变大而加速。
+- 本次不改 `天空` 或云层的尺寸、位置、Sprite、相机、室内入口、动画资源和其他 WorldMap 交互；Play 结果仍需人工确认。

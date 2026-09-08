@@ -546,3 +546,15 @@ Updated: 2026-08-22
 - 运行时入口：`AppleRuntimeBootstrap.cs`；树点击与掉落表现：`AppleTreeInteractable.cs`、`AppleTreeDropController.cs`、`AppleDropSlot.cs`、`AppleTreeFeedback.cs`。
 - Scene 唯一视觉来源：`WorldMap_Main.unity` 中 `WorldMapAppleDrops` 下的 9 个苹果槽位、9 个 `CollectionText`，以及 3 个树下 `StatusText`。这些节点必须保持序列化引用，运行时只切换显隐和文本。
 - 反馈文字使用 `Assets/_Project/Art/Fonts/NotoSansSC_SDF.asset` 及其材质；不要把旧 Liberation 字体实例材质重新绑定到这些节点。
+
+### WorldMap 云层和室内入口（2026-09-08）
+
+- `Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs` 读取 Scene 序列化的 `_cloudMoveMinX` / `_cloudMoveMaxX`，当前对应 `BaselineLine_云` 的完整室外范围。
+- `Assets/_Project/Scripts/Modules/WorldMap/CabinReturnPortal.cs` 是外场 `室内` 物体的 Collider2D 点击目标；`WorldMap_Main.unity/_SceneRoot` 的 `WorldMapSceneInteractionRouter._targets` 显式引用其现有组件。
+- `CabinReturnPortal` 只负责从 WorldMap 进入 `Apartment_Main`，不改变 Apartment 场景内容。
+
+### WorldMap 云层范围与移速校正（2026-09-08）
+
+- `WorldMapAmbientAnimationController._skyRenderer` 显式引用 `WorldMap_Main.unity` 中 `天空` 的 SpriteRenderer；云层范围不再依赖 `BaselineLine_云` 或手写最小/最大 X。
+- 控制器根据天空与云层的实际渲染边界换算云层父节点本地坐标，并保持旧版 `0.12` / `1.2` 运动组合对应的最大位移速度。
+- `WorldMap_Main.unity` 仍是天空、云层和控制器序列化引用的唯一事实源；不创建运行时视觉对象。

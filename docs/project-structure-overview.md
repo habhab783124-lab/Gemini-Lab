@@ -414,3 +414,15 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 - 苹果系统已按“服务预留固定批次 → Scene 槽位分配 → 单个槽位成功领取 → 余额入账”的顺序重写，`AppleService` 是唯一货币状态权威。
 - 三棵目标树仍由 `WorldMap_Main.unity` 中各自的 PolygonCollider2D、AppleTreeDropController、3 个 AppleDropSlot 和 AppleTreeFeedback 组成；未使用运行时创建的苹果或文字对象。
 - 收获提示和未成熟提示均使用 Scene 已有 TMP MeshRenderer，当前绑定 `NotoSansSC_SDF`，并清除旧 Liberation 实例材质覆盖。
+
+## WorldMap 云层与室内入口（2026-09-08）
+
+- 云朵视觉节点仍是 `WorldMap_Main.unity/WorldMapWeatherClouds`；完整运动范围由 Scene 中的 `BaselineLine_云` 和 `_cloudMoveMinX` / `_cloudMoveMaxX` 保存。
+- 外场 `室内` 节点使用自身 `BoxCollider2D` 和 `CabinReturnPortal`，由 `WorldMapSceneInteractionRouter` 统一裁决点击并通过 `ISceneFlowService` 进入 `Apartment_Main`。
+- 本次没有改动 Apartment 场景、室内交互或桌宠动画资源。
+
+## WorldMap 云层范围与移速校正（2026-09-08）
+
+- 云朵节点仍为 `WorldMap_Main.unity/WorldMapWeatherClouds`，范围参考为同场景已有的 `天空` SpriteRenderer。
+- `WorldMapAmbientAnimationController` 使用天空与云层的真实渲染边界计算可移动区间，并保留旧版云层的实际移动速度；不回写天空或云层的尺寸和位置作者化参数。
+- 该改动只涉及 WorldMap 云层运行时辅助逻辑和序列化引用，不扩展到室内系统或其他交互。
