@@ -1,5 +1,5 @@
 # Gemini-Lab AI memory index
-# Updated: 2026-09-08
+# Updated: 2026-09-09
 
 AGENTS.md
 Assets/_Project/Scripts/Modules/HubUI/ApartmentFurnitureSelectionPresenter.cs
@@ -43,6 +43,8 @@ Assets/_Project/Scenes/Boot.unity
 Assets/_Project/Scenes/Apartment/Apartment_Main.unity
 Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity
 Assets/_Project/Scenes/WorldMap/WorldMap_PetAnimationPreview.unity
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs
+Assets/_Project/Scripts/Modules/Pet/PetController.cs
 Assets/_Project/Scenes/Desktop/Desktop_Overlay.unity
 Assets/_Project/Prefabs/README.md
 Assets/_Project/Prefabs/Furniture
@@ -292,3 +294,8 @@ Assets/_Project/Scripts/Modules/WorldMap/WorldMapAmbientAnimationController.cs (
 Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (Sky SpriteRenderer serialized into ambient cloud controller)
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 玩家控制期间屏蔽漫游特殊动画并清理目标锁存)
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapFlowerPlacementController.cs (2026-09-09 作者化 Angel/Demon 区域 Collider 作为唯一有效边界，FlowerPlacementBounds 仅旧场景回退)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 移除普通 Idle/Move 的重复 Animator 控制，交还 PetController)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 室外玩家操控/漫游普通动画唯一控制者、真实横向位移判断与 Any State 重置规避)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 普通移动朝向使用玩家输入/漫游目标并过滤实际位移抖动)
+Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 普通移动朝向收敛为实际横向位移单一来源)
+Assets/_Project/Scripts/Modules/Pet/PetController.cs (2026-09-09 WorldMap 动画控制权隔离接口，移动/漫游/过桥逻辑保持不变)

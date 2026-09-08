@@ -187,15 +187,18 @@ namespace GeminiLab.Modules.WorldMap
         [SerializeField, Min(0.1f)] private float _sleepDurationSeconds = 2.5f;
         [SerializeField, Min(0.1f)] private float _castDurationSeconds = 2f;
         [SerializeField, Min(0.1f)] private float _proudDurationSeconds = 2f;
-        [SerializeField, Min(0.00001f)] private float _horizontalMotionEpsilon = 0.0001f;
         [SerializeField] private DebugAnimationBinding[] _bindings = Array.Empty<DebugAnimationBinding>();
 
         private readonly Dictionary<PetId, ActiveAnimation> _activeAnimations = new();
         private readonly Dictionary<PetId, AnimationRequest> _pendingRequests = new();
         private readonly Dictionary<string, int> _rangeLatches = new(StringComparer.Ordinal);
         private readonly Dictionary<PetId, float> _nextRoamingTriggerTime = new();
-        private readonly Dictionary<PetId, float> _lastHorizontalPositions = new();
-        private readonly Dictionary<PetId, float> _horizontalDeltas = new();
+        private readonly Dictionary<PetId, float> _lastFixedHorizontalPositions = new();
+        private readonly Dictionary<PetId, float> _fixedHorizontalDeltas = new();
+        private readonly Dictionary<PetId, int> _stableHorizontalDirections = new();
+        private readonly Dictionary<PetId, int> _candidateHorizontalDirections = new();
+        private readonly Dictionary<PetId, int> _candidateHorizontalDirectionSteps = new();
+        private readonly Dictionary<PetId, string> _lastNormalAnimatorStates = new();
         private readonly HashSet<string> _knownPlacementKeys = new(StringComparer.Ordinal);
         private readonly Dictionary<PetPlayerFurnitureInteractionController, bool>
             _suspendedOutdoorFurnitureInteractions = new();
@@ -207,6 +210,8 @@ namespace GeminiLab.Modules.WorldMap
         private bool _placementSnapshotInitialized;
         private bool _sceneTargetsValidated;
         private bool _isShuttingDown;
+        private const float ActualHorizontalMotionEpsilon = 0.005f;
+        private const int OppositeHorizontalDirectionConfirmationSteps = 2;
 
         public IReadOnlyList<DebugAnimationBinding> Bindings => _bindings;
 
@@ -215,6 +220,7 @@ namespace GeminiLab.Modules.WorldMap
             _isShuttingDown = false;
             _sceneTargetsValidated = false;
             EnsureDependencies();
+            SetOutdoorAnimationControllerActive(true);
             SuspendLegacyOutdoorFurnitureInteractions();
         }
 
@@ -224,6 +230,9 @@ namespace GeminiLab.Modules.WorldMap
             ReleaseAllAnimations(false);
             DisposeEventSubscriptions();
             _rangeLatches.Clear();
+            ClearHorizontalMotionSamples();
+            _lastNormalAnimatorStates.Clear();
+            SetOutdoorAnimationControllerActive(false);
             RestoreLegacyOutdoorFurnitureInteractions();
         }
 
@@ -232,14 +241,15 @@ namespace GeminiLab.Modules.WorldMap
             _isShuttingDown = true;
             ReleaseAllAnimations(false);
             DisposeEventSubscriptions();
+            ClearHorizontalMotionSamples();
+            _lastNormalAnimatorStates.Clear();
+            SetOutdoorAnimationControllerActive(false);
             RestoreLegacyOutdoorFurnitureInteractions();
         }
 
         private void Update()
         {
             EnsureDependencies();
-            SampleActualHorizontalMotion(_angelPet);
-            SampleActualHorizontalMotion(_devilPet);
             TickActiveAnimations();
 
             if (TryReadNumberKey(out int keyNumber))
@@ -249,7 +259,14 @@ namespace GeminiLab.Modules.WorldMap
 
             HandlePlayerFInput();
             EvaluateProximityTriggers();
-            ApplyOutdoorBaseAnimations();
+        }
+
+        private void FixedUpdate()
+        {
+            EnsureDependencies();
+            SampleActualHorizontalMotion(_angelPet);
+            SampleActualHorizontalMotion(_devilPet);
+            ApplyOutdoorNormalAnimations();
         }
 
         /// <summary>Called by the editor authoring pass to bind the two pets and debug mappings.</summary>
@@ -383,6 +400,7 @@ namespace GeminiLab.Modules.WorldMap
         private void EnsureDependencies()
         {
             ValidateSceneTargets();
+            SetOutdoorAnimationControllerActive(true);
 
             if (_gardenService == null)
             {
@@ -401,6 +419,19 @@ namespace GeminiLab.Modules.WorldMap
             if (!_placementSnapshotInitialized && _gardenService != null)
             {
                 RefreshPlacementSnapshot(false);
+            }
+        }
+
+        private void SetOutdoorAnimationControllerActive(bool active)
+        {
+            if (_angelPet != null)
+            {
+                _angelPet.SetExternalAnimationControllerActive(active);
+            }
+
+            if (_devilPet != null)
+            {
+                _devilPet.SetExternalAnimationControllerActive(active);
             }
         }
 
@@ -876,8 +907,26 @@ namespace GeminiLab.Modules.WorldMap
 
             if (!startedPending)
             {
-                ApplyOutdoorBaseAnimation(active.Pet);
+                RestoreNormalAnimatorState(petId, active.Animator);
             }
+        }
+
+        private void RestoreNormalAnimatorState(PetId petId, Animator animator)
+        {
+            // The WorldMap controller owns normal outdoor animation playback.
+            // Restore one authored Idle state at the special-action boundary;
+            // the next normal sampling pass will switch to Move only if the
+            // pet has actually moved since that boundary.
+            if (!TryResolveStateName(animator, "Idle_Side", out string idleStateName)) return;
+
+            animator.SetBool(IsMovingHash, false);
+            animator.SetFloat(MoveXHash, 0f);
+            animator.SetFloat(MoveYHash, 0f);
+            animator.SetInteger(MoveDirHash, 2);
+            animator.speed = 1f;
+            animator.Play(idleStateName, 0, 0f);
+            animator.Update(0f);
+            _lastNormalAnimatorStates[petId] = "Idle_Side";
         }
 
         private void ReleaseAllAnimations(bool processPending)
@@ -1144,63 +1193,166 @@ namespace GeminiLab.Modules.WorldMap
 
         private void SampleActualHorizontalMotion(PetController? pet)
         {
-            if (pet == null) return;
+            if (pet == null)
+            {
+                return;
+            }
 
             PetId petId = pet.PetId;
-            float currentX = pet.transform.position.x;
-            if (!_lastHorizontalPositions.TryGetValue(petId, out float previousX))
+            float currentX = ResolveActualPetPosition(pet).x;
+            if (!_lastFixedHorizontalPositions.TryGetValue(petId, out float previousX))
             {
-                _horizontalDeltas[petId] = 0f;
-            }
-            else
-            {
-                _horizontalDeltas[petId] = currentX - previousX;
+                _lastFixedHorizontalPositions[petId] = currentX;
+                _fixedHorizontalDeltas[petId] = 0f;
+                return;
             }
 
-            _lastHorizontalPositions[petId] = currentX;
+            _fixedHorizontalDeltas[petId] = currentX - previousX;
+            _lastFixedHorizontalPositions[petId] = currentX;
         }
 
-        private bool HasActualHorizontalMovement(PetId petId)
+        private void ClearHorizontalMotionSamples()
         {
-            return _horizontalDeltas.TryGetValue(petId, out float delta) &&
-                   Mathf.Abs(delta) > Mathf.Max(0.00001f, _horizontalMotionEpsilon);
+            _lastFixedHorizontalPositions.Clear();
+            _fixedHorizontalDeltas.Clear();
+            _stableHorizontalDirections.Clear();
+            _candidateHorizontalDirections.Clear();
+            _candidateHorizontalDirectionSteps.Clear();
         }
 
-        private void ApplyOutdoorBaseAnimations()
+        private void ApplyOutdoorNormalAnimations()
         {
-            ApplyOutdoorBaseAnimation(_angelPet);
-            ApplyOutdoorBaseAnimation(_devilPet);
+            ApplyOutdoorNormalAnimation(_angelPet);
+            ApplyOutdoorNormalAnimation(_devilPet);
         }
 
-        private void ApplyOutdoorBaseAnimation(PetController? pet)
+        private void ApplyOutdoorNormalAnimation(PetController? pet)
         {
-            if (pet == null || _activeAnimations.ContainsKey(pet.PetId)) return;
+            if (pet == null)
+            {
+                return;
+            }
 
-            Animator? animator = pet.GetComponentInChildren<Animator>(true);
-            RuntimeAnimatorController? runtimeController = animator != null
-                ? animator.runtimeAnimatorController
-                : null;
-            if (animator == null || runtimeController == null) return;
+            if (!_fixedHorizontalDeltas.TryGetValue(pet.PetId, out float horizontalDelta))
+            {
+                return;
+            }
 
-            bool isMoving = HasActualHorizontalMovement(pet.PetId);
-            animator.SetBool(IsMovingHash, isMoving);
-            float horizontalDelta = _horizontalDeltas.TryGetValue(pet.PetId, out float sampledDelta)
-                ? sampledDelta
-                : 0f;
-            animator.SetFloat(MoveXHash, Mathf.Sign(horizontalDelta));
+            // Sampling continues while a special action is active so the
+            // release boundary cannot turn a stale position difference into a
+            // false Move state.
+            if (_activeAnimations.ContainsKey(pet.PetId))
+            {
+                return;
+            }
+
+            bool movedHorizontally = Mathf.Abs(horizontalDelta) > ActualHorizontalMotionEpsilon;
+            PlayOutdoorNormalState(pet, movedHorizontally, horizontalDelta);
+        }
+
+        private void PlayOutdoorNormalState(
+            PetController pet,
+            bool moving,
+            float horizontalDelta)
+        {
+            Animator? animator = pet.GetComponent<Animator>();
+            if (animator == null)
+            {
+                return;
+            }
+
+            string requestedState = moving ? "Move_Side" : "Idle_Side";
+            if (!TryResolveStateName(animator, requestedState, out string resolvedStateName))
+            {
+                Debug.LogWarning(
+                    $"[WorldMapPetAnimation] Normal state '{requestedState}' is missing from the pet Animator.",
+                    pet);
+                return;
+            }
+
+            // The existing controllers use Any State transitions for Move and
+            // allow self transitions. Keep the condition false and enter the
+            // authored state explicitly, otherwise a true IsMoving value can
+            // restart the same Move Clip repeatedly.
+            animator.SetBool(IsMovingHash, false);
+            int stableDirection = ResolveStableHorizontalDirection(pet.PetId, horizontalDelta, moving);
+            animator.SetFloat(MoveXHash, moving ? stableDirection : 0f);
             animator.SetFloat(MoveYHash, 0f);
             animator.SetInteger(MoveDirHash, 2);
+            animator.speed = 1f;
 
-            string requestedState = isMoving ? "Move_Side" : "Idle_Side";
-            if (!TryResolveStateName(animator, requestedState, out string resolvedStateName)) return;
+            if (stableDirection != 0)
+            {
+                pet.ApplyExternalAnimationFacing(stableDirection);
+            }
 
-            AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-            if (!stateInfo.IsName(resolvedStateName))
+            bool stateChanged = !_lastNormalAnimatorStates.TryGetValue(pet.PetId, out string? lastState) ||
+                                !string.Equals(lastState, requestedState, StringComparison.Ordinal);
+            bool transitionStillActive = animator.IsInTransition(0);
+            if (stateChanged || transitionStillActive)
             {
                 animator.Play(resolvedStateName, 0, 0f);
                 animator.Update(0f);
             }
 
+            _lastNormalAnimatorStates[pet.PetId] = requestedState;
+        }
+
+        private int ResolveStableHorizontalDirection(PetId petId, float horizontalDelta, bool moving)
+        {
+            if (!moving)
+            {
+                _candidateHorizontalDirections.Remove(petId);
+                _candidateHorizontalDirectionSteps.Remove(petId);
+                return _stableHorizontalDirections.TryGetValue(petId, out int stableDirection)
+                    ? stableDirection
+                    : 0;
+            }
+
+            int observedDirection = horizontalDelta > 0f ? 1 : -1;
+            if (!_stableHorizontalDirections.TryGetValue(petId, out int currentDirection) ||
+                currentDirection == 0)
+            {
+                _stableHorizontalDirections[petId] = observedDirection;
+                _candidateHorizontalDirections.Remove(petId);
+                _candidateHorizontalDirectionSteps.Remove(petId);
+                return observedDirection;
+            }
+
+            if (observedDirection == currentDirection)
+            {
+                _candidateHorizontalDirections.Remove(petId);
+                _candidateHorizontalDirectionSteps.Remove(petId);
+                return currentDirection;
+            }
+
+            if (!_candidateHorizontalDirections.TryGetValue(petId, out int candidateDirection) ||
+                candidateDirection != observedDirection)
+            {
+                _candidateHorizontalDirections[petId] = observedDirection;
+                _candidateHorizontalDirectionSteps[petId] = 1;
+                return currentDirection;
+            }
+
+            int candidateSteps = _candidateHorizontalDirectionSteps.TryGetValue(petId, out int steps)
+                ? steps + 1
+                : 1;
+            _candidateHorizontalDirectionSteps[petId] = candidateSteps;
+            if (candidateSteps < OppositeHorizontalDirectionConfirmationSteps)
+            {
+                return currentDirection;
+            }
+
+            _stableHorizontalDirections[petId] = observedDirection;
+            _candidateHorizontalDirections.Remove(petId);
+            _candidateHorizontalDirectionSteps.Remove(petId);
+            return observedDirection;
+        }
+
+        private static Vector2 ResolveActualPetPosition(PetController pet)
+        {
+            Rigidbody2D? rigidbody = pet.GetComponent<Rigidbody2D>();
+            return rigidbody != null ? rigidbody.position : pet.transform.position;
         }
 
         private static bool ResolveFacingFlip(float horizontalDirection)

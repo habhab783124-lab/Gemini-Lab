@@ -1,5 +1,47 @@
 # Gemini-Lab 人工验证清单
 
+## B53. WorldMap outdoor pet facing: fixed-step single-source correction (2026-09-09)
+
+| Check | Result | Notes |
+| :--- | :--- | :--- |
+| Angel and Devil keep the left/right facing that matches their actual horizontal movement; a one-step position correction does not reverse facing | Pending Unity MCP Play / manual Play | Hold each horizontal input direction, test collision/obstacle contact, and reverse quickly. |
+| Zero horizontal movement keeps the last facing and does not force a new direction | Pending Unity MCP Play / manual Play | Check stopping, reaching a roaming target, and waiting on a bridge. |
+| Normal animation uses each pet's authored `WorldMap_*_Move` Clip and does not restart or switch to the other pet's Clip | Pending Unity MCP Play / manual Play | Verify Animator state and Clip in the Inspector while moving. |
+| Movement, player control, roaming, bridge traversal, bridge completion recovery, and pet-specific interaction mappings remain functional | Pending manual Play | Static checks cannot replace this runtime check. |
+| WorldMap Scene/Prefab Animator references and protected Clip/Controller/keyframe/Motion assets are unchanged | Passed static scope/resource check | Final Inspector confirmation remains recommended. |
+
+## B52. WorldMap 室外普通移动朝向单一位移来源（2026-09-09）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 天使实际向左移动时持续朝左，实际向右移动时持续朝右，不出现左右高频切换 | 待 Unity MCP Play / 人工 Play | 只观察实际横向位置变化与 `flipX`，不以输入显示状态代替 |
+| 恶魔实际向左移动时持续朝左，实际向右移动时持续朝右，不受天使或其他物体影响 | 待 Unity MCP Play / 人工 Play | 检查恶魔自身的移动和朝向 |
+| 两只桌宠停止或发生微小位置修正时保持最后朝向，不被强制重置 | 待 Unity MCP Play / 人工 Play | 检查停下、碰撞、到达漫游目标和快速反向 |
+| 特殊动作期间目标朝向不被普通移动逻辑覆盖，结束后恢复正常 | 待 Unity MCP Play / 人工 Play | 同时确认位置保持和移动锁 |
+| 移动、玩家操控、漫游、过桥、过桥后恢复及天使/恶魔交互映射保持正常 | 待人工 Play | 静态检查不能替代实机验证 |
+| Clip、Animator Controller、关键帧、循环方式、Motion、Scene/Prefab 和室内资源未修改 | 已通过静态检查后复核 | 建议在 Unity Inspector 最终确认 |
+
+## B51. WorldMap 室外桌宠移动朝向稳定性（2026-09-09）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 玩家操控天使向左/向右移动时，`flipX` 稳定保持对应朝向，不因碰撞或位置插值来回翻转 | 待 Unity MCP Play / 人工 Play | 检查连续按住左右键和快速反向；移动方向与朝向必须一致 |
+| 玩家操控恶魔向左/向右移动时，`flipX` 稳定保持对应朝向，不受天使状态或非恶魔对象影响 | 待 Unity MCP Play / 人工 Play | 只验证恶魔自身的输入与朝向 |
+| 两只桌宠自动漫游时都朝向各自漫游目标，等待、到达目标和受阻时不出现左右高频切换 | 待 Unity MCP Play / 人工 Play | 实际位移仍负责 Move/Idle，目标方向负责稳定朝向 |
+| 特殊动作期间目标朝向不被普通移动朝向覆盖，动作结束后恢复正确的普通朝向 | 待 Unity MCP Play / 人工 Play | 同时观察位置、移动锁和朝向恢复 |
+| 移动、玩家操控、漫游、过桥、过桥后恢复及两只桌宠独立交互映射保持正常 | 待人工 Play | 不能以静态编译替代实机验证 |
+| WorldMap Animator、Move Clip、关键帧、循环方式、Motion、Scene/Prefab 序列化引用和室内资源未修改 | 已通过静态检查后复核 | 最终仍建议在 Unity Inspector 做一次确认 |
+
+## B50. WorldMap 玩家操控与漫游移动动画（2026-09-09）
+
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 玩家接管天使后按住左右键，实际位置移动期间持续播放 `WorldMap_Angel_Move`，松键后恢复 Idle | 待 Unity MCP Play / 人工 Play | 检查 Animator 当前状态不会每帧重启，且 SpriteRenderer 仍按移动方向翻转 |
+| 玩家接管恶魔后按住左右键，实际位置移动期间持续播放 `WorldMap_Devil_Move`，松键后恢复 Idle | 待 Unity MCP Play / 人工 Play | 不应播放天使 Clip，也不应被许愿树、天使花朵或其他非恶魔白名单对象触发 |
+| 取消玩家控制后，两只桌宠漫游发生真实横向位移时分别播放自己的 Move Clip，等待或被阻挡时不把逻辑 Moving 当作真实移动 | 待 Unity MCP Play / 人工 Play | 检查漫游状态切换、到达目标、受阻和特殊动作结束后的恢复 |
+| 玩家操控、漫游和特殊动作期间桌宠 Transform 位置、过桥、过桥完成回调和桥后恢复均保持正常 | 待人工 Play | 本项不能用静态编译结果替代 |
+| 两个 Scene Animator 引用、两个 Move Clip 的关键帧/循环/Motion 和室内 Prefab 未修改 | 已通过静态检查后复核 | 仍需在 Unity Inspector 做最终确认 |
+
 ## B45. WorldMap 室外双宠动画状态机最终阶段（2026-09-08）
 
 | 检查项 | 结果 | 备注 |
@@ -887,3 +929,12 @@ Updated: 2026-08-22
 | :--- | :--- | :--- |
 | 云层移动范围和端点折返方式保持不变 | 待人工 Play 验证 | 本次只调整速度参数 |
 | 云层速度为上一版的一半 | 待人工 Play 验证 | `_cloudMoveSpeed` 从 `0.12` 改为 `0.06` |
+
+## B45. WorldMap 室外桌宠普通移动动画单一控制（2026-09-09）
+| 检查项 | 结果 | 备注 |
+| :--- | :--- | :--- |
+| 天使移动时使用 `WorldMap_Angel.controller` 中已有的 `WorldMap_Angel_Move`，不被强制改成其他状态或重新起播 | 待人工 Play 验证 | 普通 Idle/Move 已交还 `PetController` 单一更新 |
+| 恶魔移动时使用 `WorldMap_Devil.controller` 中已有的 `WorldMap_Devil_Move`，不被天使或 WorldMap 基础动画逻辑覆盖 | 待人工 Play 验证 | 两只桌宠 Animator 仍分别引用各自 Controller |
+| 移动方向、左右翻转和停止后的 Idle 由现有 `PetController` 链路保持一致 | 待人工 Play 验证 | 本次未修改 `PetController.cs` 或移动核心 |
+| 特殊动作期间仍锁定移动，结束后解除锁并恢复普通动画；过桥功能仍可用 | 待人工 Play 验证 | 本次只移除 WorldMap 普通基础动画的重复写入 |
+| Move/Idle Clip、特殊 Clip、Animator Controller、关键帧和 Motion 未被本次任务写入 | 已静态检查 | 当前任务仅修改 WorldMap 动画仲裁脚本与文档 |

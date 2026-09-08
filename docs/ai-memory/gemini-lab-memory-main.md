@@ -1,5 +1,39 @@
 # Gemini-Lab Memory Main
 
+## 2026-09-09 WorldMap outdoor pet facing: fixed-step single-source correction
+
+- Normal outdoor animation sampling now runs in `WorldMapPetAnimationTriggerController.FixedUpdate`, after `PetController.FixedUpdate` because the WorldMap controller has execution order `1000`.
+- `Move_Side` is selected only when the sampled `Rigidbody2D.position.x` delta for that physics step exceeds `0.005`; otherwise `Idle_Side` is selected. Input, target direction, and roaming intent are not used as normal-animation movement evidence.
+- A direction change must be observed in two consecutive physics steps before `flipX` changes. This filters one-step collision, interpolation, and position-correction reversals while keeping the current facing when the delta is zero or below the threshold.
+- `PetController.UpdateSideMirror` now exits while the WorldMap animation owner is active, so the generic pet animation path cannot write a competing `flipX`. Movement, player control, roaming, bridge traversal, interactions, indoor pets, and authored animation resources remain outside this fix.
+
+## 2026-09-09 WorldMap 室外普通移动朝向单一位移来源修复
+
+- 室外普通移动朝向不再读取玩家输入、漫游目标或多重回退来源，只读取每只桌宠实际 `Rigidbody2D.position.x` 的相邻帧差值。
+- 实际横向位移超过 `0.005` 才进入对应 `Move_Side` 并更新左右朝向；位移为零或只有微小物理修正时保持当前 `flipX`，不重置、不反转。
+- 特殊动作仍独立保持目标朝向；普通移动朝向只在没有特殊动作时写入。移动、玩家操控、漫游、过桥、天使/恶魔交互白名单和室内桌宠未修改。
+- 未修改 WorldMap/室内 Animator Controller、Animation Clip、关键帧、循环设置、Motion、Sprite、Scene 或 Prefab。
+
+## 2026-09-09 WorldMap 室外普通移动朝向稳定性修复
+
+- `WorldMapPetAnimationTriggerController` 仍以两只桌宠每帧真实 `Rigidbody2D.position.x` 变化决定普通 `Idle_Side` / `Move_Side`，但不再直接使用每个微小位移差的正负驱动 `flipX`。
+- 玩家操控时，普通朝向使用当前 `PetPlayerInputController` 的横向输入；自动漫游时使用 `RandomWander.TargetPosition` 或行为运行时目标的横向方向；只有没有稳定指令来源时才使用超过阈值的实际位移作为回退。
+- 普通朝向保留每只桌宠上一次稳定方向，过滤碰撞、插值和位置修正造成的微小反向位移。特殊动作期间仍由特殊动作目标朝向负责，普通动画逻辑不覆盖它。
+- 本次未修改移动、玩家操控、漫游、过桥、交互白名单、室内桌宠或任何 Animation Clip、Animator Controller、关键帧、循环设置、Motion、Sprite 和 Scene/Prefab 序列化引用。
+
+## 2026-09-09 WorldMap 室外普通移动动画控制权修复
+
+- WorldMap 室外天使和恶魔的普通 Idle/Move Animator 播放现在由 `WorldMapPetAnimationTriggerController` 统一负责；`PetController` 仍负责移动、玩家操控、漫游、物理和 `WalkableSurface` 过桥，只在该场景动画控制权启用时跳过通用 Animator 写入。
+- WorldMap 动画控制器按每帧真实 `Rigidbody2D.position.x` 差值判断是否发生横向移动。没有真实横向位移时播放对应 `Idle_Side`，有真实横向位移时播放对应 `Move_Side`，并只在状态改变或残留转场时调用一次 `Animator.Play`。
+- 两个现有 Animator Controller 的 Move Any State 转场允许自身转场；运行时保持 `IsMoving=false` 并直接播放作者化状态，避免持续条件每帧重置 `WorldMap_Angel_Move.anim` 或 `WorldMap_Devil_Move.anim`。没有修改 Controller、Clip、关键帧、循环设置、Motion 或 Sprite。
+- 室外特殊动作仍由同一 WorldMap 控制器触发、锁定移动并恢复；玩家操控、漫游和过桥接口保持不变。室内 PetController 行为不变，室内桌宠资源不在本次修改范围。
+
+## 2026-09-09 WorldMap 普通移动动画交还 PetController
+
+- `WorldMapPetAnimationTriggerController` 不再在每帧采样横向位移后覆盖 `IsMoving`、`MoveX`、`MoveY`、`MoveDir`，也不再直接强制 `Play("Move_Side")` / `Play("Idle_Side")`。此前它以 `DefaultExecutionOrder(1000)` 晚于 `PetController.UpdateMovementAnimation()` 执行，造成两个运行时脚本重复控制同一个 Animator，移动方向和 Clip 播放时序会被覆盖；特殊动作释放时仅保留一次性 `Idle_Side` 恢复同步。
+- WorldMap 普通 `Idle/Move` 现在由现有 `PetController` 动画链路单一负责；WorldMap 控制器只保留室外特殊动作的触发、移动锁、一次性播放和结束恢复。`PetController.cs`、移动核心、玩家操纵、漫游、过桥和室内桌宠脚本未修改。
+- `WorldMap_Angel_Move.anim` 与 `WorldMap_Devil_Move.anim` 当前工作树中的用户修改保持不变；两个 Clip 均无位置曲线，本次未修改 Clip、关键帧、Controller、Motion、循环设置或 Scene/Prefab 引用。Play 验证需单独确认。
+
 ## 2026-09-09 WorldMap 玩家控制期间屏蔽漫游特殊动画
 
 - 玩家控制期间，`WorldMapPetAnimationTriggerController` 不再评估或接受任何 `TriggerSource.Roaming` 特殊动作；天使和恶魔各自的漫游目标锁存也会被清理，避免玩家移动经过花朵、苹果树或标牌时被自动动画打断。

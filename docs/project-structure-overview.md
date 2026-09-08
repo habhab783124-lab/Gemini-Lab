@@ -1,5 +1,35 @@
 # Gemini-Lab 项目结构总览
 
+## 2026-09-09 WorldMap outdoor pet facing: fixed-step single-source correction
+
+- The WorldMap outdoor animation adapter samples horizontal Rigidbody movement in `FixedUpdate` and applies normal `Idle_Side`/`Move_Side` playback from that sample only.
+- Facing changes require two consecutive physics samples in the opposite direction. The adapter does not infer normal facing from input, roaming targets, or interaction targets.
+- `PetController` keeps movement, player control, roaming, and bridge traversal. Its generic side mirror is suppressed only while the explicit WorldMap animation owner is active.
+
+## 2026-09-09 WorldMap 室外普通移动朝向单一位移来源修复
+
+- 室外双宠普通移动只按各自 `Rigidbody2D.position.x` 的实际相邻帧位移判断左右：超过阈值向左/向右时更新朝向，停止或微小修正时保持当前朝向。
+- 普通朝向不再混用玩家输入、漫游目标和实际位移回退；特殊动作期间继续由特殊动作目标朝向控制，结束后再交回普通位移朝向。
+- `PetController` 的移动、玩家操控、漫游、桥面和过桥流程，以及天使/恶魔独立交互映射保持不变。
+
+## 2026-09-09 WorldMap 室外普通移动朝向稳定性修复
+
+- `WorldMapPetAnimationTriggerController` 继续作为室外双宠普通动画的唯一运行时播放者；实际横向位移只用于判断 `Move_Side` / `Idle_Side`，不再直接用逐帧位移差的正负切换 `flipX`。
+- 玩家控制使用当前横向输入朝向，漫游使用各自 `RandomWander` 或行为目标的横向方向，并保留独立的上一次稳定朝向，避免碰撞和插值产生左右抖动。
+- 特殊动作的目标朝向仍优先于普通移动朝向；移动、漫游、玩家控制、桥面 `WalkableSurface` 和过桥流程仍由 `PetController` 及原有组件负责。
+- 本次不修改 WorldMap/室内 Animator、Animation Clip、关键帧、循环设置、Motion、Sprite、Scene 或 Prefab。
+
+## 2026-09-09 WorldMap 玩家操控与漫游移动动画控制权修复
+
+- WorldMap 室外双宠的普通动画由 `WorldMapPetAnimationTriggerController` 唯一播放：它读取每只桌宠 Rigidbody2D 的实际横向位置变化，只有真实移动才进入对应 `Move_Side`，停止后进入 `Idle_Side`。
+- `PetController` 继续驱动移动、玩家输入、漫游、物理和 `WalkableSurface` 过桥；WorldMap 只通过动画控制权接口阻止通用动画写入，不改变移动核心或过桥状态。
+- 运行时绕过现有 Move Any State 自身转场造成的重复重置，但不修改两个 Animator Controller、Animation Clip、关键帧、循环设置、Motion、Sprite、Scene 或 Prefab。
+
+## 2026-09-09 WorldMap 普通移动动画职责收口
+
+- `_SceneRoot/WorldMapPetAnimationTriggerController` 不再每帧与 `PetController` 竞争普通 `Idle/Move` Animator 状态；它只处理室外特殊动作和动作期间的移动锁，并在特殊动作释放边界做一次性 Idle 恢复。普通移动动画由每只桌宠自身的 `PetController.UpdateMovementAnimation()` 统一更新。
+- WorldMap 场景中的天使和恶魔 Animator Controller、Move Clip、Scene/Prefab 序列化引用均保持原样。过桥、玩家操纵、漫游和其他室外功能继续由原有组件负责。
+
 ## 2026-09-09 WorldMap 玩家控制期间屏蔽漫游特殊动画
 
 - 室外桌宠处于玩家控制时，`WorldMapPetAnimationTriggerController` 只保留玩家主动 F 键交互，屏蔽天使/恶魔各自的漫游特殊动画触发并清理邻近目标锁存；这保证玩家移动经过有效目标时不会被浇水、坐地、睡觉、祈祷或施法打断。
