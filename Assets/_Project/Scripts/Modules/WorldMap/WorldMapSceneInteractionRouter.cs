@@ -138,7 +138,7 @@ namespace GeminiLab.Modules.WorldMap
             eventSystem.RaycastAll(eventData, results);
             for (int index = 0; index < results.Count; index++)
             {
-                if (IsVisibleUiGraphic(results[index].gameObject))
+                if (IsUiRaycastTarget(results[index]))
                 {
                     Debug.LogWarning(
                         $"[WorldMapClick][UIBlocked] object={results[index].gameObject.name}",
@@ -150,8 +150,14 @@ namespace GeminiLab.Modules.WorldMap
             return false;
         }
 
-        private static bool IsVisibleUiGraphic(GameObject? hit)
+        private static bool IsUiRaycastTarget(RaycastResult result)
         {
+            if (result.module is not GraphicRaycaster)
+            {
+                return false;
+            }
+
+            GameObject? hit = result.gameObject;
             if (hit == null || !hit.activeInHierarchy) return false;
 
             Graphic? graphic = hit.GetComponent<Graphic>();
@@ -160,16 +166,10 @@ namespace GeminiLab.Modules.WorldMap
                 return false;
             }
 
-            float effectiveAlpha = graphic.color.a;
-            CanvasGroup[] groups = hit.GetComponentsInParent<CanvasGroup>(true);
-            for (int index = 0; index < groups.Length; index++)
-            {
-                CanvasGroup group = groups[index];
-                if (!group.isActiveAndEnabled) return false;
-                effectiveAlpha *= group.alpha;
-            }
-
-            return effectiveAlpha > 0.001f && !graphic.canvasRenderer.cull;
+            // RaycastTarget is the UI input contract. A transparent Graphic can
+            // intentionally be an authored panel blocker, so alpha/culling must
+            // not allow the same click to fall through to a WorldMap object.
+            return true;
         }
 
         private static bool InvokeTarget(IWorldMapSceneClickTarget target)

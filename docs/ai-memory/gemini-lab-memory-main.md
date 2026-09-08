@@ -1,5 +1,20 @@
 # Gemini-Lab Memory Main
 
+## 2026-09-08 WorldMap 室外双宠动画状态机最终阶段
+
+- `WorldMapPetAnimationTriggerController` 已重写为 WorldMap 室外天使/恶魔动画的唯一最终仲裁入口：每个特殊动作在 `PetAction` 中固定归属一个桌宠，并由 `StateNameFor` 映射到已有 `Outdoor_*` 状态；天使和恶魔不会共享无来源的特殊触发器。
+- 普通 `Idle/Move` 以每帧实际横向 Transform 位移为唯一移动依据；特殊动作期间由该控制器保持特殊 Animator 状态并调用现有 `PetController.SetExternalMovementLock`，结束后依据最新横向位移恢复 `Idle_Side` 或 `Move_Side`。
+- 苹果树、许愿树和天使/恶魔标牌只使用 Scene 序列化目标及其启用的 `Collider2D.ClosestPoint`；不再运行时按对象名查找。摆花开心/得意只消费 EmotionGarden 已接受的摆花记录，并按 `Owner` 分别路由到天使或恶魔；浇水只匹配天使区域已占用的 `WorldMapPlacementSlot` 作者化落脚区域，排除预览、空槽位和恶魔花朵。
+- 漫游特殊动作使用目标进入锁存、随机概率和冷却；玩家 F 使用按键边沿；特殊 Clip 按当前 Animator 状态长度只播放一遍，不改动资源中已有的循环设置。
+- 桥能力未从动画改动中移除：`PetController`、`RandomWander`、`PetPlayerInputController`、`WalkableSurface`、桥面检测、外部移动锁接口和过桥后的恢复逻辑均未修改。`WorldMap_Main.unity` 的桌宠 Animator、移动/桥引用也未由本阶段写入。
+- 本阶段未修改 Animation Clip、Animator Controller、关键帧、Motion、循环方式、Sprite、室内桌宠脚本或室内 Prefab。受影响程序集静态编译通过；Unity MCP Play 验证已获授权但当前 Unity 编辑器进程无响应，仍需恢复编辑器后验证，不能把静态结果当作最终实机确认。
+
+## 2026-09-08 WorldMap UI 点击优先级修正
+
+- `WorldMapSceneInteractionRouter` 先查询当前鼠标位置的 `EventSystem.RaycastAll` 结果；只要命中作者化 `GraphicRaycaster` 的有效 `Graphic` 且 `raycastTarget=true`，就阻止同一点击继续进入 WorldMap 场景目标路由。
+- UI 阻挡判断不再根据 Graphic 的透明 alpha 或最终视觉可见度放行。情绪面板等全屏透明 Graphic 也可以作为作者化输入阻挡层；UI 自身按钮、输入框和面板事件仍由 EventSystem 处理。
+- 本次只修复 UI 与 WorldMap 点击链路之间的穿透，不改变邮箱、标牌、许愿树、苹果树、掉落苹果、桌宠、室内入口、Collider2D、云层或动画资源。静态检查完成后仍需用户 Play 验证。
+
 ## 2026-09-08 苹果掉落核心恢复到 eb1c300
 
 - `AppleTreeDropController.cs`、`AppleDropSlot.cs`、`AppleTreeFeedback.cs` 已恢复到 `eb1c300b991d92ec6336afaf5441d0b0ca81544c` 的掉落表现和反馈逻辑。

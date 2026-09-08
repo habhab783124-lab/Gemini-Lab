@@ -1,5 +1,18 @@
 # Gemini-Lab Project File Guide
 
+## 2026-09-08 WorldMap 室外双宠动画状态机最终阶段
+
+- `Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs` 挂在 `WorldMap_Main.unity/_SceneRoot`，现在同时负责室外普通 `Idle/Move` 最终裁决、七个特殊动作请求、触发优先级、移动锁、单次 Clip 播放和按真实横向位移恢复。
+- 其目标输入来自 Scene 序列化的两只桌宠、三棵苹果树、许愿树和两块阵营标牌；距离判断使用目标 Collider2D 最近点。花朵目标从 EmotionGarden 成功摆放记录和已占用的 `WorldMapPlacementSlot` 落脚区域解析，不读取预览或空槽位。
+- `PetController.cs`、`RandomWander.cs`、`PetPlayerInputController.cs` 和 `WalkableSurface.cs` 仍是移动、漫游、玩家输入和桥面适配的事实源；动画控制器不能删除或替换这些接口。室内 `Pet_Angel.prefab`、`Pet_Devil.prefab` 及 `Assets/_Project/Animations/Pet/` 不在本阶段范围。
+- `Assets/_Project/Animations/WorldMap/Pet/` 下的两个 AnimatorController 与 `Outdoor_*.anim` 只被读取和调用，未修改 Clip、Controller、参数、关键帧、Motion 或循环设置。当前受影响程序集静态编译通过，Unity MCP Play 仍待编辑器恢复后验证。
+
+## 2026-09-08 WorldMap UI 点击优先级修正
+
+- `Assets/_Project/Scripts/Modules/WorldMap/WorldMapSceneInteractionRouter.cs` 是 WorldMap 场景点击的统一入口；处理鼠标输入前先读取 `EventSystem.RaycastAll`。
+- 命中 `GraphicRaycaster` 的有效 UI `Graphic` 且其 `raycastTarget` 开启时，UI 优先级高于所有 WorldMap Collider2D 目标。透明 UI Graphic 仍是有效阻挡层，不能仅按 alpha 判断是否拦截。
+- `WorldMap_Main.unity` 中的 Canvas、EventSystem、`Panel_EmotionInput` 和 `Panel_DailySummaryMailbox` 是该链路的序列化事实源；本次不改场景布局和用户已有场景修改。最终鼠标穿透结果仍需人工 Play 验证。
+
 ## 2026-09-08 苹果掉落核心恢复到 eb1c300
 
 - `Assets/_Project/Scripts/Modules/Apple/AppleTreeDropController.cs`、`AppleDropSlot.cs`、`AppleTreeFeedback.cs` 以 `eb1c300b991d92ec6336afaf5441d0b0ca81544c` 为行为基准。

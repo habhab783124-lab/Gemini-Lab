@@ -1,5 +1,18 @@
 # Gemini-Lab 项目结构总览
 
+## 2026-09-08 WorldMap 室外双宠动画状态机最终阶段
+
+- `_SceneRoot/WorldMapPetAnimationTriggerController` 是室外天使与恶魔 Animator 的唯一最终仲裁入口。它只读取现有 WorldMap Animator 状态和动画资源，按实际横向位移裁决 `Idle/Move`，按明确来源触发坐地、祈祷、浇水、开心、睡觉、施法和得意。
+- 特殊动作通过现有 `PetController.SetExternalMovementLock` 暂停受影响桌宠；动作结束时根据最新真实位移恢复普通状态。移动、玩家控制、漫游、桥面 `WalkableSurface` 和过桥流程仍由原脚本负责。
+- 交互目标使用 `WorldMap_Main.unity` 中已有序列化引用和 Collider2D 最近点；花朵触发使用 EmotionGarden 成功记录及已占用的 WorldMap 摆花槽落脚区域。室内桌宠、动画资产和 Scene/Prefab 序列化引用不属于本阶段修改对象。
+- 静态编译已通过；Unity MCP Play 验证因当前编辑器进程无响应尚未完成，不能视为用户最终实机确认。
+
+## 2026-09-08 WorldMap UI 点击优先级修正
+
+- WorldMap 点击路由在 Collider2D 命中前先读取当前指针位置的 EventSystem UI 射线结果。
+- 只要命中有效的 `GraphicRaycaster` / `Graphic` 且 `raycastTarget` 开启，UI 面板就拥有最高点击优先级；透明但用于阻挡输入的作者化 Graphic 也不能让点击穿透到下方物体。
+- UI 内部点击继续由按钮、输入框和面板自身处理；只有 UI 没有命中时，才进入既有 WorldMap 目标的 Collider2D 路由。本次不改变 WorldMap 业务映射。
+
 ## 2026-09-08 WorldMap 第一阶段点击与室外桌宠链路
 
 - WorldMap 的交互目标由 `WorldMapSceneInteractionRouter` 统一裁决，业务映射必须保持为：标牌→对应情绪输入、邮箱→AI 每日总结、许愿树→许愿系统、大树 2/3/5→苹果树掉落、桌宠→对应玩家控制权。
