@@ -30,8 +30,8 @@ namespace GeminiLab.Modules.RoomRelic
         private readonly Dictionary<RoomId, string> _lastEntryDateByRoom = new();
         private readonly List<string> _obtainedGiftIds = new();
 
-        private RoomId? _currentRoomId;
-        private float _lastFriendship;
+        private readonly HashSet<RoomId> _occupiedRooms = new();
+        private bool _trackingFriendship;
 
         public RoomRelicService(
             IGameClock clock,
@@ -50,8 +50,7 @@ namespace GeminiLab.Modules.RoomRelic
                 _lastEntryDateByRoom[roomId] = string.Empty;
             }
 
-            _lastFriendship = _social.Friendship;
-            _social.FriendshipChanged += HandleFriendshipChanged;
+            Resume();
         }
 
         public string Key => "room_relic";
@@ -71,11 +70,7 @@ namespace GeminiLab.Modules.RoomRelic
         public void ProcessRoomEntry(RoomId roomId)
         {
             string today = _clock.TodayIso;
-            if (string.Equals(_lastEntryDateByRoom[roomId], today, StringComparison.Ordinal))
-            {
-                return;
-            }
-
+            // 每类物品分别记录日期；同日好友度解锁仍可领取一次首次奖励。
             _lastEntryDateByRoom[roomId] = today;
             SetCurrentRoom(roomId);
 
@@ -103,15 +98,27 @@ namespace GeminiLab.Modules.RoomRelic
 
         public void SetCurrentRoom(RoomId roomId)
         {
-            _currentRoomId = roomId;
+            _occupiedRooms.Add(roomId);
         }
 
         public void ClearCurrentRoom(RoomId roomId)
         {
-            if (_currentRoomId == roomId)
+            _occupiedRooms.Remove(roomId);
+        }
+
+        public void ConsumeCurrentItem(RoomId roomId, RoomRelicKind kind)
+        {
+            RoomRollState state = GetState(roomId);
+            if (kind == RoomRelicKind.Note)
             {
-                _currentRoomId = null;
+                state.currentNoteId = string.Empty;
             }
+            else if (kind == RoomRelicKind.TemporaryRelic)
+            {
+                state.currentRelicId = string.Empty;
+            }
+
+            PublishStateChanged(roomId);
         }
 
         public RoomNoteData? GetCurrentNote(RoomId roomId)
@@ -178,7 +185,8 @@ namespace GeminiLab.Modules.RoomRelic
             if (!state.relicUnlocked)
             {
                 state.relicUnlocked = true;
-                state.currentRelicId = RollRelicId(roomId, forced: true);
+                state.lastRelicRollDateIso = today;
+                state.currentRelicId = RollRelicId(roomId);
                 return;
             }
 
@@ -189,11 +197,11 @@ namespace GeminiLab.Modules.RoomRelic
 
             state.lastRelicRollDateIso = today;
             state.currentRelicId = RollChance(RelicProbability)
-                ? RollRelicId(roomId, forced: false)
+                ? RollRelicId(roomId)
                 : string.Empty;
         }
 
-        private string RollRelicId(RoomId roomId, bool forced)
+        private string RollRelicId(RoomId roomId)
         {
             string owner = GetSenderCharacter(roomId);
             RoomRelicData? relic = PickWeighted(
@@ -209,7 +217,8 @@ namespace GeminiLab.Modules.RoomRelic
             if (!state.giftUnlocked)
             {
                 state.giftUnlocked = true;
-                TryRollGift(roomId, forced: true);
+                state.lastGiftRollDateIso = today;
+                TryRollGift(roomId);
                 return;
             }
 
@@ -221,11 +230,11 @@ namespace GeminiLab.Modules.RoomRelic
             state.lastGiftRollDateIso = today;
             if (RollChance(GiftProbability))
             {
-                TryRollGift(roomId, forced: false);
+                TryRollGift(roomId);
             }
         }
 
-        private void TryRollGift(RoomId roomId, bool forced)
+        private void TryRollGift(RoomId roomId)
         {
             string receiver = GetReceiverCharacter(roomId);
             string giver = GetSenderCharacter(roomId);
@@ -254,39 +263,25 @@ namespace GeminiLab.Modules.RoomRelic
 
         private void HandleFriendshipChanged(float newFriendship)
         {
-            if (_currentRoomId is not RoomId roomId)
+            // 两个角色可同时在各自房间，不以最后一个碰撞事件覆盖另一个房间。
+            foreach (RoomId roomId in _occupiedRooms.ToArray())
             {
-                _lastFriendship = newFriendship;
-                return;
-            }
-
-            RoomRollState state = GetState(roomId);
-
-            if (_lastFriendship < RelicUnlockFriendship &&
-                newFriendship >= RelicUnlockFriendship &&
-                !state.relicUnlocked)
-            {
-                state.relicUnlocked = true;
-                state.currentRelicId = RollRelicId(roomId, forced: true);
+                RoomRollState state = GetState(roomId);
+                if (newFriendship >= GiftUnlockFriendship)
+                {
+                    state.currentRelicId = string.Empty;
+                    if (!state.giftUnlocked) ProcessGift(roomId, _clock.TodayIso);
+                }
+                else if (newFriendship >= RelicUnlockFriendship && !state.relicUnlocked)
+                {
+                    ProcessRelic(roomId, _clock.TodayIso);
+                }
+                else if (newFriendship < RelicUnlockFriendship)
+                {
+                    state.currentRelicId = string.Empty;
+                }
                 PublishStateChanged(roomId);
             }
-
-            if (_lastFriendship < GiftUnlockFriendship &&
-                newFriendship >= GiftUnlockFriendship)
-            {
-                state.currentRelicId = string.Empty;
-                if (!state.giftUnlocked)
-                {
-                    state.giftUnlocked = true;
-                    TryRollGift(roomId, forced: true);
-                }
-                else
-                {
-                    PublishStateChanged(roomId);
-                }
-            }
-
-            _lastFriendship = newFriendship;
         }
 
         private RoomRollState GetState(RoomId roomId)
@@ -354,6 +349,16 @@ namespace GeminiLab.Modules.RoomRelic
         public void Dispose()
         {
             _social.FriendshipChanged -= HandleFriendshipChanged;
+            _trackingFriendship = false;
+            _occupiedRooms.Clear();
+        }
+
+        /// <summary>场景再次接入同一会话服务时恢复监听，重复调用不会重复订阅。</summary>
+        public void Resume()
+        {
+            if (_trackingFriendship) return;
+            _social.FriendshipChanged += HandleFriendshipChanged;
+            _trackingFriendship = true;
         }
 
         [Serializable]
@@ -363,16 +368,20 @@ namespace GeminiLab.Modules.RoomRelic
             public RoomRollState angelRoom;
             public RoomRollState devilRoom;
             public List<string> obtainedGiftIds;
+            public string angelLastEntryDateIso;
+            public string devilLastEntryDateIso;
         }
 
         public string CaptureJson()
         {
             return JsonUtility.ToJson(new SavePayload
             {
-                version = 1,
+                version = 2,
                 angelRoom = GetState(RoomId.AngelRoom),
                 devilRoom = GetState(RoomId.DevilRoom),
-                obtainedGiftIds = _obtainedGiftIds
+                obtainedGiftIds = _obtainedGiftIds,
+                angelLastEntryDateIso = _lastEntryDateByRoom[RoomId.AngelRoom],
+                devilLastEntryDateIso = _lastEntryDateByRoom[RoomId.DevilRoom]
             });
         }
 
@@ -386,14 +395,30 @@ namespace GeminiLab.Modules.RoomRelic
             try
             {
                 SavePayload payload = JsonUtility.FromJson<SavePayload>(json);
+                if (payload.version < 1 || payload.version > 2 ||
+                    payload.angelRoom == null || payload.devilRoom == null) return false;
                 _states[RoomId.AngelRoom] = payload.angelRoom ?? new RoomRollState();
                 _states[RoomId.DevilRoom] = payload.devilRoom ?? new RoomRollState();
+                _lastEntryDateByRoom[RoomId.AngelRoom] = payload.angelLastEntryDateIso ?? payload.angelRoom.lastNoteRollDateIso;
+                _lastEntryDateByRoom[RoomId.DevilRoom] = payload.devilLastEntryDateIso ?? payload.devilRoom.lastNoteRollDateIso;
+                if (payload.version == 1)
+                {
+                    // 旧版首次必出没有记录日期；保守使用最近入室纸条判定日期。
+                    foreach (RoomRollState state in _states.Values)
+                    {
+                        if (state.relicUnlocked && string.IsNullOrEmpty(state.lastRelicRollDateIso))
+                            state.lastRelicRollDateIso = state.lastNoteRollDateIso;
+                        if (state.giftUnlocked && string.IsNullOrEmpty(state.lastGiftRollDateIso))
+                            state.lastGiftRollDateIso = state.lastNoteRollDateIso;
+                    }
+                }
                 _obtainedGiftIds.Clear();
                 if (payload.obtainedGiftIds != null)
                 {
-                    _obtainedGiftIds.AddRange(payload.obtainedGiftIds);
+                    _obtainedGiftIds.AddRange(payload.obtainedGiftIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct());
                 }
-
+                PublishStateChanged(RoomId.AngelRoom);
+                PublishStateChanged(RoomId.DevilRoom);
                 return true;
             }
             catch

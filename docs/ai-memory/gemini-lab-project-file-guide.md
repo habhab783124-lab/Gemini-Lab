@@ -1,6 +1,30 @@
 # Gemini-Lab Project File Guide
 
+## 2026-09-09 室内小门入口
+
+- 需求、操作和验证：`docs/indoor-door-interaction.md`。
+- 对话数据：`Assets/_Project/ScriptableObjects/IndoorDoorDialogues.asset`；模型 `Scripts/Modules/Pet/Social/IndoorDoorDialogueCatalog.cs`。
+- 气泡视图：`Assets/_Project/Scripts/Modules/HubUI/PetDialogueBubble.cs`；由 `PetController.VisiblePosition` 提供实际姿态位置。升级菜单 `Tools/Gemini-Lab/Apartment/Author Door Speech Bubbles`。
+- 场景交互：`Scripts/Modules/HubUI/ApartmentDoorInteraction.cs`；作者化 `Scripts/Editor/SceneBootstrap/ApartmentDoorAuthoring.cs`。
+- 保存的门 Mesh/材质及脚底物理材质：`Assets/_Project/Settings/IndoorDoor/`；回归 `Assets/_Project/Tests/EditMode/IndoorDoorInteractionTests.cs`。
+
+
 Updated: 2026-09-04
+
+## 公寓移动维护入口（2026-09-09）
+
+- `docs/apartment-movement.md`：实际实现、站立点作者化、验证与限制。
+- `Assets/_Project/Scripts/Modules/Pet/ApartmentPetMovement.cs`：物理运动与障碍查询；`ApartmentWalkPath.cs`：路径规划和扫掠。
+- `Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentMovementAuthoring.cs`：两宠移动引用与缺失站立点绑定。
+- `Assets/_Project/Tests/EditMode/ApartmentWalkPathTests.cs`：路径、边界、扫掠和脚底偏移回归。
+
+## 遗留物维护入口（2026-09-09）
+
+- `docs/room-relic-system.md`：实际规则、存档 v1→v2 兼容、会话生命周期、固定槽位和作者化边界。
+- `Assets/_Project/Tests/EditMode/RoomRelicIntegrationTests.cs`：槽位、点击消费和 Bootstrap 接入回归。
+- `Assets/_Project/Scripts/Core/UI/UIRouter.cs`：遗留物弹窗叠加当前页面，关闭回到原页面；相应回归包含在 RoomRelicIntegrationTests 中。
+- `Assets/_Project/Tests/EditMode/DeferredSaveRestoreTests.cs`：模块晚注册及等待期间保存回归。
+- `Assets/_Project/Scripts/Core/Persistence/IPersistentServiceRegistry.cs` 的 `Registered` 事件与 `Assets/_Project/Scripts/Modules/Persistence/SaveCoordinator.cs` 配合补恢复尚未注册的遗留物模块。
 
 ## 室内遗留物系统（2026-09-03）
 
@@ -355,3 +379,9 @@ Updated: 2026-09-04
 - 共享动画资源：`Assets/_Project/Animations/WorldMap/Pet/WorldMap_Angel.controller`、`WorldMap_Devil.controller` 及其引用的 `.anim`；预览场景和 `WorldMap_Main.unity` 直接引用同一份资源，不复制控制器或 Clip。
 - 作者化入口：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationPreviewAuthoring.cs`，菜单为 `Tools/Gemini-Lab/WorldMap/Create Pet Animation Preview Scene`。
 - 使用约束：应在共享 `.anim` / `.controller` 上调整动画以同步室外主场景；只调整预览场景的 Transform 或 SpriteRenderer 不会自动同步到 `WorldMap_Main`。
+
+- 小门通行升级仍由 `ApartmentDoorAuthoring.cs` 提供，新增菜单 `Upgrade Door Passage`；`ApartmentPetMovement._connectedRoom` 连接另一侧边界。遗留物点击修复位于 `RoomRelicView.Apply` / `RoomRelicInteraction.Open`。
+
+- 页面家具入口：`docs/apartment-page-furniture.md`；`Scripts/Modules/HubUI/FurniturePageLink.cs`、`Scripts/Editor/SceneBootstrap/ApartmentPageFurnitureAuthoring.cs`；Prefab 在 `Assets/_Project/Prefabs/Furniture/Leisure/CrystalBall.prefab` 与 `Gacha.prefab`。
+
+- 普通点击气泡遮挡入口：`Scripts/Modules/Pet/PetClickReactionController.cs` 的 `_controlIndicator` / `ApplyBubbleSorting`；Apartment 场景显式绑定两宠箭头，首次作者化由 `ApartmentDoorAuthoring` 同步绑定。

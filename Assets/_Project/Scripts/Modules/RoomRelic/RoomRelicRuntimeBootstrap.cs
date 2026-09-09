@@ -1,6 +1,5 @@
 #nullable enable
 using GeminiLab.Core;
-using GeminiLab.Core.Events;
 using GeminiLab.Core.Persistence;
 using GeminiLab.Core.Time;
 using GeminiLab.Modules.Pet.Social;
@@ -29,6 +28,8 @@ namespace GeminiLab.Modules.RoomRelic
 
             if (ServiceLocator.TryResolve(out IRoomRelicService? existing) && existing is not null)
             {
+                _service = existing as RoomRelicService;
+                _service?.Resume();
                 return;
             }
 
@@ -39,7 +40,6 @@ namespace GeminiLab.Modules.RoomRelic
                 return;
             }
 
-            ServiceLocator.TryResolve(out EventBus? eventBus);
             _service = new RoomRelicService(clock, social, _catalog);
             ServiceLocator.Register<IRoomRelicService>(_service);
 

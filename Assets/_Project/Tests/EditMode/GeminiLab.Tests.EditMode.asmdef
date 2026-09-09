@@ -3,6 +3,7 @@
   "rootNamespace": "GeminiLab.Tests.EditMode",
   "references": [
     "GeminiLab.Core",
+    "Unity.TextMeshPro",
     "GeminiLab.Modules.Pet",
     "GeminiLab.Modules.Persistence",
     "GeminiLab.Modules.Navigation.Abstractions",

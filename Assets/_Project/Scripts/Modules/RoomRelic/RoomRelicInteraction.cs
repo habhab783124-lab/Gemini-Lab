@@ -62,15 +62,48 @@ namespace GeminiLab.Modules.RoomRelic
             Open();
         }
 
+        public bool TryHandleWorldPoint(Vector2 worldPoint)
+        {
+            if (!isActiveAndEnabled) return false;
+            _view ??= GetComponent<RoomRelicView>();
+
+            if (_collider == null)
+            {
+                _collider = GetComponent<Collider2D>();
+            }
+
+            if (_collider == null || !_collider.enabled || !_collider.OverlapPoint(worldPoint))
+            {
+                return false;
+            }
+
+            if (!ClickOcclusionUtility.IsTopmostColliderAtWorldPoint(worldPoint, _collider))
+            {
+                return false;
+            }
+
+            if (_view != null && !_view.HasAnyActiveTarget)
+            {
+                return false;
+            }
+
+            Open();
+            return true;
+        }
+
         public void Open()
         {
-            if (_kind == RoomRelicKind.PermanentGift)
+            if (!ServiceLocator.TryResolve(out IUIRouter? router) || router is null)
             {
                 return;
             }
 
-            if (!ServiceLocator.TryResolve(out IUIRouter? router) || router is null)
+            if (_kind == RoomRelicKind.PermanentGift)
             {
+                _view ??= GetComponent<RoomRelicView>();
+                if (_view == null || !ServiceLocator.TryResolve(out IRoomRelicService? gifts) || gifts == null) return;
+                foreach (RoomGiftData gift in gifts.GetSnapshot(_roomId).PlacedGifts)
+                    if (gift.id == _view.CurrentId) { router.Open(PanelId.RoomGiftObtained, gift); return; }
                 return;
             }
 
@@ -81,7 +114,11 @@ namespace GeminiLab.Modules.RoomRelic
                 _ => PanelId.RoomGiftObtained
             };
 
-            router.Open(panelId, _roomId);
+            if (!router.Open(panelId, _roomId)) return;
+            if (ServiceLocator.TryResolve(out IRoomRelicService? service) && service is not null)
+            {
+                service.ConsumeCurrentItem(_roomId, _kind);
+            }
         }
     }
 }

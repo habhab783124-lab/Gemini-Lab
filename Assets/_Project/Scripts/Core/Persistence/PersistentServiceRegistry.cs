@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace GeminiLab.Core.Persistence
@@ -9,6 +10,7 @@ namespace GeminiLab.Core.Persistence
     public sealed class PersistentServiceRegistry : IPersistentServiceRegistry
     {
         private readonly Dictionary<string, IPersistentService> _byKey = new();
+        public event Action<IPersistentService>? Registered;
 
         public void Register(IPersistentService service)
         {
@@ -18,6 +20,7 @@ namespace GeminiLab.Core.Persistence
             }
 
             _byKey[service.Key] = service;
+            Registered?.Invoke(service);
         }
 
         public void Unregister(string key)

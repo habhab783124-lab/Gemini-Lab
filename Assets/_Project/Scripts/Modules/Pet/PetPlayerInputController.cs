@@ -17,7 +17,7 @@ namespace GeminiLab.Modules.Pet
         [SerializeField] private bool _acceptWasd = true;
         [SerializeField] private bool _acceptArrowKeys = true;
         [SerializeField] private bool _horizontalOnly = false;
-        [SerializeField, Min(0f)] private float _moveSpeed = 2.5f;
+        [SerializeField, Min(0f)] private float _moveSpeed = 10f;
 
         public static Transform? ActiveTransform => s_activeController != null ? s_activeController.transform : null;
 

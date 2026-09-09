@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace GeminiLab.Core.Persistence
@@ -18,6 +19,9 @@ namespace GeminiLab.Core.Persistence
     /// </summary>
     public interface IPersistentServiceRegistry
     {
+        /// <summary>服务注册完成后通知读档协调器，恢复延迟进入场景的模块。</summary>
+        event Action<IPersistentService> Registered;
+
         /// <summary>注册一个参与存档的服务。相同 Key 会覆盖。</summary>
         void Register(IPersistentService service);
 

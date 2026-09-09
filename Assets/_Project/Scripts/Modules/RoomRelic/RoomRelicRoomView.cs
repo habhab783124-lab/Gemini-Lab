@@ -19,8 +19,12 @@ namespace GeminiLab.Modules.RoomRelic
 
         private IRoomRelicService? _service;
 
-        private void Awake()
+        private void OnEnable() => BindService();
+        private void Start() => BindService();
+
+        private void BindService()
         {
+            if (_service != null) return;
             if (!ServiceLocator.TryResolve(out IRoomRelicService? service) || service is null)
             {
                 return;
@@ -32,7 +36,7 @@ namespace GeminiLab.Modules.RoomRelic
             Refresh();
         }
 
-        private void OnDestroy()
+        private void OnDisable()
         {
             if (_service == null)
             {
@@ -41,6 +45,7 @@ namespace GeminiLab.Modules.RoomRelic
 
             _service.StateChanged -= HandleStateChanged;
             _service.GiftObtained -= HandleGiftObtained;
+            _service = null;
         }
 
         private void HandleStateChanged(RoomRelicStateChangedEvent evt)
@@ -87,7 +92,11 @@ namespace GeminiLab.Modules.RoomRelic
                 return;
             }
 
-            int preferredIndex = Math.Abs(StringComparer.Ordinal.GetHashCode(currentId)) % slots.Length;
+            // 固定哈希在不同进程中保持相同位置，且没有 int.MinValue 的 Abs 溢出。
+            uint hash = 2166136261;
+            foreach (char character in currentId)
+                hash = unchecked((hash ^ character) * 16777619);
+            int preferredIndex = (int)(hash % (uint)slots.Length);
             for (int i = 0; i < slots.Length; i++)
             {
                 slots[i]?.Apply(i == preferredIndex ? currentId : null);
@@ -98,8 +107,21 @@ namespace GeminiLab.Modules.RoomRelic
         {
             for (int i = 0; i < _giftSlots.Length; i++)
             {
-                string? giftId = i < gifts.Count ? gifts[i].id : null;
-                _giftSlots[i]?.Apply(giftId);
+                RoomRelicView slot = _giftSlots[i];
+                if (slot == null) continue;
+                string? giftId = null;
+                if (!string.IsNullOrEmpty(slot.DisplaySlotId))
+                {
+                    for (int j = 0; j < gifts.Count; j++)
+                    {
+                        if (string.Equals(gifts[j].displaySlotId, slot.DisplaySlotId, StringComparison.Ordinal))
+                        {
+                            giftId = gifts[j].id;
+                            break;
+                        }
+                    }
+                }
+                slot.Apply(giftId);
             }
         }
 

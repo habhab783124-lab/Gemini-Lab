@@ -23,21 +23,80 @@ namespace GeminiLab.Editor.SceneBootstrap
         private const int RelicSlotCount = 5;
         private const int GiftSlotCount = 3;
 
+        [MenuItem("Tools/Gemini-Lab/Apartment/Upgrade Room Relic Bindings")]
+        public static void UpgradeExistingBindings()
+        {
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            if (scene.path != ScenePath || EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("[RoomRelicAuthoring] 请在编辑模式打开 Apartment_Main 后升级绑定。");
+                return;
+            }
+
+            int updated = 0;
+            foreach (GameObject root in scene.GetRootGameObjects())
+            foreach (RoomRelicRoomView room in root.GetComponentsInChildren<RoomRelicRoomView>(true))
+            {
+                SerializedObject roomObject = new(room);
+                SerializedProperty slots = roomObject.FindProperty("_giftSlots");
+                for (int i = 0; i < Math.Min(2, slots.arraySize); i++)
+                {
+                    var slot = slots.GetArrayElementAtIndex(i).objectReferenceValue as RoomRelicView;
+                    if (slot == null || !string.IsNullOrEmpty(slot.DisplaySlotId)) continue;
+                    Undo.RecordObject(slot, "Bind room gift display slot");
+                    SerializedObject slotObject = new(slot);
+                    slotObject.FindProperty("_displaySlotId").stringValue = i == 0 ? "desk" : "shelf";
+                    slotObject.ApplyModifiedProperties();
+                    updated++;
+                }
+            }
+
+            RoomRelicCatalogSO? catalog = AssetDatabase.LoadAssetAtPath<RoomRelicCatalogSO>(CatalogPath);
+            if (catalog != null)
+            {
+                SerializedObject catalogObject = new(catalog);
+                SerializedProperty notes = catalogObject.FindProperty("notes");
+                RoomNoteData[] defaults = CreatePlaceholderNotes();
+                for (int i = 0; i < notes.arraySize; i++)
+                {
+                    SerializedProperty note = notes.GetArrayElementAtIndex(i);
+                    SerializedProperty content = note.FindPropertyRelative("content");
+                    if (!content.stringValue.StartsWith("【占位】", StringComparison.Ordinal)) continue;
+                    foreach (RoomNoteData replacement in defaults)
+                    {
+                        if (note.FindPropertyRelative("id").stringValue != replacement.id) continue;
+                        content.stringValue = replacement.content;
+                        break;
+                    }
+                }
+                catalogObject.ApplyModifiedProperties();
+            }
+            if (updated > 0) EditorSceneManager.MarkSceneDirty(scene);
+            // 不自动保存，保留 Undo 并允许作者检查；调用方可在核对后保存。
+            Debug.Log($"[RoomRelicAuthoring] 升级 {updated} 个赠礼槽位，已保留位置、素材和自定义文案。");
+        }
+
         [MenuItem("Tools/Gemini-Lab/Apartment/Author Room Relic")]
         public static void Author()
         {
-            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            if (scene.path != ScenePath)
+            {
+                for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+                {
+                    if (UnityEngine.SceneManagement.SceneManager.GetSceneAt(i).isDirty)
+                    {
+                        Debug.LogWarning("[RoomRelicAuthoring] 存在未保存场景，请保存后再作者化。");
+                        return;
+                    }
+                }
+                scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            }
             GameObject? artRoot = GameObject.Find("ArtGenerated");
             if (artRoot == null)
             {
                 Debug.LogError("[RoomRelicAuthoring] 未找到 ArtGenerated，无法继续。");
                 return;
-            }
-
-            GameObject? existingRelicRoot = GameObject.Find(RelicRootName);
-            if (existingRelicRoot != null)
-            {
-                UnityEngine.Object.DestroyImmediate(existingRelicRoot);
             }
 
             RoomRelicCatalogSO catalog = CreateOrUpdatePlaceholderCatalog();
@@ -63,13 +122,11 @@ namespace GeminiLab.Editor.SceneBootstrap
             if (catalog == null)
             {
                 catalog = ScriptableObject.CreateInstance<RoomRelicCatalogSO>();
+                catalog.notes = CreatePlaceholderNotes();
+                catalog.relics = CreatePlaceholderRelics();
+                catalog.gifts = CreatePlaceholderGifts();
                 AssetDatabase.CreateAsset(catalog, CatalogPath);
             }
-
-            catalog.notes = CreatePlaceholderNotes();
-            catalog.relics = CreatePlaceholderRelics();
-            catalog.gifts = CreatePlaceholderGifts();
-            EditorUtility.SetDirty(catalog);
             return catalog;
         }
 
@@ -89,6 +146,8 @@ namespace GeminiLab.Editor.SceneBootstrap
         private static void EnsureRoom(Transform parent, RoomId roomId, RoomRelicCatalogSO catalog)
         {
             string roomName = roomId == RoomId.AngelRoom ? "AngelRoom" : "DevilRoom";
+            // 已作者化的房间保留位置、变体、引用和人工布局，不重新随机摆放。
+            if (parent.Find(roomName) != null) return;
             GameObject roomRoot = EnsureChild(parent, roomName);
             RoomRelicRoomView roomView = roomRoot.GetComponent<RoomRelicRoomView>();
             if (roomView == null)
@@ -101,6 +160,29 @@ namespace GeminiLab.Editor.SceneBootstrap
             string sender = roomId == RoomId.AngelRoom ? "Demon" : "Angel";
             string receiver = roomId == RoomId.AngelRoom ? "Angel" : "Demon";
             Sprite sprite = GetPlaceholderSprite();
+
+            float dir = roomId == RoomId.AngelRoom ? 1f : -1f;
+            float centerX = 8.9f * dir;
+            float centerY = -1.25f;
+            System.Random rng = new System.Random(roomId == RoomId.AngelRoom ? 137 : 731);
+
+            Vector2[] notePositions = new Vector2[NoteSlotCount];
+            for (int i = 0; i < notePositions.Length; i++)
+            {
+                notePositions[i] = RandomSlotPosition(rng, centerX, centerY);
+            }
+
+            Vector2[] relicPositions = new Vector2[RelicSlotCount];
+            for (int i = 0; i < relicPositions.Length; i++)
+            {
+                relicPositions[i] = RandomSlotPosition(rng, centerX, centerY);
+            }
+
+            Vector2[] giftPositions = new Vector2[GiftSlotCount];
+            for (int i = 0; i < giftPositions.Length; i++)
+            {
+                giftPositions[i] = RandomSlotPosition(rng, centerX, centerY);
+            }
 
             Transform noteContainer = EnsureChild(roomRoot.transform, "NoteSpawns").transform;
             string[] noteIds = new string[catalog.notes.Length];
@@ -141,6 +223,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                     noteIds,
                     sprite,
                     new Color(1f, 0.92f, 0.55f, 1f),
+                    notePositions[i],
                     noteSprites);
             }
 
@@ -185,6 +268,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                     relicIds,
                     sprite,
                     new Color(0.55f, 0.8f, 1f, 1f),
+                    relicPositions[i],
                     relicSprites);
             }
 
@@ -228,12 +312,23 @@ namespace GeminiLab.Editor.SceneBootstrap
                     giftIds,
                     sprite,
                     new Color(1f, 0.72f, 0.86f, 1f),
+                    giftPositions[i],
                     giftSprites);
+                SerializedObject giftSlotObject = new(giftViews[i]);
+                giftSlotObject.FindProperty("_displaySlotId").stringValue = i == 0 ? "desk" : i == 1 ? "shelf" : string.Empty;
+                giftSlotObject.ApplyModifiedPropertiesWithoutUndo();
             }
 
             SetObjectArray(roomView, "_noteSlots", noteViews);
             SetObjectArray(roomView, "_relicSlots", relicViews);
             SetObjectArray(roomView, "_giftSlots", giftViews);
+        }
+
+        private static Vector2 RandomSlotPosition(System.Random rng, float centerX, float centerY)
+        {
+            float x = centerX + ((float)rng.NextDouble() * 2f - 1f) * 3.5f;
+            float y = centerY + ((float)rng.NextDouble() * 2f - 1f) * 3f;
+            return new Vector2(x, y);
         }
 
         private static RoomRelicView CreateSlot(
@@ -244,10 +339,12 @@ namespace GeminiLab.Editor.SceneBootstrap
             string[] variantIds,
             Sprite sprite,
             Color color,
+            Vector2 position,
             Dictionary<string, Sprite>? spriteOverrides = null)
         {
             GameObject root = new(name);
             root.transform.SetParent(parent, false);
+            root.transform.localPosition = position;
             root.layer = parent.gameObject.layer;
 
             BoxCollider2D collider = root.AddComponent<BoxCollider2D>();
@@ -278,7 +375,7 @@ namespace GeminiLab.Editor.SceneBootstrap
 
                 renderer.sprite = variantSprite;
                 renderer.color = color;
-                renderer.sortingOrder = 50;
+                renderer.sortingOrder = 200;
                 targets[i] = variant;
             }
 
@@ -320,29 +417,14 @@ namespace GeminiLab.Editor.SceneBootstrap
                 return;
             }
 
-            DestroyExistingPopup(uiRoot.transform, "RoomNotePopup");
-            DestroyExistingPopup(uiRoot.transform, "RoomRelicDetailPopup");
-            DestroyExistingPopup(uiRoot.transform, "RoomGiftObtainedPopup");
-
             CreatePopup<RoomNotePopup>(uiRoot.transform, "RoomNotePopup", catalog);
             CreatePopup<RoomRelicDetailPopup>(uiRoot.transform, "RoomRelicDetailPopup", catalog);
             CreatePopup<RoomGiftObtainedPopup>(uiRoot.transform, "RoomGiftObtainedPopup", catalog);
         }
 
-        private static void DestroyExistingPopup(Transform parent, string name)
-        {
-            for (int i = parent.childCount - 1; i >= 0; i--)
-            {
-                Transform child = parent.GetChild(i);
-                if (child.name == name)
-                {
-                    UnityEngine.Object.DestroyImmediate(child.gameObject);
-                }
-            }
-        }
-
         private static void CreatePopup<T>(Transform parent, string name, RoomRelicCatalogSO catalog) where T : RoomRelicPanelBase
         {
+            if (parent.Find(name) != null) return;
             GameObject root = new(name);
             root.transform.SetParent(parent, false);
             root.layer = parent.gameObject.layer;
@@ -367,10 +449,10 @@ namespace GeminiLab.Editor.SceneBootstrap
             panelBg.color = new Color(0.12f, 0.13f, 0.18f, 0.98f);
 
             Button closeButton = CreateCloseButton(content.transform);
-            TMP_Text title = CreateText(content.transform, "Title", 34, TextAlignmentOptions.Center);
+            TMP_Text title = CreateText(content.transform, "Title", 42, TextAlignmentOptions.Center);
             SetAnchoredRect(title.rectTransform, new Vector2(0f, 160f), new Vector2(560f, 60f));
 
-            TMP_Text body = CreateText(content.transform, "Body", 24, TextAlignmentOptions.TopLeft);
+            TMP_Text body = CreateText(content.transform, "Body", 36, TextAlignmentOptions.TopLeft);
             SetAnchoredRect(body.rectTransform, new Vector2(0f, -30f), new Vector2(560f, 260f));
 
             T component = root.AddComponent<T>();
@@ -380,6 +462,7 @@ namespace GeminiLab.Editor.SceneBootstrap
 
             if (component is RoomNotePopup)
             {
+                title.text = "一张纸条";
                 so.FindProperty("_contentText").objectReferenceValue = body;
             }
             else if (component is RoomRelicDetailPopup)
@@ -388,6 +471,8 @@ namespace GeminiLab.Editor.SceneBootstrap
                 so.FindProperty("_descriptionText").objectReferenceValue = body;
                 RoomRelicView iconView = CreateIconVariantView(content.transform, "IconView",
                     BuildIconItems(catalog.relics, relic => relic.id, relic => relic.roomVisualKey));
+                SetAnchoredRect(title.rectTransform, new Vector2(0f, 145f), new Vector2(470f, 60f));
+                SetAnchoredRect(body.rectTransform, new Vector2(0f, -135f), new Vector2(560f, 100f));
                 so.FindProperty("_iconView").objectReferenceValue = iconView;
             }
             else if (component is RoomGiftObtainedPopup)
@@ -396,6 +481,9 @@ namespace GeminiLab.Editor.SceneBootstrap
                 so.FindProperty("_hintText").objectReferenceValue = body;
                 RoomRelicView iconView = CreateIconVariantView(content.transform, "IconView",
                     BuildIconItems(catalog.gifts, gift => gift.id, gift => gift.roomVisualKey));
+                SetAnchoredRect(title.rectTransform, new Vector2(0f, 145f), new Vector2(470f, 60f));
+                SetAnchoredRect(body.rectTransform, new Vector2(0f, -135f), new Vector2(560f, 70f));
+                body.alignment = TextAlignmentOptions.Center;
                 so.FindProperty("_iconView").objectReferenceValue = iconView;
             }
 
@@ -416,8 +504,8 @@ namespace GeminiLab.Editor.SceneBootstrap
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(-190f, 90f);
-            rect.sizeDelta = new Vector2(150f, 150f);
+            rect.anchoredPosition = new Vector2(0f, 15f);
+            rect.sizeDelta = new Vector2(160f, 160f);
 
             RoomRelicView view = iconRoot.AddComponent<RoomRelicView>();
 
@@ -495,8 +583,8 @@ namespace GeminiLab.Editor.SceneBootstrap
             image.color = new Color(1f, 1f, 1f, 0.16f);
             Button button = buttonGo.AddComponent<Button>();
 
-            TMP_Text label = CreateText(buttonGo.transform, "Label", 24, TextAlignmentOptions.Center);
-            label.text = "✕";
+            TMP_Text label = CreateText(buttonGo.transform, "Label", 44, TextAlignmentOptions.Center);
+            label.text = "X";
             StretchRect(label.rectTransform);
             return button;
         }
@@ -633,14 +721,14 @@ namespace GeminiLab.Editor.SceneBootstrap
         {
             return new[]
             {
-                new RoomNoteData { id = "note_demon_01", senderCharacter = "Demon", receiverCharacter = "Angel", content = "【占位】恶魔留下的纸条内容 01", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_demon_02", senderCharacter = "Demon", receiverCharacter = "Angel", content = "【占位】恶魔留下的纸条内容 02", visualType = RoomNoteVisualType.PaperBall, weight = 1f },
-                new RoomNoteData { id = "note_demon_03", senderCharacter = "Demon", receiverCharacter = "Angel", content = "【占位】恶魔留下的纸条内容 03", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_demon_04", senderCharacter = "Demon", receiverCharacter = "Angel", content = "【占位】恶魔留下的纸条内容 04", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_angel_01", senderCharacter = "Angel", receiverCharacter = "Demon", content = "【占位】天使留下的纸条内容 01", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_angel_02", senderCharacter = "Angel", receiverCharacter = "Demon", content = "【占位】天使留下的纸条内容 02", visualType = RoomNoteVisualType.PaperBall, weight = 1f },
-                new RoomNoteData { id = "note_angel_03", senderCharacter = "Angel", receiverCharacter = "Demon", content = "【占位】天使留下的纸条内容 03", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_angel_04", senderCharacter = "Angel", receiverCharacter = "Demon", content = "【占位】天使留下的纸条内容 04", visualType = RoomNoteVisualType.Note, weight = 1f }
+                new RoomNoteData { id = "note_demon_01", senderCharacter = "Demon", receiverCharacter = "Angel", content = "窗边那架纸飞机是我的。你要是想试飞，记得叫上我。", visualType = RoomNoteVisualType.Note, weight = 1f },
+                new RoomNoteData { id = "note_demon_02", senderCharacter = "Demon", receiverCharacter = "Angel", content = "刚才那段吉他不是弹错了，是新编的。你笑什么。", visualType = RoomNoteVisualType.PaperBall, weight = 1f },
+                new RoomNoteData { id = "note_demon_03", senderCharacter = "Demon", receiverCharacter = "Angel", content = "糖果分你一颗。南瓜形状的那颗……也可以给你。", visualType = RoomNoteVisualType.Note, weight = 1f },
+                new RoomNoteData { id = "note_demon_04", senderCharacter = "Demon", receiverCharacter = "Angel", content = "今天的晚霞像打翻的颜料盘。下次一起看吧。", visualType = RoomNoteVisualType.Note, weight = 1f },
+                new RoomNoteData { id = "note_angel_01", senderCharacter = "Angel", receiverCharacter = "Demon", content = "借你的书放回去了，夹着羽毛的那页，我想再读一遍。", visualType = RoomNoteVisualType.Note, weight = 1f },
+                new RoomNoteData { id = "note_angel_02", senderCharacter = "Angel", receiverCharacter = "Demon", content = "这只纸鹤折歪了。你说像我打瞌睡的时候，所以留下了。", visualType = RoomNoteVisualType.PaperBall, weight = 1f },
+                new RoomNoteData { id = "note_angel_03", senderCharacter = "Angel", receiverCharacter = "Demon", content = "听见你练琴了。最后那一小段很好听，可以再弹一次吗？", visualType = RoomNoteVisualType.Note, weight = 1f },
+                new RoomNoteData { id = "note_angel_04", senderCharacter = "Angel", receiverCharacter = "Demon", content = "窗台留了一个位置。等星星出来的时候，你也来坐一会儿吧。", visualType = RoomNoteVisualType.Note, weight = 1f }
             };
         }
 

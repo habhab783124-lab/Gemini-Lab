@@ -46,11 +46,14 @@ namespace GeminiLab.Modules.HubUI.Panels
             EnsureServices();
             SubscribeIfNeeded();
             RefreshAll();
-            RefreshControlIndicator();
+            RefreshControlIndicator(true);
         }
 
         public override void OnClose()
         {
+            if (_angelControlIndicator != null) _angelControlIndicator.gameObject.SetActive(false);
+            if (_devilControlIndicator != null) _devilControlIndicator.gameObject.SetActive(false);
+            _lastControlId = null;
             base.OnClose();
             _snapshotSub?.Dispose();
             _snapshotSub = null;
@@ -83,7 +86,7 @@ namespace GeminiLab.Modules.HubUI.Panels
             RefreshControlIndicator();
         }
 
-        private void RefreshControlIndicator()
+        private void RefreshControlIndicator(bool force = false)
         {
             Transform? activeTransform = PetPlayerInputController.ActiveTransform;
             PetController? controller = activeTransform != null
@@ -91,7 +94,7 @@ namespace GeminiLab.Modules.HubUI.Panels
                 : null;
             PetId? activeId = controller != null ? controller.PetId : (PetId?)null;
 
-            if (activeId == _lastControlId)
+            if (!force && activeId == _lastControlId)
             {
                 return;
             }

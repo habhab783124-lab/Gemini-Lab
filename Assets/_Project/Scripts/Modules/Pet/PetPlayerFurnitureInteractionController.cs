@@ -39,6 +39,8 @@ namespace GeminiLab.Modules.Pet
             [SerializeField] private string _label = string.Empty;
             [SerializeField] private GameObject? _target;
             [SerializeField] private GameObject? _poseTarget;
+            [Tooltip("宠物走到家具旁的站立点；与交互动画的姿势点分开。")]
+            [SerializeField] private Transform? _approachPoint;
             [SerializeField] private string _fallbackTargetName = string.Empty;
             [SerializeField] private string _fallbackPoseTargetName = string.Empty;
             [SerializeField] private bool _useFallbackWorldPoint;
@@ -64,6 +66,7 @@ namespace GeminiLab.Modules.Pet
             public string Label => _label;
             public GameObject? Target => _target;
             public GameObject? PoseTarget => _poseTarget;
+            public Transform? ApproachPoint => _approachPoint;
             public string FallbackTargetName => _fallbackTargetName;
             public string FallbackPoseTargetName => _fallbackPoseTargetName;
             public bool UseFallbackWorldPoint => _useFallbackWorldPoint;
@@ -128,11 +131,29 @@ namespace GeminiLab.Modules.Pet
         [SerializeField] private InteractionBinding[] _bindings = Array.Empty<InteractionBinding>();
 
         private static int s_lastProcessedInteractFrame = -1;
+        // 场景交互入口优先消费 F，避免同一按键同时结算交流和启动家具动画。
+        public static event Func<bool>? PriorityInteractRequested;
+
+        public static bool TryHandlePriorityInteraction()
+        {
+            if (PriorityInteractRequested == null) return false;
+            foreach (Func<bool> handler in PriorityInteractRequested.GetInvocationList())
+                if (handler()) return true;
+            return false;
+        }
         private PetController? _petController;
 
         private void Awake()
         {
             _petController = GetComponent<PetController>();
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.color = Color.green;
+            foreach (InteractionBinding binding in _bindings)
+                if (binding.ApproachPoint != null)
+                    Gizmos.DrawWireSphere(binding.ApproachPoint.position, 0.15f);
         }
 
         private void Update()
@@ -148,6 +169,7 @@ namespace GeminiLab.Modules.Pet
             }
 
             s_lastProcessedInteractFrame = Time.frameCount;
+            if (TryHandlePriorityInteraction()) return;
             if (!TryHandleGlobalInteractKey(_interactKey))
             {
                 Debug.LogWarning($"[PetPlayerFurnitureInteraction] No eligible binding found for key '{_interactKey}' on frame {Time.frameCount}.");
@@ -334,7 +356,7 @@ namespace GeminiLab.Modules.Pet
 
                 candidate = new AutoInteractionCandidate(
                     BuildInteractionRequest(binding, targetName, targetObject),
-                    interactionPoint);
+                    binding.ApproachPoint != null ? (Vector2)binding.ApproachPoint.position : interactionPoint);
                 return true;
             }
 

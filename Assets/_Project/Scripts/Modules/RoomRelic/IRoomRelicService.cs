@@ -21,6 +21,8 @@ namespace GeminiLab.Modules.RoomRelic
         /// <summary>玩家离开房间时清除当前房间。</summary>
         void ClearCurrentRoom(RoomId roomId);
 
+        void ConsumeCurrentItem(RoomId roomId, RoomRelicKind kind);
+
         RoomNoteData? GetCurrentNote(RoomId roomId);
         RoomRelicData? GetCurrentRelic(RoomId roomId);
         IReadOnlyList<RoomGiftData> GetPlacedGifts(RoomId roomId);

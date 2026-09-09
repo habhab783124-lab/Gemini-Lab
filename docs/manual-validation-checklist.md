@@ -1,6 +1,64 @@
 # Gemini-Lab 人工验证清单
 
+## 2026-09-09 双宠交流气泡验证
+
+- 52 项 EditMode 全部通过，涵盖双方三种回应、先后显示、提前关闭、精力不足、过期清理及只结算一次。
+- Play 30 组话题/回应全部通过：气泡文本与资产完全一致，无姓名前缀，无 TMP 文本溢出，所有气泡 Graphic 的 raycastTarget 为 false。
+- Play 已验证跟随移动、翻转不镜像、独立家具姿态位置、停用组件清理、切换收藏页面后清理；水晶球/扭蛋机仍通过实际 UI 点击及建造模式拦截检查。
+- Game View 已检查先发起与双方回应画面；Play Console 0 error。测试过程中曾触发既有 EditMode EmotionGardenService 恢复异常，最终测试通过。
+- 已退出 Play，旧中央 Conversation 节点不存在，气泡默认隐藏，时序保存为 2.5 / 8 秒，仅两只原层级宠物；存档 SHA256 全部恢复一致，无新增文件。
+- 证据 `Logs/DoorBubbles/`；真实键盘手工操作、其他窗口比例和独立构建未覆盖。
+
+## 2026-09-09 室内小门专项验证
+
+- 已通过：38 项 EditMode；Unity Play 模拟视口点击开门、身体区域点选；F 优先处理入口下 10 个话题 × 3 回应；关闭对话不重复结算，其他页面禁止交流；箭头随选中与页面开关正确显示。
+- 已通过：最终设置下 10 条家具路径实际物理步进，均到达且未越界；Game View 对话/开门形态检查，无文字溢出，最终 Console 0 error。
+- 已退出 Play，场景已保存且只有两只原层级宠物；原存档哈希一致且无新增文件。
+- 人工仍可复核：不同窗口尺寸下的阅读与操作手感；真实键盘连续 WASD→F→Esc；独立构建与长时间运行未覆盖。
+
+
 Updated: 2026-08-07
+
+## 公寓移动优化验证（2026-09-09）
+
+35 项 EditMode 测试通过（0 失败/跳过），包含 7 项新增导航回归以及输入、动画方向、遗留物回归。证据在 `Logs/ApartmentMovement/final-tests.json`。
+
+| 检查项 | 结果 | 方式 |
+| --- | --- | --- |
+| 房间限制包含脚底偏移，左右镜像不改变边界 | 通过 | EditMode + Scene 参数 |
+| 绕家具、不可达目标、斜向滑动、高速薄障碍 | 通过 | EditMode |
+| 10 个家具站立点实际到达且不越界 | 10/10 通过 | Play 模式逐步 Physics2D.Simulate，非仅路径查询 |
+| 两宠各 8 方向、速度 10 持续移动 | 16/16 通过 | Play 实际物理步进，全程检查脚底碰撞体边界 |
+| 天使弹琴完成后继续行为、恶魔绕床后睡眠 | 通过 | 正常 Update/FixedUpdate 24 秒观察与 Game View 截图 |
+| 存档保护 | 通过 | 独立测试存档，原文件 SHA256 恢复核对一致 |
+| 任意家具摆放组合、长时间运行、独立构建 | 未覆盖 | 复杂/封闭布局仍需补验 |
+
+最后 Play Console 0 error，测试已停止；完整实现与保守碰撞包围盒限制见 `docs/apartment-movement.md`。
+
+## 遗留物完善验证（2026-09-09）
+
+Unity 2022.3.62f3，通过本地 MCP 连接当前项目验证。`RoomRelicServiceTests`、`RoomRelicIntegrationTests`、`DeferredSaveRestoreTests` 与 `SaveSystemTests` 合计 29 项 EditMode 测试通过，0 失败、0 跳过。最终结果在本机忽略目录 `Logs/RoomRelicPlayCheck/final-editmode.json`。
+
+| 检查项 | 结果 | 备注 |
+| --- | --- | --- |
+| Unity 脚本编译 | 通过 | 修改后完成重编译与域重载，无 C# 编译错误 |
+| 版本 1 迁移、首次奖励同日重启、消费后恢复 | EditMode 通过 | 同日不重复抽取，次日正常判定 |
+| 晚注册模块恢复、等待期间保存、切换待恢复存档 | EditMode 通过 | SaveCoordinator 注册事件补恢复 |
+| 双房间解锁、暂停/恢复订阅、Bootstrap 重新接入 | EditMode 通过 | 组件入口测试，不等同完整场景往返 |
+| 赠礼固定槽位、读档刷新、弹窗失败不消费 | EditMode 通过 | 已验证 shelf 先获得不会占 desk 槽 |
+| Scene/Runtime 视觉契约 | 通过 | 预置节点与 Sprite 引用存在，无运行时最终视觉生成 |
+| 场景作者化迁移范围 | 通过 | 新增 24 个槽位字段，4 个为 desk/shelf；另保存弹窗字号、颜色、关闭按钮与赠礼布局修复；未改 Sprite |
+| 公寓 → 世界地图 → 公寓 | Play 通过 | 通过场景服务真实加载；两房间各 1 件赠礼保留，降到好友度 40 后仍在 |
+| 房间真实物理触发与双房间解锁 | Play 通过 | 重置空状态、重新启用触发器后，真实物理帧生成两房遗物；好友度 80 时各获赠礼，无直接调用进入方法 |
+| 独立测试目录实际保存和读取 | Play 通过 | slot_3 保存后清空模块再读取，赠礼恢复且已读纸条不复活；原存档 SHA256 全部恢复一致 |
+| 公寓视口点击、弹窗阅读与关闭 | Play 通过 | EventSystem RaycastAll + 模拟 pointerClickHandler，命中 ApartmentViewportImage，经桥接器打开；关闭返回 SpaceSys |
+| 弹窗排版与作者化持久性 | Game View 截图通过 | 正式纸条内容、关闭 X、遗物详情和赠礼提示可读；重新进入 Play 使用 Scene 保存的布局；未逐项截图对照所有 Scene 状态 |
+| 正常 Boot → 主菜单 → 公寓完整 UI 流程、独立构建 | 未覆盖 | 本轮从已打开的 Apartment + Boot 进入 Play，不声称全游戏验收 |
+| 速写、小星星吊坠正式图标 | 未完成 | 素材仍缺，保留原有占位 |
+
+测试后 Console 出现现有 `EditorBootSceneLoader.InitBootstraps` 调用 `EmotionGardenRuntimeBootstrap.Awake` 导致编辑模式执行 `DontDestroyOnLoad` 的异常（后者第 36 行）。相关源文件不在本轮修改范围，未顺带修复；不能宣称整个项目 Console 零错误。
+
+最后 Play Console 为 0 error（`Logs/RoomRelicPlayCheck/final-play-console.json`），截图包括 `note-final.png`、`relic-detail.png` 和 `gift-fixed.png`。旧 Catalog 内存对象曾显示占位文案，卸载并重新加载该资产后，域重载与再次 Play 已确认使用磁盘新文案。测试已停止，原存档目录无新增文件。
 
 ## B18. 苹果资源系统（2026-08-14）
 
@@ -522,3 +580,9 @@ Updated: 2026-08-07
 | 在 Animation 窗口编辑共享 `.anim` / `.controller` 后，室外主场景显示相同动画资源 | 未验证 | 需在 Unity 中修改后切换 `WorldMap_Main` 检查 |
 | Apartment 场景的宠物 Sprite / AnimatorController 未被预览场景新增引用 | 通过 | 预览场景只引用 `Art/WorldMap/pets` 与 `Animations/WorldMap/Pet` |
 | 预览场景 Play 视图和 Scene 视图均显示相同室外桌宠资源 | 未验证 | 需打开预览场景并进入 PlayMode 目视确认 |
+
+- 小门后续回归：43 项 EditMode 全部通过；实际 UI Raycast → PointerClick 验证 8 张纸条、10 个临时遗物、2 个正式素材赠礼。两宠均通过实际物理步进的开门跨越、关闭阻挡、隔墙阻挡、访客不瞬移回家、占用门口拒绝关闭。存档哈希已恢复，编辑器退出 Play，原层级宠物仅两只。测试恢复后 Console 记录既有 `EmotionGardenService` 在 EditMode 调用 DontDestroyOnLoad 的异常，本次未改该模块。
+
+- 水晶球/扭蛋机专项：实际 UI 射线点击跳转正确，其他页面和建造模式不误打开；20 个遗留物点击及 10 条家具物理路线回归通过，Game View 素材/布局已检查，Play Console 0 error；原存档哈希恢复一致，未测试独立构建。
+
+- 控制标识遮挡修复：Game View 前后对照确认箭头不再盖住普通点击气泡；Play 两宠身体点击均通过，所有气泡 Renderer 排序高于标识，过期后气泡隐藏且当前宠物控制箭头正常显示。Console 0 error，证据 `Logs/BubbleIndicatorFix/`。

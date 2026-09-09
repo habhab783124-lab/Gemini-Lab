@@ -16,6 +16,7 @@
     "GeminiLab.Modules.EmotionGarden",
     "GeminiLab.Modules.Apple",
     "GeminiLab.Modules.Persistence",
+    "GeminiLab.Modules.RoomRelic",
     "Unity.TextMeshPro"
   ],
   "includePlatforms": [],

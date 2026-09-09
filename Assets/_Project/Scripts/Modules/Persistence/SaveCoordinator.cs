@@ -17,7 +17,7 @@ namespace GeminiLab.Modules.Persistence
         public string SlotId { get; }
     }
 
-    /// <summary>事件：某槽位已读取完成（所有 IPersistentService Restore 已跑完）。</summary>
+    /// <summary>槽位已读取；已注册服务完成恢复，其余数据在服务注册时补恢复。</summary>
     public readonly struct SaveSlotLoadedEvent
     {
         public SaveSlotLoadedEvent(string slotId) { SlotId = slotId; }
@@ -38,7 +38,7 @@ namespace GeminiLab.Modules.Persistence
     /// Load 流程：
     ///   SaveSystem.LoadAsync → 遍历 bundle.ServiceKeys → Registry.TryGet → Restore
     /// </summary>
-    public sealed class SaveCoordinator : ISaveCoordinator
+    public sealed class SaveCoordinator : ISaveCoordinator, IDisposable
     {
         private static readonly string[] _defaultSlots = { "slot_1", "slot_2", "slot_3" };
 
@@ -46,6 +46,7 @@ namespace GeminiLab.Modules.Persistence
         private readonly IPersistentServiceRegistry _registry;
         private readonly IGameClock _clock;
         private readonly EventBus? _eventBus;
+        private readonly Dictionary<string, string> _pendingRestores = new();
 
         public SaveCoordinator(
             ISaveSystem saveSystem,
@@ -57,6 +58,7 @@ namespace GeminiLab.Modules.Persistence
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _eventBus = eventBus;
+            _registry.Registered += RestorePendingService;
         }
 
         public IReadOnlyList<string> DefaultSlotIds => _defaultSlots;
@@ -101,11 +103,17 @@ namespace GeminiLab.Modules.Persistence
             // 重置并按当前 Registry 重新写入
             bundle.ServiceKeys.Clear();
             bundle.ServiceJsons.Clear();
+            // 尚未进入其场景的模块也必须随当前进度保存，不能丢掉刚读入的数据。
+            foreach (var pending in _pendingRestores)
+            {
+                bundle.SetService(pending.Key, pending.Value);
+            }
             foreach (var svc in _registry.All)
             {
                 try
                 {
-                    bundle.SetService(svc.Key, svc.CaptureJson() ?? string.Empty);
+                    if (!_pendingRestores.ContainsKey(svc.Key))
+                        bundle.SetService(svc.Key, svc.CaptureJson() ?? string.Empty);
                 }
                 catch (Exception ex)
                 {
@@ -124,6 +132,8 @@ namespace GeminiLab.Modules.Persistence
             var bundle = await _saveSystem.LoadAsync<SaveBundle>(slotId, cancellationToken).ConfigureAwait(true);
             if (bundle is null) return false;
 
+            // 切换存档槽时，不能把上一槽尚未恢复的数据带入新槽。
+            _pendingRestores.Clear();
             for (int i = 0; i < bundle.ServiceKeys.Count; i++)
             {
                 string key = bundle.ServiceKeys[i];
@@ -131,18 +141,20 @@ namespace GeminiLab.Modules.Persistence
                 var svc = _registry.TryGet(key);
                 if (svc is null)
                 {
-                    Debug.LogWarning($"[SaveCoordinator] 未找到 key='{key}' 对应的 IPersistentService，跳过");
+                    _pendingRestores[key] = json;
                     continue;
                 }
                 try
                 {
                     if (!svc.RestoreJson(json))
                     {
+                        _pendingRestores[key] = json;
                         Debug.LogWarning($"[SaveCoordinator] Restore '{key}' 返回 false");
                     }
                 }
                 catch (Exception ex)
                 {
+                    _pendingRestores[key] = json;
                     Debug.LogWarning($"[SaveCoordinator] Restore '{key}' 抛异常：{ex.Message}");
                 }
             }
@@ -150,6 +162,24 @@ namespace GeminiLab.Modules.Persistence
             _eventBus?.Publish(new SaveSlotLoadedEvent(slotId));
             return true;
         }
+
+        private void RestorePendingService(IPersistentService service)
+        {
+            if (!_pendingRestores.TryGetValue(service.Key, out string json)) return;
+            try
+            {
+                if (service.RestoreJson(json))
+                    _pendingRestores.Remove(service.Key);
+                else
+                    Debug.LogWarning($"[SaveCoordinator] Deferred restore '{service.Key}' 返回 false，保留原数据");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[SaveCoordinator] Deferred restore '{service.Key}' 失败：{ex.Message}");
+            }
+        }
+
+        public void Dispose() => _registry.Registered -= RestorePendingService;
 
         public async Task DeleteAsync(string slotId, CancellationToken cancellationToken = default)
         {

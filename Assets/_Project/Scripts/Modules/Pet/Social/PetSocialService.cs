@@ -12,7 +12,7 @@ namespace GeminiLab.Modules.Pet.Social
     /// - 回应类型：对方 Energy&lt;30 或 Mood&lt;30 → NEED_SPACE（最高优先级）；
     ///   否则 Friendship&gt;=60 → WARM；其余 NORMAL（§15）
     /// - 发起者 Energy&lt;10 不允许发起（§16）
-    /// - 结算表（§17）：NEED_SPACE 双方 E-1/M-1、F+0；NORMAL 双方 E-2/M+2、F+1；WARM 双方 E-2/M+3、F+2
+    /// - 结算表（§17）：NEED_SPACE 双方 E0/M0、F+0；NORMAL 双方 E-1/M+1、F+1；WARM 双方 E-2/M+3、F+2
     /// - 防刷：获得亲密度后 300s 内再次交流 FriendshipDelta=0（心情/精力照常结算，§18）
     /// - 特殊事件直接增减亲密度，不受防刷限制（§19）
     /// 实现 <see cref="IPersistentService"/>（Key = "pet_social"），由 PetRuntimeBootstrap 注册。
@@ -91,8 +91,8 @@ namespace GeminiLab.Modules.Pet.Social
             switch (response)
             {
                 case SocialResponseType.NeedSpace:
-                    initiatorEnergyDelta = -1f; initiatorMoodDelta = -1f;
-                    targetEnergyDelta = -1f; targetMoodDelta = -1f;
+                    initiatorEnergyDelta = 0f; initiatorMoodDelta = 0f;
+                    targetEnergyDelta = 0f; targetMoodDelta = 0f;
                     friendshipGain = 0f;
                     break;
                 case SocialResponseType.Warm:
@@ -101,8 +101,8 @@ namespace GeminiLab.Modules.Pet.Social
                     friendshipGain = 2f;
                     break;
                 default: // Normal
-                    initiatorEnergyDelta = -2f; initiatorMoodDelta = 2f;
-                    targetEnergyDelta = -2f; targetMoodDelta = 2f;
+                    initiatorEnergyDelta = -1f; initiatorMoodDelta = 1f;
+                    targetEnergyDelta = -1f; targetMoodDelta = 1f;
                     friendshipGain = 1f;
                     break;
             }

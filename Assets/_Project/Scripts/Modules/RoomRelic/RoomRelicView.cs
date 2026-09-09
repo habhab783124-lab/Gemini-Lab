@@ -21,8 +21,13 @@ namespace GeminiLab.Modules.RoomRelic
         }
 
         [SerializeField] private VariantBinding[] _variants = Array.Empty<VariantBinding>();
+        [Tooltip("永久赠礼使用的固定位置标识，与配置中的 displaySlotId 对应。")]
+        [SerializeField] private string _displaySlotId = string.Empty;
+
+        public string DisplaySlotId => _displaySlotId;
 
         public bool HasAnyActiveTarget { get; private set; }
+        public string? CurrentId { get; private set; }
 
         public void Apply(string? currentId)
         {
@@ -41,6 +46,9 @@ namespace GeminiLab.Modules.RoomRelic
             }
 
             HasAnyActiveTarget = hasAnyActiveTarget;
+            CurrentId = hasAnyActiveTarget ? currentId : null;
+            // 空槽位不能继续挡住重叠处的纸条、遗物或宠物点击。
+            if (TryGetComponent(out Collider2D hitArea)) hitArea.enabled = hasAnyActiveTarget;
         }
     }
 }
