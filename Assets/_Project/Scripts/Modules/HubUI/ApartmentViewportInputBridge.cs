@@ -2,6 +2,7 @@
 using System;
 using GeminiLab.Modules.Furniture;
 using GeminiLab.Modules.Pet;
+using GeminiLab.Modules.RoomRelic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -21,11 +22,15 @@ namespace GeminiLab.Modules.HubUI
         [SerializeField] private RawImage? _viewportImage;
         [SerializeField] private Camera? _viewportCamera;
         [SerializeField] private float _worldPlaneZ;
+        [SerializeField] private ApartmentDoorInteraction? _indoorDoor;
+        [SerializeField] private FurniturePageLink[] _furniturePageLinks = System.Array.Empty<FurniturePageLink>();
         [Tooltip("Scene-authored world click handlers, evaluated in array order after Build Mode and before pets.")]
         [SerializeField] private MonoBehaviour[] _worldPointInteractables = Array.Empty<MonoBehaviour>();
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            if (eventData.button != PointerEventData.InputButton.Left &&
+                eventData.button != PointerEventData.InputButton.Right) return;
             if (!TryScreenPointToWorldPoint(
                     eventData.position,
                     eventData.pressEventCamera,
@@ -39,6 +44,11 @@ namespace GeminiLab.Modules.HubUI
             {
                 return;
             }
+
+            if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_indoorDoor != null && _indoorDoor.TryHandleWorldPoint(worldPoint)) return;
+            foreach (FurniturePageLink link in _furniturePageLinks)
+                if (link != null && link.TryHandleWorldPoint(worldPoint)) return;
 
             if (eventData.button == PointerEventData.InputButton.Left &&
                 TryHandleWorldPointInteractables(worldPoint))
@@ -54,6 +64,19 @@ namespace GeminiLab.Modules.HubUI
             {
                 PetClickReactionController petClick = petClicks[i];
                 if (petClick != null && petClick.TryHandleWorldPoint(worldPoint))
+                {
+                    return;
+                }
+            }
+
+            RoomRelicInteraction[] relicInteractions = UnityEngine.Object.FindObjectsByType<RoomRelicInteraction>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None);
+
+            for (int i = 0; i < relicInteractions.Length; i++)
+            {
+                RoomRelicInteraction relicInteraction = relicInteractions[i];
+                if (relicInteraction != null && relicInteraction.TryHandleWorldPoint(worldPoint))
                 {
                     return;
                 }

@@ -1,0 +1,177 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1457d77cb1fd8324baba42cfcb6e91c3, type: 3}
+  m_Name: RoomRelicCatalog
+  m_EditorClassIdentifier: 
+  notes:
+  - id: note_demon_01
+    senderCharacter: Demon
+    receiverCharacter: Angel
+    content: "\u7A97\u8FB9\u90A3\u67B6\u7EB8\u98DE\u673A\u662F\u6211\u7684\u3002\u4F60\u8981\u662F\u60F3\u8BD5\u98DE\uFF0C\u8BB0\u5F97\u53EB\u4E0A\u6211\u3002"
+    visualType: 0
+    weight: 1
+  - id: note_demon_02
+    senderCharacter: Demon
+    receiverCharacter: Angel
+    content: "\u521A\u624D\u90A3\u6BB5\u5409\u4ED6\u4E0D\u662F\u5F39\u9519\u4E86\uFF0C\u662F\u65B0\u7F16\u7684\u3002\u4F60\u7B11\u4EC0\u4E48\u3002"
+    visualType: 1
+    weight: 1
+  - id: note_demon_03
+    senderCharacter: Demon
+    receiverCharacter: Angel
+    content: "\u7CD6\u679C\u5206\u4F60\u4E00\u9897\u3002\u5357\u74DC\u5F62\u72B6\u7684\u90A3\u9897\u2026\u2026\u4E5F\u53EF\u4EE5\u7ED9\u4F60\u3002"
+    visualType: 0
+    weight: 1
+  - id: note_demon_04
+    senderCharacter: Demon
+    receiverCharacter: Angel
+    content: "\u4ECA\u5929\u7684\u665A\u971E\u50CF\u6253\u7FFB\u7684\u989C\u6599\u76D8\u3002\u4E0B\u6B21\u4E00\u8D77\u770B\u5427\u3002"
+    visualType: 0
+    weight: 1
+  - id: note_angel_01
+    senderCharacter: Angel
+    receiverCharacter: Demon
+    content: "\u501F\u4F60\u7684\u4E66\u653E\u56DE\u53BB\u4E86\uFF0C\u5939\u7740\u7FBD\u6BDB\u7684\u90A3\u9875\uFF0C\u6211\u60F3\u518D\u8BFB\u4E00\u904D\u3002"
+    visualType: 0
+    weight: 1
+  - id: note_angel_02
+    senderCharacter: Angel
+    receiverCharacter: Demon
+    content: "\u8FD9\u53EA\u7EB8\u9E64\u6298\u6B6A\u4E86\u3002\u4F60\u8BF4\u50CF\u6211\u6253\u778C\u7761\u7684\u65F6\u5019\uFF0C\u6240\u4EE5\u7559\u4E0B\u4E86\u3002"
+    visualType: 1
+    weight: 1
+  - id: note_angel_03
+    senderCharacter: Angel
+    receiverCharacter: Demon
+    content: "\u542C\u89C1\u4F60\u7EC3\u7434\u4E86\u3002\u6700\u540E\u90A3\u4E00\u5C0F\u6BB5\u5F88\u597D\u542C\uFF0C\u53EF\u4EE5\u518D\u5F39\u4E00\u6B21\u5417\uFF1F"
+    visualType: 0
+    weight: 1
+  - id: note_angel_04
+    senderCharacter: Angel
+    receiverCharacter: Demon
+    content: "\u7A97\u53F0\u7559\u4E86\u4E00\u4E2A\u4F4D\u7F6E\u3002\u7B49\u661F\u661F\u51FA\u6765\u7684\u65F6\u5019\uFF0C\u4F60\u4E5F\u6765\u5750\u4E00\u4F1A\u513F\u5427\u3002"
+    visualType: 0
+    weight: 1
+  relics:
+  - id: relic_demon_01
+    ownerCharacter: Demon
+    targetRoom: 0
+    displayName: "\u7EA2\u9ED1\u7EB8\u98DE\u673A"
+    observationText: "\u6298\u5F97\u6B6A\u6B6A\u626D\u626D\u7684\uFF0C\u98DE\u5F97\u5012\u8FD8\u633A\u8FDC\u3002"
+    roomVisualKey: 4e070b2a29c2f8b4d832e4d5c174f8b0
+    roomSpritePath: "Assets/_Project/Art/Sprites/Relic/\u7EB8\u98DE\u673A.png"
+    weight: 1
+  - id: relic_demon_02
+    ownerCharacter: Demon
+    targetRoom: 0
+    displayName: "\u8C03\u8272\u76D8"
+    observationText: "\u989C\u8272\u6DF7\u5F97\u4E71\u4E03\u516B\u7CDF\uFF0C\u50CF\u4ED6\u6574\u7406\u5230\u4E00\u534A\u7684\u5FC3\u4E8B\u3002"
+    roomVisualKey: 8930f36f3efe98e468f3522ae96fa1b3
+    roomSpritePath: "Assets/_Project/Art/Sprites/Relic/\u989C\u6599\u76D8.png"
+    weight: 1
+  - id: relic_demon_03
+    ownerCharacter: Demon
+    targetRoom: 0
+    displayName: "\u62E8\u7247"
+    observationText: "\u8FD9\u4E2A\u7B28\u86CB\u4E0D\u4F1A\u4EE5\u4E3A\u7AD6\u7434\u548C\u5409\u4ED6\u4E00\u6837\u7528\u62E8\u7247\u5427\u3002"
+    roomVisualKey: c7a9a7cd560939b4faf921b6fca7c7f3
+    roomSpritePath: "Assets/_Project/Art/Sprites/Relic/\u62E8\u7247.png"
+    weight: 1
+  - id: relic_demon_04
+    ownerCharacter: Demon
+    targetRoom: 0
+    displayName: "\u5357\u74DC\u7CD6\u679C"
+    observationText: "\u628A\u6700\u559C\u6B22\u7684\u4E07\u5723\u9650\u5B9A\u6B3E\u9001\u6211\u4E86\uFF1F"
+    roomVisualKey: 232777944ca791d448cf4840262643c4
+    roomSpritePath: "Assets/_Project/Art/Sprites/Relic/\u5357\u74DC\u7CD6\u679C.png"
+    weight: 1
+  - id: relic_demon_05
+    ownerCharacter: Demon
+    targetRoom: 0
+    displayName: "\u901F\u5199"
+    observationText: "\u628A\u6211\u753B\u7684\u50BB\u4E4E\u4E4E\u7684\u2026\u2026\u6254\u6389\u7B97\u4E86\u2014\u2014\u7B97\u4E86\u3002"
+    roomVisualKey: 
+    roomSpritePath: 
+    weight: 1
+  - id: relic_angel_01
+    ownerCharacter: Angel
+    targetRoom: 1
+    displayName: "\u5343\u7EB8\u9E64"
+    observationText: "\u7FC5\u8180\u548C\u7942\u7684\u4E00\u6837\u8F7B\u4E00\u6837\u8584\uFF0C\u55EF\uFF0C\u4F60\u662F\u5929\u4F7F\u7684\u4FE1\u4F7F\u5417\uFF1F"
+    roomVisualKey: b3bc4a7a7b73869419f8897dccbafd8a
+    roomSpritePath: "Assets/_Project/Art/Sprites/Relic/\u5343\u7EB8\u9E64.png"
+    weight: 1
+  - id: relic_angel_02
+    ownerCharacter: Angel
+    targetRoom: 1
+    displayName: "\u96D5\u82B1\u5C0F\u955C\u5B50"
+    observationText: "\u55EF\u3001\u55EF\u3001\u55EF\uFF0C\u8BF6\u8FD9\u4E2A\u955C\u5B50\u6CA1\u529E\u6CD5\u548C\u6211\u8BF4\u8BDD\u5417\uFF1F"
+    roomVisualKey: c54d937a2c5f2b84bb6870e8a0bd3c05
+    roomSpritePath: "Assets/_Project/Art/Sprites/Relic/\u5C0F\u955C\u5B50.png"
+    weight: 1
+  - id: relic_angel_03
+    ownerCharacter: Angel
+    targetRoom: 1
+    displayName: "\u7FBD\u6BDB\u4E66\u7B7E"
+    observationText: "\u597D\u770B\u2026\u2026\u6211\u4E5F\u60F3\u8981\u7FBD\u6BDB\u7FC5\u8180\u2026\u2026\u8FD8\u80FD\u6389\u4E0B\u6765\u505A\u4E66\u7B7E\u2026\u2026"
+    roomVisualKey: 6643c15cd7a2ec74fbbe1a119c5d1d01
+    roomSpritePath: "Assets/_Project/Art/Sprites/Relic/\u7FBD\u6BDB\u4E66\u7B7E.png"
+    weight: 1
+  - id: relic_angel_04
+    ownerCharacter: Angel
+    targetRoom: 1
+    displayName: "\u7AD6\u7434\u7434\u8C31\u6B8B\u9875"
+    observationText: "\u8981\u662F\u7942\u542C\u5230\u6211\u7528\u5409\u4ED6\u5F39\u51FA\u8FD9\u4E00\u6BB5\u4F1A\u5F88\u60CA\u8BB6\u5427\u3002"
+    roomVisualKey: cedf53eb805316849bcc895b54650888
+    roomSpritePath: "Assets/_Project/Art/Sprites/Relic/\u7AD6\u7434\u6B8B\u9875.png"
+    weight: 1
+  - id: relic_angel_05
+    ownerCharacter: Angel
+    targetRoom: 1
+    displayName: "\u5C0F\u661F\u661F\u540A\u5760"
+    observationText: "\u4E0D\u91CD\uFF0C\u4EAE\u6676\u6676\u7684\uFF0C\u7CFB\u5728\u5C3E\u5DF4\u5C16\u4E0A\u521A\u521A\u597D\u3002"
+    roomVisualKey: 
+    roomSpritePath: 
+    weight: 1
+  gifts:
+  - id: gift_demon_01
+    giverCharacter: Demon
+    receiverCharacter: Angel
+    displayName: "\u5357\u74DC\u7CD6\u679C"
+    observationText: "\u6076\u9B54\u9001\u7ED9\u5929\u4F7F\u7684\u5357\u74DC\u7CD6\u679C\u3002"
+    roomVisualKey: 232777944ca791d448cf4840262643c4
+    displaySlotId: desk
+    weight: 1
+  - id: gift_demon_02
+    giverCharacter: Demon
+    receiverCharacter: Angel
+    displayName: "\u901F\u5199"
+    observationText: "\u6076\u9B54\u9001\u7ED9\u5929\u4F7F\u7684\u901F\u5199\u3002"
+    roomVisualKey: 
+    displaySlotId: shelf
+    weight: 1
+  - id: gift_angel_01
+    giverCharacter: Angel
+    receiverCharacter: Demon
+    displayName: "\u7FBD\u6BDB\u4E66\u7B7E"
+    observationText: "\u5929\u4F7F\u9001\u7ED9\u6076\u9B54\u7684\u7FBD\u6BDB\u4E66\u7B7E\u3002"
+    roomVisualKey: 6643c15cd7a2ec74fbbe1a119c5d1d01
+    displaySlotId: desk
+    weight: 1
+  - id: gift_angel_02
+    giverCharacter: Angel
+    receiverCharacter: Demon
+    displayName: "\u5C0F\u661F\u661F\u540A\u5760"
+    observationText: "\u5929\u4F7F\u9001\u7ED9\u6076\u9B54\u7684\u5C0F\u661F\u661F\u540A\u5760\u3002"
+    roomVisualKey: 
+    displaySlotId: shelf
+    weight: 1

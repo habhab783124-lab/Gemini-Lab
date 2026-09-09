@@ -65,6 +65,7 @@ namespace GeminiLab.Modules.Pet
         [SerializeField] private RuntimeAnimatorController? _movementController;
         [SerializeField] private bool _sideFramesFaceLeft = true;
         [SerializeField] private BoxCollider2D? _movementBounds;
+        [SerializeField] private ApartmentPetMovement? _apartmentMovement;
         [SerializeField] private Transform? _sortingAnchor;
         [SerializeField] private int _sortingOrderOffset;
         [SerializeField] private PetId _petId = PetId.Angel;
@@ -75,6 +76,11 @@ namespace GeminiLab.Modules.Pet
         [SerializeField] private BehaviorConfigSO? _behaviorConfig;
 
         public PetId PetId => _petId;
+
+        /// <summary>气泡等反馈跟随实际显示的宠物；睡觉等家具姿态使用独立视觉对象。</summary>
+        public Vector3 VisiblePosition => _sleepInteractionVisualSpriteRenderer != null &&
+            _sleepInteractionVisualSpriteRenderer.enabled && _sleepInteractionVisualSpriteRenderer.gameObject.activeInHierarchy
+                ? _sleepInteractionVisualSpriteRenderer.transform.position : transform.position;
 
         /// <summary>初始性格矩阵（Inspector 绑定；可为空）。启动时由 PersonalityEvolutionBootstrap 补种读取。</summary>
         public PersonalityMatrixSO? InitialPersonalityMatrix => _personality;
@@ -354,6 +360,16 @@ namespace GeminiLab.Modules.Pet
             if (_externalMovementLocked)
             {
                 StopExternalMovement();
+                return;
+            }
+
+            if (_apartmentMovement != null && _apartmentMovement.IsReady && _context != null)
+            {
+                if (!_hasInteractionPhysicsOverride)
+                {
+                    _apartmentMovement.FixedTick(Time.fixedDeltaTime);
+                    _context.RuntimeData.Position = _apartmentMovement.Position;
+                }
                 return;
             }
 
@@ -781,6 +797,7 @@ namespace GeminiLab.Modules.Pet
 
         private void TickPlayerControlled(PetContext context, float deltaTime)
         {
+            _apartmentMovement?.SetManualVelocity(Vector2.zero);
             // 玩家接管后终止漫游触发中的家具交互，避免取消选中后残留交互动画。
             // 同时还原自动交互期间应用的覆盖（pose/可视/排序），否则宠物会被钉在交互点。
             if (_wanderInteractionActive)
@@ -821,6 +838,12 @@ namespace GeminiLab.Modules.Pet
 
             if (!canMove || _playerInputController == null)
             {
+                return;
+            }
+
+            if (_apartmentMovement != null && _apartmentMovement.IsReady)
+            {
+                _apartmentMovement.SetManualVelocity(movementInput * _playerInputController.MoveSpeed);
                 return;
             }
 
@@ -917,6 +940,24 @@ namespace GeminiLab.Modules.Pet
             }
 
             isWandering = true;
+            if (_apartmentMovement != null && _apartmentMovement.IsReady)
+            {
+                if (!_apartmentMovement.Follow(wander.TargetPosition, wander.MoveSpeed, wander.ArrivalThreshold, out bool arrived))
+                {
+                    _apartmentMovement.Stop();
+                    wander.AbandonTarget();
+                    isWandering = false;
+                    return WanderMoveOutcome.Abandoned;
+                }
+                context.RuntimeData.Position = _apartmentMovement.Position;
+                context.RuntimeData.TargetPosition = wander.TargetPosition;
+                context.RuntimeData.TargetReached = arrived;
+                if (!arrived) return WanderMoveOutcome.None;
+                _apartmentMovement.Stop();
+                wander.NotifyArrived();
+                isWandering = false;
+                return WanderMoveOutcome.Arrived;
+            }
             Vector2 current = GetCurrentWorldPosition();
             Vector2 toTarget = wander.TargetPosition - current;
             if (wander.HorizontalOnly)
@@ -1602,6 +1643,12 @@ namespace GeminiLab.Modules.Pet
 
         private void SetWanderVelocity(Vector2 velocity)
         {
+            if (_apartmentMovement != null && _apartmentMovement.IsReady)
+            {
+                if (velocity == Vector2.zero) _apartmentMovement.Stop();
+                else _apartmentMovement.SetManualVelocity(velocity);
+                return;
+            }
             if (_rigidbody2D != null)
             {
                 _rigidbody2D.velocity = velocity;
@@ -2151,6 +2198,9 @@ namespace GeminiLab.Modules.Pet
                 // 会沿表面滑动/抖动。两种来源都经过去抖，避免 MoveDir 高频翻转
                 // 让动画在 Move_Front / Move_Back / Move_Side 之间乱切换。
                 Vector2 targetDelta = _context.RuntimeData.TargetPosition - currentPosition;
+                // 绕家具时朝向当前路径段，不能一直面向最终家具位置。
+                if (_apartmentMovement != null && _apartmentMovement.IsReady)
+                    targetDelta = _apartmentMovement.SteeringVelocity;
                 if (targetDelta.sqrMagnitude > DirectionEpsilonSqr)
                 {
                     _lastMoveDirection = _animationDirectionDebouncer.Step(targetDelta.normalized, _lastMoveDirection);
@@ -2741,6 +2791,7 @@ namespace GeminiLab.Modules.Pet
         private void EnsurePhysicsBinding()
         {
             BoxCollider2D? legacyBoxCollider = gameObject.GetComponent<BoxCollider2D>();
+            CapsuleCollider2D? existingCapsule = gameObject.GetComponent<CapsuleCollider2D>();
 
             if (_rigidbody2D == null)
             {
@@ -2758,6 +2809,11 @@ namespace GeminiLab.Modules.Pet
 
             if (_capsuleCollider2D == null)
             {
+                _capsuleCollider2D = existingCapsule;
+            }
+
+            if (_capsuleCollider2D == null)
+            {
                 if (legacyBoxCollider != null)
                 {
                     Destroy(legacyBoxCollider);
@@ -2766,7 +2822,7 @@ namespace GeminiLab.Modules.Pet
                 _capsuleCollider2D = gameObject.AddComponent<CapsuleCollider2D>();
             }
 
-            if (_capsuleCollider2D != null)
+            if (_capsuleCollider2D != null && existingCapsule == null)
             {
                 _capsuleCollider2D.direction = CapsuleDirection2D.Vertical;
                 if (_spriteRenderer != null && _spriteRenderer.sprite != null)
@@ -2887,6 +2943,8 @@ namespace GeminiLab.Modules.Pet
 
         private Vector2 ClampToMovementBounds(Vector2 position)
         {
+            if (_apartmentMovement != null && _apartmentMovement.IsReady)
+                return _apartmentMovement.Clamp(position);
             if (_movementBounds == null)
             {
                 return position;

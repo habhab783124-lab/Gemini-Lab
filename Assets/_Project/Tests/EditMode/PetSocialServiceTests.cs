@@ -104,13 +104,13 @@ namespace GeminiLab.Tests.EditMode
 
             PetSocialOutcome outcome = service.TrySocialize(PetId.Angel, PetId.Devil);
 
-            // §17：双方 E-1 / M-1 / F+0
+            // §17：双方 E0 / M0 / F+0
             Assert.IsTrue(outcome.Initiated);
             Assert.AreEqual(SocialResponseType.NeedSpace, outcome.ResponseType);
-            Assert.AreEqual(79f, _angel.Energy, 0.001f);
-            Assert.AreEqual(59f, _angel.Mood, 0.001f);
-            Assert.AreEqual(19f, _devil.Energy, 0.001f);
-            Assert.AreEqual(59f, _devil.Mood, 0.001f);
+            Assert.AreEqual(80f, _angel.Energy, 0.001f);
+            Assert.AreEqual(60f, _angel.Mood, 0.001f);
+            Assert.AreEqual(20f, _devil.Energy, 0.001f);
+            Assert.AreEqual(60f, _devil.Mood, 0.001f);
             Assert.AreEqual(30f, service.Friendship, 0.001f);
             Assert.IsFalse(outcome.FriendshipGainApplied);
         }
@@ -124,12 +124,12 @@ namespace GeminiLab.Tests.EditMode
 
             PetSocialOutcome outcome = service.TrySocialize(PetId.Angel, PetId.Devil);
 
-            // §17：双方 E-2 / M+2 / F+1
+            // §17：双方 E-1 / M+1 / F+1
             Assert.AreEqual(SocialResponseType.Normal, outcome.ResponseType);
-            Assert.AreEqual(78f, _angel.Energy, 0.001f);
-            Assert.AreEqual(62f, _angel.Mood, 0.001f);
-            Assert.AreEqual(78f, _devil.Energy, 0.001f);
-            Assert.AreEqual(62f, _devil.Mood, 0.001f);
+            Assert.AreEqual(79f, _angel.Energy, 0.001f);
+            Assert.AreEqual(61f, _angel.Mood, 0.001f);
+            Assert.AreEqual(79f, _devil.Energy, 0.001f);
+            Assert.AreEqual(61f, _devil.Mood, 0.001f);
             Assert.AreEqual(31f, service.Friendship, 0.001f);
             Assert.IsTrue(outcome.FriendshipGainApplied);
 
@@ -170,7 +170,7 @@ namespace GeminiLab.Tests.EditMode
             Assert.IsFalse(second.FriendshipGainApplied);
             Assert.AreEqual(0f, second.FriendshipDelta, 0.001f);
             Assert.AreEqual(31f, service.Friendship, 0.001f);
-            Assert.AreEqual(64f, _angel.Mood, 0.001f); // 两次 M+2 都生效
+            Assert.AreEqual(62f, _angel.Mood, 0.001f); // 两次 M+1 都生效
 
             _now = _now.AddSeconds(201); // 距上次获得 301s
             PetSocialOutcome third = service.TrySocialize(PetId.Angel, PetId.Devil);

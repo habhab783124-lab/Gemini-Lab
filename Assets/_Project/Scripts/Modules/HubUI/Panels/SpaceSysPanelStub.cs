@@ -26,8 +26,13 @@ namespace GeminiLab.Modules.HubUI.Panels
         [SerializeField] private Image? _devilEnergyFill;
         [SerializeField] private TMP_Text? _devilEnergyText;
 
+        [Header("主控标识")]
+        [SerializeField] private SpriteRenderer? _angelControlIndicator;
+        [SerializeField] private SpriteRenderer? _devilControlIndicator;
+
         private IPetRoster? _roster;
         private IDisposable? _snapshotSub;
+        private PetId? _lastControlId;
 
         protected override void OnDestroy()
         {
@@ -41,10 +46,14 @@ namespace GeminiLab.Modules.HubUI.Panels
             EnsureServices();
             SubscribeIfNeeded();
             RefreshAll();
+            RefreshControlIndicator(true);
         }
 
         public override void OnClose()
         {
+            if (_angelControlIndicator != null) _angelControlIndicator.gameObject.SetActive(false);
+            if (_devilControlIndicator != null) _devilControlIndicator.gameObject.SetActive(false);
+            _lastControlId = null;
             base.OnClose();
             _snapshotSub?.Dispose();
             _snapshotSub = null;
@@ -70,6 +79,37 @@ namespace GeminiLab.Modules.HubUI.Panels
 
             RefreshPet(_roster.TryGet(PetId.Angel), _angelMoodFill, _angelMoodText, _angelEnergyFill, _angelEnergyText);
             RefreshPet(_roster.TryGet(PetId.Devil), _devilMoodFill, _devilMoodText, _devilEnergyFill, _devilEnergyText);
+        }
+
+        private void Update()
+        {
+            RefreshControlIndicator();
+        }
+
+        private void RefreshControlIndicator(bool force = false)
+        {
+            Transform? activeTransform = PetPlayerInputController.ActiveTransform;
+            PetController? controller = activeTransform != null
+                ? activeTransform.GetComponent<PetController>()
+                : null;
+            PetId? activeId = controller != null ? controller.PetId : (PetId?)null;
+
+            if (!force && activeId == _lastControlId)
+            {
+                return;
+            }
+
+            _lastControlId = activeId;
+
+            if (_angelControlIndicator != null)
+            {
+                _angelControlIndicator.gameObject.SetActive(activeId == PetId.Angel);
+            }
+
+            if (_devilControlIndicator != null)
+            {
+                _devilControlIndicator.gameObject.SetActive(activeId == PetId.Devil);
+            }
         }
 
         private static void RefreshPet(PetRuntimeData? data,

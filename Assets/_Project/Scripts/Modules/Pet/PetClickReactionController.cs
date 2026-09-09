@@ -24,6 +24,10 @@ namespace GeminiLab.Modules.Pet
         }
 
         [SerializeField] private bool _enableClickReaction = true;
+        [SerializeField] private bool _socializeOnClick = true;
+        [SerializeField] private Collider2D? _selectionArea;
+        [SerializeField, Tooltip("气泡显示在此控制标识上方，避免箭头盖住文字。")]
+        private SpriteRenderer? _controlIndicator;
         [SerializeField] private float _bubbleDurationSeconds = 3f;
         [SerializeField] private Vector3 _bubbleLocalOffset = new(0f, 2.6f, 0f);
         [SerializeField] private float _bubbleCharacterSize = 0.14f;
@@ -99,7 +103,7 @@ namespace GeminiLab.Modules.Pet
 
         private void EnsureClickCollider()
         {
-            _clickCollider = GetComponent<Collider2D>();
+            _clickCollider = _selectionArea != null ? _selectionArea : GetComponent<Collider2D>();
             if (_clickCollider != null)
             {
                 return;
@@ -145,7 +149,8 @@ namespace GeminiLab.Modules.Pet
             }
 
             if (_clickCollider == null ||
-                !ClickOcclusionUtility.IsTopmostColliderAtWorldPoint(worldPoint, _clickCollider) ||
+                (!ClickOcclusionUtility.IsTopmostColliderAtWorldPoint(worldPoint, _clickCollider) &&
+                 !ClickOcclusionUtility.IsTopmostColliderAtWorldPoint(worldPoint, GetComponent<Collider2D>())) ||
                 !_clickCollider.OverlapPoint(worldPoint))
             {
                 return false;
@@ -161,7 +166,7 @@ namespace GeminiLab.Modules.Pet
 
             // 交流结算（数值规则文档 §15-18）：被点击的宠物是“对方”，另一只是“发起者”。
             // NEED_SPACE / 发起者精力不足时用固定气泡反馈，其余情况走原有随机语料。
-            if (TryResolveSocialFeedback(out string socialFeedback))
+            if (_socializeOnClick && TryResolveSocialFeedback(out string socialFeedback))
             {
                 ShowBubble(socialFeedback);
                 return true;
@@ -236,8 +241,17 @@ namespace GeminiLab.Modules.Pet
             ApplyBubbleSorting();
         }
 
+        private bool _dialogueBubbleActive;
+
+        public void SetDialogueBubbleActive(bool active)
+        {
+            _dialogueBubbleActive = active;
+            if (active) HideBubbleImmediate();
+        }
+
         private void ShowBubble(string message)
         {
+            if (_dialogueBubbleActive) return;
             EnsureBubbleVisuals();
             if (_bubbleRoot == null || _bubbleBackground == null || _bubbleTail == null || _bubbleText == null)
             {
@@ -295,6 +309,20 @@ namespace GeminiLab.Modules.Pet
 
             int sortingOrder = _petRenderer.sortingOrder + BubbleSortingOffset;
             string sortingLayerName = _petRenderer.sortingLayerName;
+            if (_controlIndicator != null)
+            {
+                int petLayer = SortingLayer.GetLayerValueFromID(_petRenderer.sortingLayerID);
+                int indicatorLayer = SortingLayer.GetLayerValueFromID(_controlIndicator.sortingLayerID);
+                if (indicatorLayer > petLayer)
+                {
+                    sortingLayerName = _controlIndicator.sortingLayerName;
+                    sortingOrder = _controlIndicator.sortingOrder + 1;
+                }
+                else if (indicatorLayer == petLayer)
+                {
+                    sortingOrder = Mathf.Max(sortingOrder, _controlIndicator.sortingOrder + 1);
+                }
+            }
 
             if (_bubbleBackground != null)
             {

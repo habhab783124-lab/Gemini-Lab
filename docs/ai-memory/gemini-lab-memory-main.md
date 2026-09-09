@@ -1,5 +1,44 @@
 # Gemini-Lab Memory Main
 
+## 2026-09-09 室内小门交流完成
+
+- 点击小门开关；选中宠物到任一侧门边按 F 交流，双向各 5 话题和三种回应已存 `IndoorDoorDialogues.asset`。
+- 最新展示改为双宠各自气泡：发起句立即出现，2.5 秒后对方回应，8 秒后收起；不再有中央问答窗口和姓名前缀。跟随实际可见宠物（含家具姿态），不会翻字或拦截点击。当前 52 项 EditMode 与 Play 30 组问答通过，证据 `Logs/DoorBubbles/`。
+- 按新图片需求修正 NORMAL 双方 E-1/M+1/F+1，NEED_SPACE 全部为 0；WARM 不变。保留发起者 E<10 限制与亲密度 300 秒冷却。
+- 公寓宠物新增独立身体点击区域，选中不再结算社交；复用金色头顶箭头并修正页面切换显示。脚底摩擦为 0，skin 降到 0.02。
+- 38 项 EditMode、Play 30 个话题/回应组合、视口开门、身体点击与 10 条家具物理路线验证通过；原存档 SHA256 已恢复一致，退出 Play，场景中仅两只宠物。入口与限制见 `docs/indoor-door-interaction.md`。
+
+
+Updated: 2026-09-04
+
+## 2026-09-09 公寓移动优化
+
+- 两只公寓宠物显式绑定 `ApartmentPetMovement`：手动与自动移动共用脚底边界、扫掠/滑动与固定物理帧运动；自动走位通过可见图绕家具，未修改世界地图移动链路。
+- 10 个 `Approach_*` 站立点已保存 Scene，门口/竖琴等目标与交互姿势分开；新增 `Upgrade Pet Movement` 作者化菜单，保留人工站立点。
+- 35 项 EditMode 通过；Play 10 条实际物理路线、16 组方向边界测试通过，正常帧弹琴与绕床睡眠通过。原存档已恢复核对。实际边界见 `docs/apartment-movement.md`。
+
+## 2026-09-09 遗留物可靠性完善
+
+- 当前功能分支新增：延迟注册服务补读档；遗留物跨场景复用时恢复好友度订阅；双房间独立占用；首次奖励写入日期并兼容 v1 存档。
+- 赠礼按 Scene 中显式 `_displaySlotId` 固定展示；打开弹窗成功才消费纸条/临时遗物；读档通知预置视觉刷新。
+- 作者化工具保留已有房间、弹窗、配置和人工布局；新增 `Upgrade Room Relic Bindings` 菜单。8 条纸条文案已替换占位；速写、小星星吊坠仍缺正式素材。
+- 实现与验证边界见 `docs/room-relic-system.md` 和 `docs/manual-validation-checklist.md`；本地 main `a683a60` 尚无该模块。
+- Play 复验修复：遗留物弹窗保留 SpaceSys 背景，纸条文字/关闭按钮可读，赠礼图文分离；布局已存 Scene。29 项 EditMode 通过；Play 物理触发、模拟视口点击、场景往返与独立目录存读档通过。原存档已恢复核对，尚未覆盖完整主菜单和独立构建。
+
+## 2026-09-03 室内遗留物系统实现（未运行场景作者化）
+
+- 新增 `GeminiLab.Modules.RoomRelic` 运行时模块：`RoomRelicService` 实现每日首次进入判定、纸条 50%、临时遗留物 45~79 每日 50%、永久赠礼 ≥80 每日 15% 且不重复，存档 key 为 `room_relic`。
+- `RoomRelicRuntimeBootstrap` 在 Apartment 场景 `RoomRelic` 根节点注册服务；`RoomRelicEntryTrigger` 复用 `PetMovementBounds` / `PetMovementBounds_Devil` 作为房间进入触发。
+- 运行时视觉组件只切换场景预置槽位/变体，不创建最终视觉；新增 `RoomNotePopup`、`RoomRelicDetailPopup`、`RoomGiftObtainedPopup` 三个 UI 面板。
+- 新增编辑器作者化入口 `ApartmentRoomRelicAuthoring`，菜单为 `Tools/Gemini-Lab/Apartment/Author Room Relic`；`AutoSetup` 版本提升到 66。已通过 MCP 执行作者化，Apartment 场景里已生成 `RoomRelic` 节点、占位槽位与三个弹窗。
+- 新增 EditMode 测试 `RoomRelicServiceTests`；代码已通过本地临时项目编译校验，任务闸门和视觉契约检查通过。
+- `Assets/_Project/Art/Sprites/Relic/` 中 8 张已提供遗物 Sprite 已绑定到 Apartment 场景 `RelicSpawn` 变体；缺失的 `速写` 和 `小星星吊坠` 仍使用占位。
+- 2026-09-04 补充：`RoomRelicDetailPopup` 与 `RoomGiftObtainedPopup` 增加 `_iconView`，复用 `RoomRelicView` 变体切换显示 icon（运行时不写 Sprite）；作者化 `CreatePopup` 生成 icon 变体节点。
+- 赠礼数据从占位改为 4 个真实素材：南瓜糖果/速写（恶魔→天使）、羽毛书签/小星星吊坠（天使→恶魔），缺素材的 `roomVisualKey` 留空占位；南瓜糖果、羽毛书签已绑定素材，速写、小星星吊坠仍缺素材。
+- 纸条掉落槽位按 `visualType` 绑定纸条/纸团素材（折纸 Origami 形态已取消），赠礼掉落槽位绑定真实素材。
+- 2026-09-04 SpaceSys 面板增加「人物主控」通用标识：`SpaceSysPanelStub` 新增 `_angelControlIndicator`/`_devilControlIndicator`（SpriteRenderer），运行时按 `PetPlayerInputController.ActiveTransform` 对应的 `PetController.PetId` 切换 active；标识挂在 `Pet_Angel`/`Pet_Devil` 头顶（世界空间 SpriteRenderer，跟随宠物），绑定 `Assets/_Project/Art/Sprites/Pet/人物主控.png`。
+- 2026-09-04 新增调试工具 `Assets/_Project/Scripts/Editor/Tools/RoomRelicDebugWindow.cs`，菜单 `Tools/Gemini-Lab/Room Relic Debug`：Play Mode 下可设置好友度（0/45/80）、触发 Angel/Devil 房间进入判定（反射重置每日判定）、查看当前纸条/遗物/赠礼状态，用于验收遗物掉落。
+
 ## 2026-09-09 WorldMap outdoor pet facing: fixed-step single-source correction
 
 - Normal outdoor animation sampling now runs in `WorldMapPetAnimationTriggerController.FixedUpdate`, after `PetController.FixedUpdate` because the WorldMap controller has execution order `1000`.
@@ -608,6 +647,12 @@ Updated: 2026-08-22
 - 新增 `Assets/_Project/Scripts/Editor/Tools/WorldMapFlowerSoilLayoutWindow.cs`，入口为 `Tools/Gemini-Lab/WorldMap 花卉布局复用`。
 - 窗口分别保存每周种植参考格、图鉴列表参考卡和图鉴详情参考页，三个按钮将参考对象下 `FlowerImage` 与 `SoilImage` 的 `RectTransform` 布局复制到对应目标集合。
 - 复制目标为 `CellTemplate` 与 `Day0`~`Day6`、`CodexCardSlot_00`~`11` 和所有 `DetailView`；操作使用 Unity Undo 并标记当前场景 dirty，不复制 Sprite、颜色或启用状态。
+
+- 2026-09-09 小门后续修复：空遗留物槽位禁用点击 Collider；永久赠礼支持再次查看；双房间共用外边界，门上下隔墙始终阻挡，开门可双向串门，关门不拉回访客、占用门口时拒绝关门。43 项 EditMode 通过，Play 实际 UI 点击 20/20 内容与双宠跨门物理检查通过。
+
+- 2026-09-09 新增公寓页面家具：天使房水晶球点击打开 Tarot，恶魔房扭蛋机点击打开 Collection；Scene/Prefab/家具定义已保存，显式绑定 FurniturePageLink。实际 UI 点击、建造模式拦截、20 个遗留物点击及 10 条家具物理路线通过。见 `docs/apartment-page-furniture.md`。
+
+- 气泡遮挡修复：普通点击气泡现在通过 `_controlIndicator` 显式引用排在控制箭头上方（原约 1250 < 箭头 9999）。双宠 Play 点击、到期隐藏与控制标识验证通过，Console 0 error；场景绑定已保存。
 
 ### 2026-08-18 AI 每日小结与 WorldMap 自由行走
 - `EmotionGardenService` 新增 `EmotionDailySummaryData` 与 `DailySummaries` 持久化字段；提交情绪时按日期覆盖当天小结，旧存档缺少该字段时从已有花朵记录补出兼容摘要。

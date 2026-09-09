@@ -35,3 +35,5 @@
 5. 每次家具放置/拆除必须同步通知 `NavigationService.RebuildAsync()`，否则会出现寻路穿模。
 6. 建造模式下全局时间尺度保持 1.0，不得使用 `Time.timeScale = 0`（会影响 Gateway 心跳）。
 7. 贴墙家具（如壁画、挂钟）通过 `Furniture.Placement = Wall`，吸附到 Tilemap 的 "Wall" 子层，**渲染 SortingOrder 高于地板家具**，交互锚点的朝向固定向外。
+
+- 已实现的页面入口家具：水晶球与扭蛋机的 Prefab/定义均位于对应 Leisure 子目录，页面路由由 HubUI 的 FurniturePageLink 承担。配置和验证见 `docs/apartment-page-furniture.md`。

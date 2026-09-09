@@ -46,7 +46,12 @@ namespace GeminiLab.Core.UI
                 return false;
             }
 
-            if (_stack.Count > 0)
+            if (IsRoomRelicPopup(id))
+            {
+                // 遗留物弹窗覆盖当前页面；关闭后继续留在原房间视口。
+                if (Top.HasValue && IsRoomRelicPopup(Top.Value)) CloseTop();
+            }
+            else if (_stack.Count > 0)
             {
                 CloseAll();
             }
@@ -55,6 +60,11 @@ namespace GeminiLab.Core.UI
             panel.OnOpen(payload);
             _eventBus?.Publish(new UIPanelOpenedEvent(id));
             return true;
+        }
+
+        private static bool IsRoomRelicPopup(PanelId id)
+        {
+            return id == PanelId.RoomNote || id == PanelId.RoomRelicDetail || id == PanelId.RoomGiftObtained;
         }
 
         public bool Close(PanelId id)

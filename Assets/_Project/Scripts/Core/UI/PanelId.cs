@@ -27,6 +27,11 @@ namespace GeminiLab.Core.UI
         EmotionCollection = 28,
         DailySummaryMailbox = 29,
 
+        // 室内遗留物
+        RoomNote = 29,
+        RoomRelicDetail = 30,
+        RoomGiftObtained = 31,
+
         // 通用
         ConfirmDialog = 90
     }

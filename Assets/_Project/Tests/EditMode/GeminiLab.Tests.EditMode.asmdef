@@ -3,6 +3,7 @@
   "rootNamespace": "GeminiLab.Tests.EditMode",
   "references": [
     "GeminiLab.Core",
+    "Unity.TextMeshPro",
     "GeminiLab.Modules.Pet",
     "GeminiLab.Modules.Persistence",
     "GeminiLab.Modules.Navigation.Abstractions",
@@ -12,10 +13,11 @@
     "GeminiLab.Modules.DesktopOverlay",
     "GeminiLab.Modules.Travel",
     "GeminiLab.Modules.Tarot",
-    "GeminiLab.Modules.Collection",
     "GeminiLab.Modules.Apple",
     "GeminiLab.Modules.HubUI",
     "GeminiLab.Modules.EmotionGarden",
+    "GeminiLab.Modules.RoomRelic",
+    "GeminiLab.Modules.Collection",
     "GeminiLab.Modules.WorldMap",
     "GeminiLab.Modules.ApartmentKeepsake"
   ],

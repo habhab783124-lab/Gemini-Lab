@@ -23,6 +23,7 @@ FinalWeight = BaseWeight × PersonalityMultiplier × EnergyMultiplier × MoodMul
 
 | 文件 | 说明 |
 | :--- | :--- |
+| `ApartmentPetMovement.cs` / `ApartmentWalkPath.cs` | 公寓显式绑定的固定物理帧移动、脚底边界、家具扫掠/滑动与可见图绕行；不替换 WorldMap 路径。详见 `docs/apartment-movement.md`。 |
 | `PetController.cs` | `MonoBehaviour` 运行时宿主。玩家可控宠走输入链；非玩家可控宠在配置了 `_behaviorConfig` 时走**行为驱动循环**（待机/抽取 → Moving → 执行绑定交互 → §12 结算 → §9/§10 记录），否则回退旧随机漫游；无输入控制器的宠（WorldMap）走 FSM。 |
 | `Behavior/BehaviorConfigSO.cs` | 每只宠一张行为表：BaseWeight/Category/性格标签/偏好精力/结算增量/冷却/绑定 InteractionType。资产位于 `_Project/ScriptableObjects/PetConfig/BehaviorConfig_{Angel,Devil}.asset`。 |
 | `Behavior/BehaviorWeightCalculator.cs` | 四倍率纯函数（§2/§3/§6/§9）。 |

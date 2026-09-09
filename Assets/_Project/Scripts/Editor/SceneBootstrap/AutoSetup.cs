@@ -11,7 +11,7 @@ namespace GeminiLab.Editor.SceneBootstrap
     public static class AutoSetup
     {
         private const string SetupDoneKey = "GeminiLab.AutoSetupDone";
-        private const int ExpectedVersion = 71;
+        private const int ExpectedVersion = 72;
 
         static AutoSetup()
         {
@@ -470,6 +470,11 @@ namespace GeminiLab.Editor.SceneBootstrap
                     {
                         // 只应用本次 UI 增量，避免重建已有场景层级和花朵对象。
                         WorldMapEmotionGardenUIPatch.PatchUiTaskMinimizedAll();
+                    }
+
+                    if (currentVersion < 72)
+                    {
+                        ApartmentRoomRelicAuthoring.Author();
                     }
 
                     EditorPrefs.SetInt(SetupDoneKey, ExpectedVersion);

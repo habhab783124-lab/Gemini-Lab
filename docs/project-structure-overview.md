@@ -1,5 +1,25 @@
 # Gemini-Lab 项目结构总览
 
+## 2026-09-09 室内小门已落地
+
+Apartment 场景中 `ArtGenerated/Environment/door` 绑定 `ApartmentDoorInteraction`，下方 `OpenDoor/Stripe0..4` 为开门形态；`ApartmentViewportHost/IndoorDoorUI` 保存操作提示，旧 `Conversation` 已移除。视口图片下 `AngelDialogueBubble` / `DevilDialogueBubble` 分别保存两只宠物的气泡，子节点 `Content/Tail` 和 `Content/Body/Text` 可在 Scene / Inspector 调整；默认隐藏 Content，交流时按顺序显示。两只宠物下新增只用于点选的 `SelectionArea`，原 `ControlIndicator` 继续显示金色箭头。内容资产为 `IndoorDoorDialogues.asset`，门边接近点复用现有 `Approach_*_门边`。详细规则与验证见 `docs/indoor-door-interaction.md`。
+
+
+Updated: 2026-07-30
+
+## 公寓移动（2026-09-09）
+
+Apartment 两宠新增显式绑定的 `ApartmentPetMovement`，Scene 中保存 10 个 `Approach_*` 站立点，分别供天使 6 个、恶魔 4 个家具行为使用。原家具层级、姿势、Sprite 与碰撞体保留。组件 Inspector 可调房间、脚底体积引用、安全间距及障碍更新周期；详见 `docs/apartment-movement.md`。
+
+## 遗留物系统（2026-09-09）
+
+- 当前功能分支的 Apartment 已保存 `ArtGenerated/RoomRelic`、两房间预置物品槽与三弹窗，详见 `docs/room-relic-system.md`。
+- 赠礼槽通过 `RoomRelicView._displaySlotId` 对应配置的 `desk` / `shelf`，运行时不移动布局或赋 Sprite。
+- 运行时服务支持延迟读档和场景往返；编辑器作者化保留人工修改，新 `Upgrade Room Relic Bindings` 菜单仅补绑定和占位文案。
+- 三类遗留物弹窗保留底层空间页；Apartment Scene 已保存纸条/详情文字颜色、字号、关闭 X 和赠礼布局。Play 点击、场景往返与存读档验证见人工验证清单。
+
+## 苹果资源系统（2026-08-14）
+
 ## 2026-09-09 WorldMap outdoor pet facing: fixed-step single-source correction
 
 - The WorldMap outdoor animation adapter samples horizontal Rigidbody movement in `FixedUpdate` and applies normal `Idle_Side`/`Move_Side` playback from that sample only.
@@ -333,6 +353,12 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 - 预览场景使用室外专用 Sprite 与 `Assets/_Project/Animations/WorldMap/Pet/` 下的两套 WorldMap Animator Controller；Apartment 宠物资源保持独立。
 - `WorldMap_Main.unity` 与预览场景共享 Controller / AnimationClip 资产。Animation 窗口中的动画修改应落在共享 `.anim` / `.controller` 资产上，才能同步室外场景。
 - 场景作者化脚本为 `Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapPetAnimationPreviewAuthoring.cs`；它只校准共享引用，不重建或复制现有动画资源。
+
+- 小门下新增作者化碰撞节点 `DividerUpper`、`DividerLower`、`PassageBlocker`；两宠 motor 显式绑定另一侧 `PetMovementBounds`，原 door BoxCollider 改为点击 Trigger。只开放门洞，外墙和家具仍阻挡。
+
+- Apartment_Main 新增根节点家具“水晶球”“扭蛋机”，分别为 CrystalBall/Gacha Prefab 实例。定义在 FurnitureConfig/Leisure，绑定页面 Tarot/Collection；视口桥新增 `_furniturePageLinks` 序列化引用。
+
+- 两只 Apartment 宠物的 `PetClickReactionController._controlIndicator` 绑定自身 `ControlIndicator`，普通点击气泡位于该标识上方，不再让箭头遮住文字；现有节点层级保持不变。
 
 ## AI 每日小结邮箱
 
