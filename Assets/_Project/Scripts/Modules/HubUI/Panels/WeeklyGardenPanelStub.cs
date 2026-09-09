@@ -271,7 +271,16 @@ namespace GeminiLab.Modules.HubUI.Panels
                 : data.FlowerName;
             string emotionName = EmotionFlowerCatalog.ResolveEmotionDisplayName(data.EmotionType);
             string stateText = data.State == GrowthState.Bloomed ? "已开花" : "培育中";
-            SetDetailText(FormatFlowerDate(data.DateIso), emotionName, $"{flowerName}\n{stateText}");
+            string keywordText = data.EmotionKeywords != null && data.EmotionKeywords.Length > 0
+                ? string.Join("、", data.EmotionKeywords)
+                : emotionName;
+            string languageText = string.IsNullOrWhiteSpace(data.FlowerLanguage)
+                ? $"{flowerName}的花语暂未生成"
+                : data.FlowerLanguage.Trim();
+            SetDetailText(
+                FormatFlowerDate(data.DateIso),
+                $"{emotionName}\n关键词：{keywordText}",
+                $"{flowerName}\n{languageText}\n{stateText}");
         }
 
         private void SetDetailText(string date, string emotion, string flowerLanguage)

@@ -137,7 +137,16 @@ namespace GeminiLab.Modules.HubUI.Panels
 
             if (_service != null)
             {
-                _clusters.AddRange(_service.GetAllClusters());
+                // Empty catalog entries are not authored placeholder cards.
+                // Keep only flowers that have actually been collected so the
+                // runtime never exposes a grid of unknown/empty cards.
+                foreach (ClusterProgress cluster in _service.GetAllClusters())
+                {
+                    if (cluster.TotalCount > 0 && cluster.UnlockedStage > 0)
+                    {
+                        _clusters.Add(cluster);
+                    }
+                }
                 _clusters.Sort(CompareClusters);
             }
 
@@ -284,9 +293,9 @@ namespace GeminiLab.Modules.HubUI.Panels
 
             if (_detailSoilImage != null)
             {
-                bool showSoil = detailFlowerVariantKey != null;
-                _detailSoilImage.enabled = showSoil;
-                _detailSoilImage.gameObject.SetActive(showSoil);
+                // 土壤只属于每周培育面板；图鉴详情中的花朵不显示土壤。
+                _detailSoilImage.enabled = false;
+                _detailSoilImage.gameObject.SetActive(false);
             }
 
             if (_detailPreviousButton != null)
@@ -446,6 +455,7 @@ namespace GeminiLab.Modules.HubUI.Panels
 
             public void Set(bool visible, int number, bool unlocked, string name, string meta, string? flowerVariantKey)
             {
+                if (_button != null) _button.gameObject.SetActive(visible);
                 if (_button != null) _button.interactable = visible;
                 if (_cardImage != null) _cardImage.enabled = visible && unlocked;
                 if (_lockedImage != null) _lockedImage.gameObject.SetActive(visible && !unlocked);
@@ -465,9 +475,9 @@ namespace GeminiLab.Modules.HubUI.Panels
                 }
                 if (_soilImage != null)
                 {
-                    bool showSoil = visible && unlocked && flowerVariantKey != null;
-                    _soilImage.enabled = showSoil;
-                    _soilImage.gameObject.SetActive(showSoil);
+                    // 图鉴卡片只展示花朵本身，土壤不属于图鉴视觉。
+                    _soilImage.enabled = false;
+                    _soilImage.gameObject.SetActive(false);
                 }
                 if (_unlockedContent != null) _unlockedContent.SetActive(visible && unlocked);
                 if (_numberText != null) _numberText.text = $"No. {number:000}";

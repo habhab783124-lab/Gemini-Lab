@@ -1,6 +1,5 @@
 #nullable enable
 using GeminiLab.Core;
-using GeminiLab.Modules.Pet;
 using UnityEngine;
 
 namespace GeminiLab.Modules.WorldMap
@@ -51,20 +50,20 @@ namespace GeminiLab.Modules.WorldMap
             if (_camera is null) return;
 
             // 左键点击非桌宠区域 → 取消选中（必须在跟随/平移分支之前，否则选中状态下不会执行）
-            if (Input.GetMouseButtonDown(0) && !ClickOcclusionUtility.IsPointerOverUI())
+            if (Input.GetMouseButtonDown(0))
             {
-                if (ClickOcclusionUtility.TryGetTopmostColliderUnderMouse(_camera, out Collider2D? topmostCollider))
+                WorldMapSceneInteractionRouter? interactionRouter = WorldMapSceneInteractionRouter.Active;
+                bool pointerBlocked = interactionRouter != null
+                    ? interactionRouter.IsPointerBlockedByUI()
+                    : ClickOcclusionUtility.IsPointerOverUI();
+                bool clickedOutdoorPet = !pointerBlocked && interactionRouter != null &&
+                    interactionRouter.TryGetTargetAtScreenPoint(
+                        Input.mousePosition,
+                        out IWorldMapSceneClickTarget? clickTarget) &&
+                    clickTarget is WorldMapPetInteractionController;
+                if (!pointerBlocked && !clickedOutdoorPet)
                 {
-                    if (topmostCollider == null ||
-                        topmostCollider.GetComponentInParent<PetPlayerInputController>() == null)
-                    {
-                        PetPlayerInputController.ReleaseAllControl();
-                        _blockLeftDragUntilMouseUp = true;
-                    }
-                }
-                else
-                {
-                    PetPlayerInputController.ReleaseAllControl();
+                    WorldMapPetInteractionController.ReleaseAllControl();
                     _blockLeftDragUntilMouseUp = true;
                 }
             }
@@ -74,7 +73,7 @@ namespace GeminiLab.Modules.WorldMap
                 _blockLeftDragUntilMouseUp = false;
             }
 
-            Transform? followTarget = PetPlayerInputController.ActiveTransform;
+            Transform? followTarget = WorldMapPetInteractionController.ActiveTransform;
 
             Vector3 pos = transform.position;
 

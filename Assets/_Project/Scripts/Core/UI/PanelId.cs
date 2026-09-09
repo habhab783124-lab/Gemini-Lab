@@ -25,6 +25,7 @@ namespace GeminiLab.Core.UI
         EmotionInput = 26,
         WeeklyGardenView = 27,
         EmotionCollection = 28,
+        DailySummaryMailbox = 29,
 
         // 室内遗留物
         RoomNote = 29,

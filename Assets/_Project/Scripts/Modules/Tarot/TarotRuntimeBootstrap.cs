@@ -21,6 +21,7 @@ namespace GeminiLab.Modules.Tarot
     /// 否则 Gateway 可用 → GatewayTarotBackend；
     /// 否则 → FallbackOnlyBackend（全本地解读）。
     /// </summary>
+    [DefaultExecutionOrder(100)]
     public sealed class TarotRuntimeBootstrap : MonoBehaviour
     {
         [SerializeField] private TarotDeckSO? _deck;
@@ -32,6 +33,10 @@ namespace GeminiLab.Modules.Tarot
         private void Awake()
         {
             if (Application.isPlaying) DontDestroyOnLoad(gameObject);
+        }
+
+        private void Start()
+        {
 
             if (_deck == null)
             {

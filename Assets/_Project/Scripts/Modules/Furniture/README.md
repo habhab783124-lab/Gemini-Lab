@@ -1,5 +1,9 @@
 # Modules/Furniture/ — V-Decor 建造系统（2D）
 
+## 室内家具选中反馈（任务 2）
+
+`ApartmentFurnitureSelectionAuthoring` 在 `Apartment_Main` 中为现有家具作者化 `FurnitureSelectionHighlight` 与句子提示节点。`ApartmentFurnitureSelectionPresenter` 只切换这些场景节点并填充已作者化 TMP 文本；视口点击继续经过 `ApartmentViewportInputBridge`，由 `ClickOcclusionUtility` 决定重叠家具的最上层目标，点击空白清除选中状态。任务 3 遗留物和任务 4 入口迁移不属于本轮范围。需求中的“苹果垫”对应现有 `家具_装饰_储物的家具_恶魔_01`，其 Sprite、Prefab、配置和 Scene 实例均已存在，真实 definitionId 和第 10 个描边节点已写入 Scene。
+
 ## 文件夹职责
 实现 **2D 视角下** 长按 `V` 键的家具建造模式、基于 `Grid / Tilemap` 的网格吸附、环境 Buff 聚合、家具羁绊（习惯标签）与交互锚点管理。
 

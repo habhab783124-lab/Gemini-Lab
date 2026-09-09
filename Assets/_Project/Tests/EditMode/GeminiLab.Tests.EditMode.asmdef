@@ -16,7 +16,10 @@
     "GeminiLab.Modules.Apple",
     "GeminiLab.Modules.HubUI",
     "GeminiLab.Modules.EmotionGarden",
-    "GeminiLab.Modules.RoomRelic"
+    "GeminiLab.Modules.RoomRelic",
+    "GeminiLab.Modules.Collection",
+    "GeminiLab.Modules.WorldMap",
+    "GeminiLab.Modules.ApartmentKeepsake"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

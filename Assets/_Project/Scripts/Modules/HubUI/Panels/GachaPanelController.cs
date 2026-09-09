@@ -55,9 +55,6 @@ namespace GeminiLab.Modules.HubUI.Panels
         private readonly List<GameObject> _spawned = new();
         private readonly List<GameObject> _rewardSpawned = new();
 
-        private const int SingleCost = 1;
-        private const int MultiCost = 5;
-
         protected override void Awake()
         {
             base.Awake();
@@ -126,9 +123,9 @@ namespace GeminiLab.Modules.HubUI.Panels
                 _balanceText.text = $"{_apple.Balance}";
 
             if (_singleDrawButton != null)
-                _singleDrawButton.interactable = _apple != null && _apple.Balance >= SingleCost;
+                _singleDrawButton.interactable = _apple != null && _apple.Balance >= GachaService.SingleCost;
             if (_multiDrawButton != null)
-                _multiDrawButton.interactable = _apple != null && _apple.Balance >= MultiCost;
+                _multiDrawButton.interactable = _apple != null && _apple.Balance >= GachaService.MultiCost;
         }
 
         private void RefreshGrid()

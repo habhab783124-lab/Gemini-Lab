@@ -13,13 +13,21 @@ namespace GeminiLab.Modules.WorldMap
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(Collider2D))]
-    public sealed class CabinReturnPortal : MonoBehaviour
+    public sealed class CabinReturnPortal : MonoBehaviour, IWorldMapSceneClickTarget
     {
         [SerializeField] private Color _hoverTint = new Color(1.15f, 1.15f, 1.15f, 1f);
+        [SerializeField] private int _interactionPriority = 25;
 
         private SpriteRenderer? _sprite;
         private Collider2D? _clickCollider;
         private Color _originalColor;
+
+        public bool IsWorldMapInteractionEnabled =>
+            isActiveAndEnabled && _clickCollider != null && _clickCollider.enabled;
+
+        public int WorldMapInteractionPriority => _interactionPriority;
+
+        public Renderer? WorldMapSortingRenderer => _sprite;
 
         private void Awake()
         {
@@ -54,6 +62,11 @@ namespace GeminiLab.Modules.WorldMap
 
         private void OnMouseDown()
         {
+            if (WorldMapSceneInteractionRouter.Active is { } router && router.IsRegistered(this))
+            {
+                return;
+            }
+
             if (ClickOcclusionUtility.IsPointerOverUI())
             {
                 return;
@@ -67,9 +80,20 @@ namespace GeminiLab.Modules.WorldMap
             // 防止 Play 模式启动时 Unity SendMouseEvents 的首帧伪点击
             if (Time.frameCount < 2) return;
 
+            HandleWorldMapClick();
+        }
+
+        public bool ContainsWorldPoint(Vector2 worldPoint)
+        {
+            _clickCollider ??= GetComponent<Collider2D>();
+            return IsWorldMapInteractionEnabled && _clickCollider!.OverlapPoint(worldPoint);
+        }
+
+        public void HandleWorldMapClick()
+        {
             if (!ServiceLocator.TryResolve(out ISceneFlowService? sceneFlow) || sceneFlow is null)
             {
-                Debug.LogError("[CabinReturnPortal] 未找到 ISceneFlowService");
+                Debug.LogError("[CabinReturnPortal] 未找到 ISceneFlowService", this);
                 return;
             }
 

@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using GeminiLab.Modules.Pet;
 using UnityEditor;
 using UnityEditor.Animations;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace GeminiLab.Editor.SceneBootstrap
@@ -30,6 +31,12 @@ namespace GeminiLab.Editor.SceneBootstrap
             {
                 Debug.LogWarning("[WorldMapOutdoorPets] 当前处于 PlayMode，跳过场景作者化；请停止运行后重新执行。 ");
                 return;
+            }
+
+            const string scenePath = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
+            if (EditorSceneManager.GetActiveScene().path != scenePath)
+            {
+                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             }
 
             EnsureFolder(AnimationRoot);
@@ -60,11 +67,28 @@ namespace GeminiLab.Editor.SceneBootstrap
             AnimatorController angelController = CreateController(angel);
             AnimatorController devilController = CreateController(devil);
 
-            BindScenePet("Pet_Angel", angelController, angel.IdleFrames.FirstOrDefault(), sideFramesFaceLeft: true);
-            BindScenePet("Pet_Devil", devilController, devil.IdleFrames.FirstOrDefault());
+            BindScenePet(
+                "Pet_Angel",
+                angelController,
+                angel.IdleFrames.FirstOrDefault(),
+                sideFramesFaceLeft: true,
+                boundsMin: new Vector2(-18f, -1.95f),
+                boundsMax: new Vector2(18f, -1.65f));
+            BindScenePet(
+                "Pet_Devil",
+                devilController,
+                devil.IdleFrames.FirstOrDefault(),
+                boundsMin: new Vector2(-18f, -1.95f),
+                boundsMax: new Vector2(18f, -1.65f));
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            var activeScene = EditorSceneManager.GetActiveScene();
+            if (activeScene.IsValid() && activeScene.path == "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity")
+            {
+                EditorSceneManager.MarkSceneDirty(activeScene);
+                EditorSceneManager.SaveScene(activeScene);
+            }
             Debug.Log("[WorldMapOutdoorPets] 室外双宠 AnimationClip、无条件状态机和场景实例绑定已完成。");
         }
 
@@ -163,7 +187,9 @@ namespace GeminiLab.Editor.SceneBootstrap
             string petName,
             AnimatorController controller,
             Sprite? idleSprite,
-            bool? sideFramesFaceLeft = null)
+            bool? sideFramesFaceLeft = null,
+            Vector2? boundsMin = null,
+            Vector2? boundsMax = null)
         {
             GameObject? pet = GameObject.Find(petName);
             if (pet == null)
@@ -234,8 +260,57 @@ namespace GeminiLab.Editor.SceneBootstrap
                 EditorUtility.SetDirty(petController);
             }
 
+            EnsureFreeWander(pet, boundsMin ?? new Vector2(-18f, -1.95f), boundsMax ?? new Vector2(18f, -1.65f));
+
             EditorUtility.SetDirty(animator);
             if (renderer != null) EditorUtility.SetDirty(renderer);
+        }
+
+        private static void EnsureFreeWander(GameObject pet, Vector2 boundsMin, Vector2 boundsMax)
+        {
+            var wander = pet.GetComponent<RandomWander>();
+            if (wander == null)
+            {
+                wander = Undo.AddComponent<RandomWander>(pet);
+            }
+
+            var wanderSo = new SerializedObject(wander);
+            SetVector2(wanderSo, "_boundsMin", boundsMin);
+            SetVector2(wanderSo, "_boundsMax", boundsMax);
+            SetFloat(wanderSo, "_moveSpeed", 1.2f);
+            SetFloat(wanderSo, "_arrivalThreshold", 0.15f);
+            SetFloat(wanderSo, "_minWaitSeconds", 2f);
+            SetFloat(wanderSo, "_maxWaitSeconds", 5f);
+            var horizontal = wanderSo.FindProperty("_horizontalOnly");
+            if (horizontal != null) horizontal.boolValue = true;
+            wanderSo.ApplyModifiedPropertiesWithoutUndo();
+
+            var input = pet.GetComponent<PetPlayerInputController>();
+            if (input == null)
+            {
+                input = Undo.AddComponent<PetPlayerInputController>(pet);
+            }
+
+            var inputSo = new SerializedObject(input);
+            var prefer = inputSo.FindProperty("_preferControlOnEnable");
+            if (prefer != null) prefer.boolValue = false;
+            var inputHorizontal = inputSo.FindProperty("_horizontalOnly");
+            if (inputHorizontal != null) inputHorizontal.boolValue = true;
+            inputSo.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(wander);
+            EditorUtility.SetDirty(input);
+        }
+
+        private static void SetVector2(SerializedObject serialized, string propertyName, Vector2 value)
+        {
+            var property = serialized.FindProperty(propertyName);
+            if (property != null) property.vector2Value = value;
+        }
+
+        private static void SetFloat(SerializedObject serialized, string propertyName, float value)
+        {
+            var property = serialized.FindProperty(propertyName);
+            if (property != null) property.floatValue = value;
         }
 
         private static AnimationClip CreateOrUpdateClip(string path, IReadOnlyList<Sprite> frames, bool loop)

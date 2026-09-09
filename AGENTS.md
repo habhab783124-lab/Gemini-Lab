@@ -73,6 +73,10 @@
   3. 再运行 `tools/check-task-gate.ps1`
   4. 只有校验通过，才进入写操作
 - 如果任务边界变化，必须先重写任务卡，再继续执行。
+- 新任务卡还必须声明 `workflow_contract_version`、`task_id`、`human_approved`、`approval_source` 和 `plan_hash`；计划 hash 不覆盖执行状态、批准时间和验证记录。
+- 任务闸门会校验批准状态和计划 hash；通过后先运行 `tools/check-task-scope.ps1 -Mode CreateBaseline`，再进入实际写入。
+- 收尾统一运行 `tools/verify-task.ps1 -JsonOnly`；它会组合 review 闸门、任务范围、`git diff --check` 和 PowerShell 语法检查。任一失败都不能将任务标记为 `done`。
+- 以上是原有流程的机器检查层，不增加新的用户 token 或命令，也不改变“探索 → 规划 → 用户确认 → 行动”的顺序。
 
 ### 视觉任务硬闸门
 - 每张任务卡都必须声明 `scene_play_parity_required`、`scene_visual_contracts` 和 `runtime_visual_files`；非视觉任务分别使用 `false`、`[]`、`[]`，不能省略字段。

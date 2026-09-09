@@ -1,6 +1,7 @@
 #nullable enable
 using GeminiLab.Core;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace GeminiLab.Modules.Pet
 {
@@ -18,6 +19,7 @@ namespace GeminiLab.Modules.Pet
         [SerializeField] private bool _acceptArrowKeys = true;
         [SerializeField] private bool _horizontalOnly = false;
         [SerializeField, Min(0f)] private float _moveSpeed = 10f;
+        [SerializeField] private bool _allowLegacyMouseTakeover = true;
 
         public static Transform? ActiveTransform => s_activeController != null ? s_activeController.transform : null;
 
@@ -72,6 +74,14 @@ namespace GeminiLab.Modules.Pet
 
         private void OnMouseDown()
         {
+            // WorldMap 的唯一点击处理者是 WorldMapSceneInteractionRouter。
+            // 保留默认 true 以兼容室内场景；WorldMap 不再让旧 OnMouseDown 与路由竞争。
+            if (!_allowLegacyMouseTakeover ||
+                string.Equals(SceneManager.GetActiveScene().name, "WorldMap_Main", System.StringComparison.Ordinal))
+            {
+                return;
+            }
+
             if (ClickOcclusionUtility.IsPointerOverUI())
             {
                 return;
@@ -156,7 +166,9 @@ namespace GeminiLab.Modules.Pet
                 return;
             }
 
-            if (s_activeController == null || _preferControlOnEnable)
+            // 自由行走场景默认不抢占控制权；只有明确标记 PreferControlOnEnable
+            // 的公寓实例才会在启用时接管键盘。点击桌宠仍会通过 TakeControl() 接管。
+            if (_preferControlOnEnable)
             {
                 s_activeController = this;
             }
@@ -168,7 +180,7 @@ namespace GeminiLab.Modules.Pet
             for (int i = 0; i < controllers.Length; i++)
             {
                 PetPlayerInputController controller = controllers[i];
-                if (controller == null || !controller._enableInput || !controller.isActiveAndEnabled)
+                if (controller == null || !controller._enableInput || !controller._preferControlOnEnable || !controller.isActiveAndEnabled)
                 {
                     continue;
                 }

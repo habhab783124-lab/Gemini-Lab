@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using GeminiLab.Core;
 using GeminiLab.Core.Events;
 using GeminiLab.Core.UI;
@@ -25,7 +26,19 @@ namespace GeminiLab.Modules.HubUI
         {
             var router = ResolveOrCreateRouter();
             router?.CloseAll();
-            router?.Open(_panelId);
+            router?.Open(ResolvePanelIdForCompatibility());
+        }
+
+        private PanelId ResolvePanelIdForCompatibility()
+        {
+            // 旧版邮箱作者化曾把 enumValueIndex(12) 写入场景，而不是实际值 29。
+            // 场景已修正为 29；这里兼容仍在内存中的旧对象，避免本次编辑器会话点击失效。
+            if ((int)_panelId == 12 && !Enum.IsDefined(typeof(PanelId), _panelId))
+            {
+                return PanelId.DailySummaryMailbox;
+            }
+
+            return _panelId;
         }
 
         private static IUIRouter? ResolveOrCreateRouter()

@@ -17,6 +17,16 @@ namespace GeminiLab.Editor.SceneBootstrap
         private const string ScenePath = "Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity";
         private const float GroundY = -3f;
 
+        private static readonly string[] AngelSignNames =
+        {
+            "天使标牌", "天使区域标牌", "天使区域的标牌", "标牌_天使", "AngelSign", "AngelSignboard"
+        };
+
+        private static readonly string[] DemonSignNames =
+        {
+            "恶魔标牌", "恶魔区域标牌", "恶魔区域的标牌", "标牌_恶魔", "DevilSign", "DevilSignboard"
+        };
+
         public static void Patch()
         {
             var scene = EditorSceneManager.GetActiveScene().path == ScenePath
@@ -35,9 +45,10 @@ namespace GeminiLab.Editor.SceneBootstrap
             // 1) 清理旧的单一大花园（如果有，移走 WorldMapGardenZone 避免冲突）
             RemoveOldGardenZoneEntry(parent);
 
-            // 2) 双入口：天使 + 恶魔
-            EnsureEmotionEntry(parent, "EmotionEntry_Angel", "angel", "天使花园", -4f, GroundY + 0.8f);
-            EnsureEmotionEntry(parent, "EmotionEntry_Demon", "demon", "恶魔花园", 4f, GroundY + 0.8f);
+            // 2) 双入口：直接使用场景中已有的天使/恶魔标牌，不再创建占位入口。
+            EnsureSignEntry(AngelSignNames, "angel");
+            EnsureSignEntry(DemonSignNames, "demon");
+            DeactivateLegacyEmotionEntries(parent);
 
             // 3) 共享九宫格花圃可视化（不带 WorldMapGardenZone）
             EnsureGardenPlots(parent);
@@ -45,6 +56,38 @@ namespace GeminiLab.Editor.SceneBootstrap
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Debug.Log("[WorldMapGardenZonePatch] 天使+恶魔双入口 + 九宫格花圃已就绪");
+        }
+
+        private static void EnsureSignEntry(string[] candidateNames, string owner)
+        {
+            GameObject? sign = null;
+            for (int i = 0; i < candidateNames.Length; i++)
+            {
+                sign = GameObject.Find(candidateNames[i]);
+                if (sign != null) break;
+            }
+
+            if (sign == null)
+            {
+                Debug.LogWarning($"[WorldMapGardenZonePatch] 未找到{owner}标牌，未创建占位入口");
+                return;
+            }
+
+            WorldMapGardenZone zone = sign.GetComponent<WorldMapGardenZone>() ?? sign.AddComponent<WorldMapGardenZone>();
+            SerializedObject zoneSo = new SerializedObject(zone);
+            SerializedProperty? ownerProp = zoneSo.FindProperty("_owner");
+            if (ownerProp != null) ownerProp.stringValue = owner;
+            zoneSo.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(zone);
+        }
+
+        private static void DeactivateLegacyEmotionEntries(Transform parent)
+        {
+            foreach (string name in new[] { "EmotionEntry_Angel", "EmotionEntry_Demon" })
+            {
+                Transform? legacy = parent.Find(name);
+                if (legacy != null) legacy.gameObject.SetActive(false);
+            }
         }
 
         /// <summary>彻底删除旧版 GardenZone（单入口时代遗留），避免和新双入口 + GardenPlots 混淆。</summary>
