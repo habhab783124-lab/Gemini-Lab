@@ -10,8 +10,9 @@ namespace GeminiLab.Core.SceneFlow
     {
         Boot = 0,
         MainMenu = 1,
-        Apartment = 2,
-        WorldMap = 3,
-        DesktopOverlay = 4
+        Prologue = 2,
+        Apartment = 3,
+        WorldMap = 4,
+        DesktopOverlay = 5
     }
 }

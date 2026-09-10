@@ -20,6 +20,7 @@ namespace GeminiLab.Modules.MainMenu
 
         private ISceneFlowService? _sceneFlow;
         private IUIRouter? _uiRouter;
+        private const string ProloguePlayedKey = "HasPlayedPrologue";
 
         private void Awake()
         {
@@ -62,10 +63,29 @@ namespace GeminiLab.Modules.MainMenu
 
         private void OnStartClicked()
         {
+            Debug.Log("[MainMenu] 按钮点击成功，进入 OnStartClicked");
             if (_sceneFlow is null && !ServiceLocator.TryResolve(out _sceneFlow))
             {
                 Debug.LogError("[MainMenu] 未找到 ISceneFlowService，无法进入公寓场景");
                 return;
+            }
+
+            Debug.Log("[MainMenu] SceneFlow 获取成功");
+
+            bool hasPlayedPrologue =
+                PlayerPrefs.GetInt(ProloguePlayedKey, 0) == 1;
+
+            Debug.Log("[MainMenu] HasPlayedPrologue = " + hasPlayedPrologue);
+
+            if (hasPlayedPrologue)
+            {
+                Debug.Log("[MainMenu] 准备跳转 Apartment");
+                _sceneFlow!.LoadAsync(SceneId.Apartment);
+            }
+            else
+            {
+                Debug.Log("[MainMenu] 准备跳转 Prologue");
+                _sceneFlow!.LoadAsync(SceneId.Prologue);
             }
 
             _sceneFlow!.LoadAsync(SceneId.Apartment);

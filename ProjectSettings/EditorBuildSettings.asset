@@ -15,6 +15,9 @@ EditorBuildSettings:
     path: Assets/_Project/Scenes/MainMenu/MainMenu.unity
     guid: 290475957c7c0a541a9876f9bcb387c6
   - enabled: 1
+    path: Assets/_Project/Scenes/Intro/Prologue.unity
+    guid: d7cbed8f9beae6549829535a42b9028f
+  - enabled: 1
     path: Assets/_Project/Scenes/Apartment/Apartment_Main.unity
     guid: ba67ec8fbabf03a44a9184ef79530ca8
   - enabled: 1

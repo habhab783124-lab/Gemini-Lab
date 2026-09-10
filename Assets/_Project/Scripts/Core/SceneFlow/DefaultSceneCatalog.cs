@@ -14,6 +14,7 @@ namespace GeminiLab.Core.SceneFlow
         {
             { SceneId.Boot, "Boot" },
             { SceneId.MainMenu, "MainMenu" },
+            { SceneId.Prologue, "Prologue" },
             { SceneId.Apartment, "Apartment_Main" },
             { SceneId.WorldMap, "WorldMap_Main" },
             { SceneId.DesktopOverlay, "Desktop_Overlay" }
