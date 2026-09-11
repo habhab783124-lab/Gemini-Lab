@@ -1,5 +1,24 @@
 # Gemini-Lab 人工验证清单
 
+## 2026-09-11 PR 集成验证（独立工作区）
+
+- 最终 `verify-task.ps1 -JsonOnly` 通过：主任务闸门、4 份 Scene/Prefab 资源契约、3 个运行时文件扫描、范围检查、diff 空白检查。
+- PetController 原有四处视觉闸门失败已修复：取消运行时创建视觉对象、直接写 Sprite 和两处直接写 AnimatorController；所需资源已序列化。
+- 绑定检查：两个 Pet Prefab、WorldMap 两只宠物的 GameObject / Transform / SpriteRenderer / Animator 引用、实际资源 GUID、默认禁用状态及唯一 fileID 通过。Apartment 通过现存 Prefab 引用继承。
+- 编译：使用 Unity 2022.3.62f3 所带 Roslyn 和本地缓存依赖，28 个相关程序集编译通过，包括 Pet、HubUI、编辑器工具和 EditMode 测试程序集。这不等同于完整 Unity 导入或测试执行。
+- 新增 7 个测试用例涵盖两种 Prefab、两个场景、AnimatorController 保留、视觉复用和清理、身体位移/缩放时家具姿态稳定。
+- 未完成：完整 EditMode 运行、Play 中家具互动及 Scene/Play 画面对照。独立工作区 UPM 返回 `The path argument must be of type string. Received undefined`；禁用 UPM 的启动也因未加载 UI 包而编译失败。本次不将这些步骤记录为通过，也没有运行独立构建。
+- 下方 2026-09-09 的 65/65 和 Play 记录是原功能历史证据，不代表本次集成后的执行结果。PR 保持草稿，待 Unity 环境恢复后运行测试和画面回归。
+- Unity 版本、包源、MCP 配置及旧日志未纳入提交；原工作区快照的 38 个文件 SHA256 保持一致。
+
+## 2026-09-09 入室交流确认与纸条更新验证
+
+- 65/65 EditMode 通过：入室/拒绝/重入、双方三种回应、延迟结算、取消、重复点击、话题随机、外部锁保留、原社交与遗留物回归。
+- Play 双向 × 3 回应、12 次按钮事件通过；四个按钮在渲染后的实际 EventSystem 射线中均为第一命中，点击交流成功。
+- 正常帧观察双方维持 Idle、速度为 0、位置不变；到期恢复和切页面清理通过。34 条纸条逐条在实际场景出现一个有效槽，弹窗文案一致，无 TMP 溢出，打开后消耗成功。
+- 34 条 Catalog 数据、6 个槽 / 102 个变体、4 个按钮 Sprite 引用验证通过。Game View 已检查底部按钮不裁切和两宠各自气泡；旧中央窗口未恢复。
+- 验证证据：`Logs/CommunicationUpdate/`。测试完成退出 Play、保存 Scene，恢复本次测试前存档；未覆盖所有窗口比例、真实按键手工连按或独立构建。
+
 ## 2026-09-09 双宠交流气泡验证
 
 - 52 项 EditMode 全部通过，涵盖双方三种回应、先后显示、提前关闭、精力不足、过期清理及只结算一次。

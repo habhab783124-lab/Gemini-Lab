@@ -179,10 +179,13 @@ namespace GeminiLab.Modules.Pet
         private bool _hasStoredInteractionSorting;
         private int _storedInteractionSortingLayerId;
         private int _storedInteractionSortingOrder;
-        private GameObject? _sleepInteractionVisualObject;
-        private Transform? _sleepInteractionVisualTransform;
-        private Animator? _sleepInteractionVisualAnimator;
-        private SpriteRenderer? _sleepInteractionVisualSpriteRenderer;
+        [SerializeField] private GameObject? _sleepInteractionVisualObject;
+        [SerializeField] private Transform? _sleepInteractionVisualTransform;
+        [SerializeField] private Animator? _sleepInteractionVisualAnimator;
+        [SerializeField] private SpriteRenderer? _sleepInteractionVisualSpriteRenderer;
+        private Vector3 _interactionVisualWorldPosition;
+        private Vector3 _interactionVisualWorldScale;
+        private Quaternion _interactionVisualWorldRotation;
         private bool _hasStoredPetSpriteVisible;
         private bool _storedPetSpriteVisible;
         private bool _hasAppliedWorldMapPetCollisionPolicy;
@@ -204,7 +207,26 @@ namespace GeminiLab.Modules.Pet
         /// 供 WorldMap 当前动画联调入口使用的逐宠物移动锁。
         /// 不改变 Apartment 的移动配置，也不影响另一只桌宠。
         /// </summary>
-        public bool IsMovementLocked => _externalMovementLocked;
+        public bool IsMovementLocked => _externalMovementLocked || _conversationPaused;
+        private bool _conversationPaused;
+        public bool IsConversationPaused => _conversationPaused;
+
+        /// <summary>交流独立占用移动锁，结束时不解除其他系统施加的锁。</summary>
+        public void SetConversationPaused(bool paused)
+        {
+            if (_conversationPaused == paused) return;
+            _conversationPaused = paused;
+            if (!paused) return;
+            if (_context != null)
+            {
+                CancelPlayerInteraction(_context);
+                if (_wanderInteractionActive) EndWanderInteraction();
+                CancelBehaviorDrivenLoop(_context);
+                TickExternalMovementLock(_context);
+                UpdateMovementAnimation();
+            }
+            else StopExternalMovement();
+        }
 
         /// <summary>
         /// Lets a scene-specific animation owner take over Animator playback
@@ -312,9 +334,10 @@ namespace GeminiLab.Modules.Pet
                 return;
             }
 
-            if (_externalMovementLocked)
+            if (IsMovementLocked)
             {
                 TickExternalMovementLock(_context);
+                if (_conversationPaused) UpdateMovementAnimation();
                 PublishSnapshotIfChanged(_context);
                 return;
             }
@@ -357,7 +380,7 @@ namespace GeminiLab.Modules.Pet
 
         private void FixedUpdate()
         {
-            if (_externalMovementLocked)
+            if (IsMovementLocked)
             {
                 StopExternalMovement();
                 return;
@@ -402,6 +425,8 @@ namespace GeminiLab.Modules.Pet
         private void LateUpdate()
         {
             UpdateDynamicSortingOrder();
+            if (_sleepInteractionVisualSpriteRenderer != null && _sleepInteractionVisualSpriteRenderer.enabled)
+                ApplyAuthoredInteractionVisualPose();
         }
 
         private void OnDestroy()
@@ -414,10 +439,6 @@ namespace GeminiLab.Modules.Pet
                 _stateMachine.StateChanged -= PublishStateChanged;
             }
 
-            if (_sleepInteractionVisualObject != null)
-            {
-                Destroy(_sleepInteractionVisualObject);
-            }
             if (ServiceLocator.TryResolve(out IPetRoster? roster) && roster is not null)
             {
                 roster.Unregister(_petId);
@@ -1701,6 +1722,7 @@ namespace GeminiLab.Modules.Pet
 
         public bool TryStartPlayerInteraction(PetPlayerInteractionRequest request)
         {
+            if (_conversationPaused) return false;
             if (_context is null)
             {
                 LogDevilFTraceWarning(
@@ -1931,12 +1953,13 @@ namespace GeminiLab.Modules.Pet
                 $"localOffset={FormatVector2(request.PetInteractionLocalOffset)} worldPoint={FormatVector2(request.PetInteractionWorldPoint)} " +
                 $"finalPosePoint={FormatVector2(posePoint)} scale={FormatVector3(request.PetInteractionScale)}");
 
-            _sleepInteractionVisualTransform.position = new Vector3(
-                posePoint.x,
-                posePoint.y,
-                transform.position.z);
-            _sleepInteractionVisualTransform.localScale = request.PetInteractionScale;
+            _interactionVisualWorldPosition = new Vector3(posePoint.x, posePoint.y, transform.position.z);
+            Transform referenceParent = transform.parent != null ? transform.parent : transform;
+            _interactionVisualWorldScale = Vector3.Scale(request.PetInteractionScale, referenceParent.lossyScale);
+            _interactionVisualWorldRotation = referenceParent.rotation;
+            ApplyAuthoredInteractionVisualPose();
             ApplySleepInteractionVisualSorting(sortingTarget, request.SortingOrderOffsetWhileInteracting);
+            _sleepInteractionVisualAnimator.enabled = true;
             _sleepInteractionVisualSpriteRenderer.enabled = true;
             _sleepInteractionVisualAnimator.Play(
                 ResolveInteractionAnimatorStateName(request),
@@ -1951,8 +1974,26 @@ namespace GeminiLab.Modules.Pet
             }
         }
 
+        private void ApplyAuthoredInteractionVisualPose()
+        {
+            if (_sleepInteractionVisualTransform == null) return;
+            // A serialized child must remain at the furniture pose when the hidden body moves.
+            _sleepInteractionVisualTransform.SetPositionAndRotation(_interactionVisualWorldPosition, _interactionVisualWorldRotation);
+            Vector3 parentScale = _sleepInteractionVisualTransform.parent != null
+                ? _sleepInteractionVisualTransform.parent.lossyScale : Vector3.one;
+            _sleepInteractionVisualTransform.localScale = new Vector3(
+                _interactionVisualWorldScale.x / (Mathf.Approximately(parentScale.x, 0f) ? 1f : parentScale.x),
+                _interactionVisualWorldScale.y / (Mathf.Approximately(parentScale.y, 0f) ? 1f : parentScale.y),
+                _interactionVisualWorldScale.z / (Mathf.Approximately(parentScale.z, 0f) ? 1f : parentScale.z));
+        }
+
         private void RestoreSleepInteractionVisual()
         {
+            if (_sleepInteractionVisualAnimator != null)
+            {
+                _sleepInteractionVisualAnimator.enabled = false;
+            }
+
             if (_sleepInteractionVisualSpriteRenderer != null)
             {
                 _sleepInteractionVisualSpriteRenderer.enabled = false;
@@ -1968,45 +2009,14 @@ namespace GeminiLab.Modules.Pet
 
         private void EnsureSleepInteractionVisual()
         {
-            if (_sleepInteractionVisualObject != null &&
-                _sleepInteractionVisualTransform != null &&
-                _sleepInteractionVisualAnimator != null &&
-                _sleepInteractionVisualSpriteRenderer != null)
+            // Final visual resources belong to the Scene/Prefab, never runtime construction.
+            if (_sleepInteractionVisualObject == null ||
+                _sleepInteractionVisualTransform == null ||
+                _sleepInteractionVisualAnimator == null ||
+                _sleepInteractionVisualSpriteRenderer == null)
             {
-                return;
+                Debug.LogWarning("[PetController] Detached interaction visual is not authored. Run Pet Visual Bindings in the Editor.", this);
             }
-
-            _sleepInteractionVisualObject = new GameObject("SleepInteractionVisual")
-            {
-                layer = gameObject.layer
-            };
-
-            _sleepInteractionVisualTransform = _sleepInteractionVisualObject.transform;
-            Transform parent = transform.parent != null ? transform.parent : transform;
-            _sleepInteractionVisualTransform.SetParent(parent, false);
-            _sleepInteractionVisualTransform.localPosition = Vector3.zero;
-            _sleepInteractionVisualTransform.localRotation = Quaternion.identity;
-            _sleepInteractionVisualTransform.localScale = Vector3.one;
-
-            _sleepInteractionVisualSpriteRenderer = _sleepInteractionVisualObject.AddComponent<SpriteRenderer>();
-            if (_spriteRenderer != null)
-            {
-                _sleepInteractionVisualSpriteRenderer.sharedMaterial = _spriteRenderer.sharedMaterial;
-                _sleepInteractionVisualSpriteRenderer.color = _spriteRenderer.color;
-                _sleepInteractionVisualSpriteRenderer.sortingLayerID = _spriteRenderer.sortingLayerID;
-                _sleepInteractionVisualSpriteRenderer.sortingOrder = _spriteRenderer.sortingOrder;
-                _sleepInteractionVisualSpriteRenderer.sprite = _spriteRenderer.sprite;
-            }
-
-            _sleepInteractionVisualSpriteRenderer.enabled = false;
-
-            _sleepInteractionVisualAnimator = _sleepInteractionVisualObject.AddComponent<Animator>();
-            if (_movementController != null)
-            {
-                _sleepInteractionVisualAnimator.runtimeAnimatorController = _movementController;
-            }
-
-            _sleepInteractionVisualAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         }
 
         private void ApplySleepInteractionVisualSorting(GameObject sortingTarget, int sortingOrderOffset)
@@ -2771,20 +2781,9 @@ namespace GeminiLab.Modules.Pet
 
         private void EnsureAnimatorBinding()
         {
-            if (_animator == null)
+            if (_animator == null || _animator.runtimeAnimatorController is null)
             {
-                _animator = gameObject.AddComponent<Animator>();
-            }
-
-            if (_animator == null)
-            {
-                Debug.LogWarning("[PetController] Failed to ensure Animator component on pet object.", this);
-                return;
-            }
-
-            if (_movementController != null && _animator.runtimeAnimatorController != _movementController)
-            {
-                _animator.runtimeAnimatorController = _movementController;
+                Debug.LogWarning("[PetController] Author an Animator and controller on the pet in the Scene/Prefab.", this);
             }
         }
 

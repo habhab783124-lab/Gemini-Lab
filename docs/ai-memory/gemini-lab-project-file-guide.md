@@ -1,5 +1,19 @@
 # Gemini-Lab Project File Guide
 
+## 2026-09-11 宠物交互视觉绑定
+
+- `Assets/_Project/Scripts/Editor/SceneBootstrap/PetVisualBindingAuthoring.cs`：显式作者化主 Animator 和交互视觉资源，保留已有绑定与布局。
+- `Assets/_Project/Tests/EditMode/PetVisualBindingTests.cs`：Prefab / 场景引用、控制器保留、对象复用、结束清理及身体位移/缩放回归。
+- `Assets/_Project/Prefabs/Pet/Pet_Angel.prefab`、`Pet_Devil.prefab` 与 WorldMap 场景：实际保存 `InteractionVisual` 和四个序列化引用；Apartment 继承 Prefab 绑定。
+- 本次专项编译通过，Unity 测试执行受包加载失败阻塞；详见人工验证清单的本次记录。
+
+## 2026-09-09 交流更新入口
+
+- `Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentCommunicationAuthoring.cs`：`Update Communication` 菜单，补按钮、房间绑定与纸条变体。
+- `Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentCommunicationContent.cs`：34 条策划纸条默认内容；实际读取 `RoomRelicCatalog.asset`。
+- `Assets/_Project/Art/UI/Communication/`：chat_angel / chat_devil / nochat_angel / nochat_devil 四张按钮。
+- `ApartmentDoorInteraction.cs`：入室选项、确认与气泡流程；`PetController.SetConversationPaused`：独立暂停，兼容其他移动锁。
+
 ## 2026-09-09 室内小门入口
 
 - 需求、操作和验证：`docs/indoor-door-interaction.md`。

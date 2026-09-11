@@ -320,3 +320,8 @@ Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.c
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 普通移动朝向使用玩家输入/漫游目标并过滤实际位移抖动)
 Assets/_Project/Scripts/Modules/WorldMap/WorldMapPetAnimationTriggerController.cs (2026-09-09 普通移动朝向收敛为实际横向位移单一来源)
 Assets/_Project/Scripts/Modules/Pet/PetController.cs (2026-09-09 WorldMap 动画控制权隔离接口，移动/漫游/过桥逻辑保持不变)
+Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentCommunicationAuthoring.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentCommunicationContent.cs
+Assets/_Project/Art/UI/Communication
+Assets/_Project/Scripts/Editor/SceneBootstrap/PetVisualBindingAuthoring.cs
+Assets/_Project/Tests/EditMode/PetVisualBindingTests.cs
