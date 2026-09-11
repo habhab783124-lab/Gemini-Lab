@@ -325,3 +325,10 @@ Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentCommunicationContent.cs
 Assets/_Project/Art/UI/Communication
 Assets/_Project/Scripts/Editor/SceneBootstrap/PetVisualBindingAuthoring.cs
 Assets/_Project/Tests/EditMode/PetVisualBindingTests.cs
+docs/apartment-onboarding.md
+Assets/_Project/Scripts/Core/UI/GameplayInputBlock.cs
+Assets/_Project/Scripts/Modules/HubUI/ApartmentTutorialController.cs
+Assets/_Project/Scripts/Modules/Persistence/ApartmentTutorialProgress.cs
+Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentOnboardingAuthoring.cs
+Assets/_Project/Tests/EditMode/ApartmentOnboardingTests.cs
+Assets/_Project/Art/UI/ApartmentOnboarding/README.md

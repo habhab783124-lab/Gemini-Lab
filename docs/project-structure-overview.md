@@ -1,5 +1,12 @@
 # Gemini-Lab 项目结构总览
 
+## 2026-09-11 公寓引导增量
+
+- `Apartment_Main` 新增 `ApartmentOnboarding`，内部有 `Btn_ApartmentTutorialOpen`、`Panel_ApartmentTutorial/TutorialCard` 与 `TutorialPage_1..6`。面板默认关闭，六页图文资源已保存。
+- 家具反馈从 10 个点击项扩展为 38 个悬停项；显式 `_hitRenderer` 使用已有 Sprite 网格命中，原 Collider 与 SpriteRenderer 不改动。
+- 提示与引导可在 Inspector 调整；宽度 4 的亮金描边通过 `FurnitureSelectionOutline.mat` 作者化。实际工程 Play 和 PR 分支编译/静态验证分别记录于 `docs/apartment-onboarding.md`。
+
+
 ## 2026-09-11 宠物交互视觉作者化
 
 - 两个 Pet Prefab 已包含主 Animator 和 `InteractionVisual` 子节点（SpriteRenderer / Animator 默认禁用）；Apartment 的宠物实例继承该结构，WorldMap 两只宠物也已保存对应节点。

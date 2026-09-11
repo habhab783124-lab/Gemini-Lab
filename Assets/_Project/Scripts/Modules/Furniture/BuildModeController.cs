@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using GeminiLab.Core.UI;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -15,6 +16,15 @@ namespace GeminiLab.Modules.Furniture
         private IFurnitureService? _furnitureService;
         private bool _isBuildMode;
         private int _selectedIndex;
+        private static readonly HashSet<BuildModeController> Controllers = new();
+        public static bool IsAnyBuildModeEnabled
+        {
+            get { foreach (var controller in Controllers) if (controller != null && controller._isBuildMode) return true; return false; }
+        }
+        private void OnEnable() => Controllers.Add(this);
+        private void OnDisable() { Controllers.Remove(this); _isBuildMode = false; }
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetControllers() => Controllers.Clear();
 
         public bool IsBuildModeEnabled => _isBuildMode;
 
@@ -25,6 +35,7 @@ namespace GeminiLab.Modules.Furniture
 
         private void Update()
         {
+            if (GameplayInputBlock.IsBlocked) return;
             if (Input.GetKeyDown(_toggleKey))
             {
                 _isBuildMode = !_isBuildMode;

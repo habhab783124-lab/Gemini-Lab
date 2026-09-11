@@ -1,5 +1,14 @@
 # Gemini-Lab Project File Guide
 
+## 2026-09-11 公寓引导与悬停入口
+
+- `docs/apartment-onboarding.md`：实际行为、资源、编辑入口、验证证据与待验收项。
+- `Scripts/Modules/HubUI/ApartmentTutorialController.cs`：已作者化六页引导；`ApartmentFurnitureSelectionPresenter.cs` 与 `ApartmentViewportInputBridge.cs`：图片网格悬停及原点击链。
+- `Scripts/Modules/Persistence/ApartmentTutorialProgress.cs`：按存档保存的首次/跳过/完成状态；`Scripts/Core/UI/GameplayInputBlock.cs`：可独立释放的输入锁。
+- `Scripts/Editor/SceneBootstrap/ApartmentOnboardingAuthoring.cs`：显式新增面板入口，保留已有布局。`Tests/EditMode/ApartmentOnboardingTests.cs`：10 个针对性用例，已编译但未在目标工程运行。
+- `Art/UI/ApartmentOnboarding/Panel.png` 与 `Apartment_Main` 中 `ApartmentOnboarding`：实际 UI 资源与绑定。
+
+
 ## 2026-09-11 宠物交互视觉绑定
 
 - `Assets/_Project/Scripts/Editor/SceneBootstrap/PetVisualBindingAuthoring.cs`：显式作者化主 Animator 和交互视觉资源，保留已有绑定与布局。

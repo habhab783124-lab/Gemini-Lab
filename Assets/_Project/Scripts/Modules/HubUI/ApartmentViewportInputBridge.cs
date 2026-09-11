@@ -1,5 +1,7 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
+using GeminiLab.Core.UI;
 using GeminiLab.Modules.Furniture;
 using GeminiLab.Modules.Pet;
 using GeminiLab.Modules.RoomRelic;
@@ -16,7 +18,7 @@ namespace GeminiLab.Modules.HubUI
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(RectTransform))]
-    public sealed class ApartmentViewportInputBridge : MonoBehaviour, IPointerClickHandler
+    public sealed class ApartmentViewportInputBridge : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler
     {
         // 视口点击桥显式限定 UnityEngine.Object，避免与 System.Object 发生歧义。
         [SerializeField] private RawImage? _viewportImage;
@@ -26,9 +28,56 @@ namespace GeminiLab.Modules.HubUI
         [SerializeField] private FurniturePageLink[] _furniturePageLinks = System.Array.Empty<FurniturePageLink>();
         [Tooltip("Scene-authored world click handlers, evaluated in array order after Build Mode and before pets.")]
         [SerializeField] private MonoBehaviour[] _worldPointInteractables = Array.Empty<MonoBehaviour>();
+        [SerializeField] private ApartmentFurnitureSelectionPresenter? _furnitureHover;
+        [SerializeField] private BuildModeController? _buildMode;
+        private bool _pointerInside;
+        private Vector2 _pointerPosition;
+        private Camera? _eventCamera;
+        private PointerEventData? _hoverEvent;
+        private EventSystem? _eventSystem;
+        private readonly List<RaycastResult> _uiHits = new();
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            _pointerInside = true;
+            _pointerPosition = eventData.position;
+            _eventCamera = eventData.enterEventCamera;
+        }
+        public void OnPointerMove(PointerEventData eventData) => _pointerPosition = eventData.position;
+        public void OnPointerExit(PointerEventData eventData) => ClearHover();
+        private void OnDisable() => ClearHover();
+        private void OnApplicationFocus(bool focused) { if (!focused) ClearHover(); }
+        private void ClearHover()
+        {
+            _pointerInside = false;
+            if (_furnitureHover != null) _furnitureHover.ClearSelection();
+        }
+        private void LateUpdate()
+        {
+            if (_furnitureHover == null) return;
+            if (!_pointerInside || GameplayInputBlock.IsBlocked || BuildModeController.IsAnyBuildModeEnabled || (_buildMode != null && _buildMode.IsBuildModeEnabled) || !IsViewportTopmostUI() ||
+                !TryScreenPointToWorldPoint(_pointerPosition, _eventCamera, out Vector2 point, out _))
+            { _furnitureHover.ClearSelection(); return; }
+            _furnitureHover.SetHoverWorldPoint(point);
+        }
+        private bool IsViewportTopmostUI()
+        {
+            if (EventSystem.current == null || _viewportImage == null) return false;
+            if (_eventSystem != EventSystem.current)
+            {
+                _eventSystem = EventSystem.current;
+                _hoverEvent = new PointerEventData(_eventSystem);
+            }
+            _hoverEvent!.Reset();
+            _hoverEvent.position = _pointerPosition;
+            _uiHits.Clear();
+            _eventSystem.RaycastAll(_hoverEvent, _uiHits);
+            return _uiHits.Count > 0 && _uiHits[0].gameObject == _viewportImage.gameObject;
+        }
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            if (GameplayInputBlock.IsBlocked) return;
             if (eventData.button != PointerEventData.InputButton.Left &&
                 eventData.button != PointerEventData.InputButton.Right) return;
             if (!TryScreenPointToWorldPoint(
@@ -104,6 +153,7 @@ namespace GeminiLab.Modules.HubUI
             for (int i = 0; i < _worldPointInteractables.Length; i++)
             {
                 MonoBehaviour candidate = _worldPointInteractables[i];
+                if (candidate is ApartmentFurnitureSelectionPresenter) continue;
                 if (candidate is IApartmentWorldPointInteractable interactable &&
                     candidate.isActiveAndEnabled &&
                     interactable.TryHandleWorldPoint(worldPoint))

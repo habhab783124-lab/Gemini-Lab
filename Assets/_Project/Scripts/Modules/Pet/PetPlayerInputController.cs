@@ -1,5 +1,6 @@
 #nullable enable
 using GeminiLab.Core;
+using GeminiLab.Core.UI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -23,7 +24,7 @@ namespace GeminiLab.Modules.Pet
 
         public static Transform? ActiveTransform => s_activeController != null ? s_activeController.transform : null;
 
-        public bool InputEnabled => _enableInput && isActiveAndEnabled && ReferenceEquals(s_activeController, this);
+        public bool InputEnabled => !GameplayInputBlock.IsBlocked && _enableInput && isActiveAndEnabled && ReferenceEquals(s_activeController, this);
 
         public float MoveSpeed => _moveSpeed;
 
@@ -33,7 +34,7 @@ namespace GeminiLab.Modules.Pet
 
         public void TakeControl()
         {
-            if (!_enableInput || !isActiveAndEnabled)
+            if (GameplayInputBlock.IsBlocked || !_enableInput || !isActiveAndEnabled)
             {
                 return;
             }

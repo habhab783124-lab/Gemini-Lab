@@ -60,8 +60,6 @@ namespace GeminiLab.Editor.SceneBootstrap
                 return;
             }
 
-            ApartmentSceneFurnitureBindings? bindings = furnitureRoot.GetComponent<ApartmentSceneFurnitureBindings>();
-            bindings?.ApplyBindings();
 
             Material? outlineMaterial = AssetDatabase.LoadAssetAtPath<Material>(OutlineMaterialPath);
             if (outlineMaterial == null)
@@ -89,6 +87,16 @@ namespace GeminiLab.Editor.SceneBootstrap
                 authoredEntries.Add(new AuthoredEntry(target, highlight, definition.DefinitionId, definition.Message));
             }
 
+            // Extend the authored list to visible furniture, without changing physics colliders.
+            foreach (SpriteRenderer renderer in UnityEngine.Object.FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                GameObject target = renderer.gameObject;
+                if (renderer.sprite == null || (!target.name.StartsWith("家具_", StringComparison.Ordinal) && target.GetComponent<FurniturePageLink>() == null) ||
+                    target.GetComponent<Collider2D>() == null || authoredEntries.Exists(entry => entry.Target == target)) continue;
+                string title = target.name.Replace("家具_", "").Replace("装饰_", "").Replace("休闲_", "").Replace("_01", "").Replace("_02", "").Replace("_", " · ");
+                authoredEntries.Add(new AuthoredEntry(target, EnsureHighlight(target, outlineMaterial), target.name, title));
+            }
+
             GameObject? viewportHost = GameObject.Find("ApartmentViewportHost");
             if (viewportHost == null)
             {
@@ -104,7 +112,9 @@ namespace GeminiLab.Editor.SceneBootstrap
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
 
-            int missingCount = Definitions.Length - authoredEntries.Count;
+            int missingCount = 0;
+            foreach (var definition in Definitions)
+                if (!authoredEntries.Exists(entry => entry.DefinitionId == definition.DefinitionId)) missingCount++;
             Debug.Log($"[ApartmentFurnitureSelectionAuthoring] 完成家具选中作者化：{authoredEntries.Count} 项，缺失目标：{missingCount} 项。");
         }
 
@@ -235,6 +245,14 @@ namespace GeminiLab.Editor.SceneBootstrap
                 throw new InvalidOperationException($"无法在提示节点上创建 Image：{root.name}");
             }
             background.color = new Color(0.05f, 0.08f, 0.12f, 0.88f);
+            Sprite? panelSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Project/Art/UI/ApartmentOnboarding/Panel.png");
+            if (panelSprite != null)
+            {
+                background.sprite = panelSprite;
+                background.type = Image.Type.Sliced;
+                background.pixelsPerUnitMultiplier = 4f;
+                background.color = Color.white;
+            }
             background.raycastTarget = false;
 
             GameObject textObject = FindOrCreateChild(root.transform, "Text");
@@ -265,8 +283,10 @@ namespace GeminiLab.Editor.SceneBootstrap
                 throw new InvalidOperationException($"无法在提示文本上创建 TMP_Text：{textObject.name}");
             }
             text.alignment = TextAlignmentOptions.Center;
-            text.fontSize = 22f;
+            text.fontSize = 26f;
+            text.fontStyle = FontStyles.Bold;
             text.color = Color.white;
+            if (panelSprite != null) text.color = new Color(0.12f, 0.055f, 0.025f);
             text.enableWordWrapping = true;
             text.raycastTarget = false;
             TMP_FontAsset? font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
@@ -296,6 +316,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                 entry.FindPropertyRelative("_highlight").objectReferenceValue = entries[i].Highlight;
                 entry.FindPropertyRelative("_definitionId").stringValue = entries[i].DefinitionId;
                 entry.FindPropertyRelative("_message").stringValue = entries[i].Message;
+                entry.FindPropertyRelative("_hitRenderer").objectReferenceValue = entries[i].Target.GetComponent<SpriteRenderer>();
             }
 
             serialized.FindProperty("_messageRoot").objectReferenceValue = messageRoot;

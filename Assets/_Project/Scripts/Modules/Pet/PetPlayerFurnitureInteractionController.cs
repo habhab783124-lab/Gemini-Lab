@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using GeminiLab.Core.UI;
 using GeminiLab.Modules.Furniture;
 using UnityEngine;
 
@@ -158,7 +159,7 @@ namespace GeminiLab.Modules.Pet
 
         private void Update()
         {
-            if (!_enableInteraction || !isActiveAndEnabled || !Input.GetKeyDown(_interactKey))
+            if (GameplayInputBlock.IsBlocked || !_enableInteraction || !isActiveAndEnabled || !Input.GetKeyDown(_interactKey))
             {
                 return;
             }
@@ -178,6 +179,7 @@ namespace GeminiLab.Modules.Pet
 
         public bool TryHandleWorldPoint(Vector2 worldPoint)
         {
+            if (GameplayInputBlock.IsBlocked) return false;
             if (!_enableInteraction || !isActiveAndEnabled)
             {
                 return false;
