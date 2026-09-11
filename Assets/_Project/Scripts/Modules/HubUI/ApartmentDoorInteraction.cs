@@ -81,6 +81,7 @@ namespace GeminiLab.Modules.HubUI
 
         private void Update()
         {
+            if (GameplayInputBlock.IsBlocked) return;
             RefreshVisit();
             if (Input.GetKeyDown(KeyCode.Escape)) DeclineConversation();
             AdvanceDialogue(Time.unscaledTime);
