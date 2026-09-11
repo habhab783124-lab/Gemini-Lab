@@ -1,5 +1,13 @@
 # Gemini-Lab 项目结构总览
 
+## 序章画布适配
+
+- Prologue 的 Canvas 使用1920×1080参考画布；BackgroundVideo预置16:9 FitInParent，VideoLetterbox在其下方提供全屏黑底。具体设置见 `docs/prologue-viewport-fit.md`。
+
+## 存档调试工具
+
+- `Assets/_Project/Scripts/Editor/Persistence/` 保存存档调试窗口，菜单 `Tools/Gemini-Lab/Save Data Debug`；不需要 Scene 节点或运行时挂载。备份写入 persistentDataPath 下的 `SaveDebugBackups`，不进入 Assets。详见 `docs/save-data-debug-tool.md`。
+
 ## 2026-09-11 公寓引导增量
 
 - `Apartment_Main` 新增 `ApartmentOnboarding`，内部有 `Btn_ApartmentTutorialOpen`、`Panel_ApartmentTutorial/TutorialCard` 与 `TutorialPage_1..6`。面板默认关闭，六页图文资源已保存。
