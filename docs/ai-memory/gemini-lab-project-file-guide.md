@@ -1,5 +1,16 @@
 # Gemini-Lab Project File Guide
 
+## 序章视频适配
+
+- `Assets/_Project/Scenes/Intro/Prologue.unity`：CanvasScaler、视频AspectRatioFitter、VideoPlayer FitInside及预置VideoLetterbox。
+- `docs/prologue-viewport-fit.md`：参数与验证范围。
+
+## 存档清理工具
+
+- `Assets/_Project/Scripts/Editor/Persistence/SaveDataDebugWindow.cs`：编辑器窗口、范围检查、备份和失败恢复。
+- `Assets/_Project/Tests/EditMode/SaveDataDebugTests.cs`：临时目录专项测试。
+- `docs/save-data-debug-tool.md`：使用入口与精确清理范围。
+
 ## 2026-09-11 公寓引导与悬停入口
 
 - `docs/apartment-onboarding.md`：实际行为、资源、编辑入口、验证证据与待验收项。

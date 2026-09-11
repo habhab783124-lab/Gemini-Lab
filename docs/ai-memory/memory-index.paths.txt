@@ -332,3 +332,7 @@ Assets/_Project/Scripts/Modules/Persistence/ApartmentTutorialProgress.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/ApartmentOnboardingAuthoring.cs
 Assets/_Project/Tests/EditMode/ApartmentOnboardingTests.cs
 Assets/_Project/Art/UI/ApartmentOnboarding/README.md
+docs/save-data-debug-tool.md
+Assets/_Project/Scripts/Editor/Persistence/SaveDataDebugWindow.cs
+Assets/_Project/Tests/EditMode/SaveDataDebugTests.cs
+docs/prologue-viewport-fit.md

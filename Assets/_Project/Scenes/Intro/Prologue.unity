@@ -291,8 +291,8 @@ Camera:
   m_GameObject: {fileID: 348178466}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -382,7 +382,7 @@ VideoPlayer:
   m_TargetMaterialRenderer: {fileID: 0}
   m_TargetMaterialProperty: <noninit>
   m_RenderMode: 2
-  m_AspectRatio: 2
+  m_AspectRatio: 3
   m_DataSource: 0
   m_TimeUpdateMode: 2
   m_PlaybackSpeed: 1
@@ -427,6 +427,7 @@ GameObject:
   - component: {fileID: 703046132}
   - component: {fileID: 703046134}
   - component: {fileID: 703046133}
+  - component: {fileID: 703046135}
   m_Layer: 5
   m_Name: 'BackgroundVideo '
   m_TagString: Untagged
@@ -449,7 +450,7 @@ RectTransform:
   m_Father: {fileID: 2040686082}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -488,6 +489,20 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 703046131}
   m_CullTransparentMesh: 1
+--- !u!114 &703046135
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 703046131}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86710e43de46f6f4bac7c8e50813a599, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  m_AspectMode: 3
+  m_AspectRatio: 1.7777778
 --- !u!1 &704261845
 GameObject:
   m_ObjectHideFlags: 0
@@ -654,7 +669,7 @@ MonoBehaviour:
   - video: {fileID: 32900000, guid: e2c5bd66aa963c84491f643b037a6bce, type: 3}
     text: "\t\u8774\u8776\u843D\u4E86\u4E0B\u53BB\u3002\u5B83\u6CBE\u4E86\u4E00\u4E0B\u3002\r\n\r\n\t\u6CA1\u6709\u58F0\u97F3\u3002\u6CA1\u6709\u88C2\u5F00\u3002\u53EA\u662F\u4E00\u6EF4\u871C\u843D\u5728\u4E86\u8774\u8776\u7684\u89E6\u89D2\u4E0A\u3002\r"
     illustration: {fileID: 0}
-    textOffset: {x: -702, y: -134}
+    textOffset: {x: -686, y: -134}
     textBoxSize: {x: 500, y: 200}
     textAlignment: 513
     textColor: {r: 0.09803922, g: 0.050980393, b: 0.02745098, a: 1}
@@ -668,7 +683,7 @@ MonoBehaviour:
   - video: {fileID: 32900000, guid: 4e401322bf2b1984f93e4f9d5fba6121, type: 3}
     text: "\t\u8424\u706B\u866B\u7684\u89E6\u89D2\u78B0\u4E86\u4E0A\u53BB\u3002\u5B83\u4E5F\u6CBE\u4E86\u4E00\u4E0B\u3002\r"
     illustration: {fileID: 0}
-    textOffset: {x: 469, y: -485}
+    textOffset: {x: 469, y: -416}
     textBoxSize: {x: 700, y: 200}
     textAlignment: 513
     textColor: {r: 1, g: 1, b: 1, a: 1}
@@ -717,7 +732,7 @@ MonoBehaviour:
   - video: {fileID: 32900000, guid: 88ab7a17e53456a4798070b4aaa0268e, type: 3}
     text: "\t\u4F46\u8D70\u5230\u56ED\u5B50\u53E6\u4E00\u5934\u65F6\uFF0C\u6211\u5728\u667A\u6167\u6811\u7684\u6839\u65C1\uFF0C\u53C8\u770B\u89C1\u4E86\u4E00\u7C92\u6697\u7EA2\u8272\u7684\u5149\u3002\u4E24\u7C92\u5149\uFF0C\u9694\u7740\u4E00\u6574\u7247\u56ED\u5B50\uFF0C\u5374\u50CF\u662F\u540C\u4E00\u6837\u4E1C\u897F\u5206\u6210\u4E86\u4E24\u534A\u3002\r"
     illustration: {fileID: 0}
-    textOffset: {x: 590, y: 234}
+    textOffset: {x: 586, y: 234}
     textBoxSize: {x: 700, y: 200}
     textAlignment: 513
     textColor: {r: 0.09803922, g: 0.050980393, b: 0.02745098, a: 1}
@@ -882,6 +897,81 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1254873707}
+  m_CullTransparentMesh: 1
+--- !u!1 &1485101073
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1485101074}
+  - component: {fileID: 1485101076}
+  - component: {fileID: 1485101075}
+  m_Layer: 5
+  m_Name: VideoLetterbox
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1485101074
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485101073}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2040686082}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1485101075
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485101073}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1485101076
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485101073}
   m_CullTransparentMesh: 1
 --- !u!1 &1553228418
 GameObject:
@@ -1183,11 +1273,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
-  m_ScreenMatchMode: 0
+  m_ReferenceResolution: {x: 1920, y: 1080}
+  m_ScreenMatchMode: 1
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
@@ -1229,6 +1319,7 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1485101074}
   - {fileID: 703046132}
   - {fileID: 2018148223}
   - {fileID: 1816586272}
