@@ -1,5 +1,15 @@
 # Gemini-Lab 项目结构总览
 
+## 2026-09-11 宠物交互视觉作者化
+
+- 两个 Pet Prefab 已包含主 Animator 和 `InteractionVisual` 子节点（SpriteRenderer / Animator 默认禁用）；Apartment 的宠物实例继承该结构，WorldMap 两只宠物也已保存对应节点。
+- PetController 的交互视觉引用由 Inspector 保存；运行时只切换可见状态、播放已绑定动画并应用家具请求中的姿态。子节点会维持交互世界坐标，避免隐藏身体的移动/缩放改变交互画面。
+- 可用 `Tools/Gemini-Lab/Pet/Author Visual Bindings` 补齐当前场景绑定。批量迁移需显式调用编辑器方法，不在载入项目时执行。
+
+## 2026-09-09 交流选项与纸条变体
+
+`ApartmentViewportImage` 下新增 `AngelConversationChoices`、`DevilConversationChoices`，分别保存 `Chat` / `Decline` 按钮；只显示访客所在房间的一组。原双宠气泡保留。门组件显式绑定 `_angelRoom` / `_devilRoom`，交流不再按门边距离触发。`ArtGenerated/RoomRelic` 的 6 个纸条槽各有 17 个预置变体，共 102 个 ID 绑定。`Art/UI/Communication` 为四张按钮资源；所有 Sprite 和布局保存在 Scene。详见 `docs/indoor-door-interaction.md`。
+
 ## 2026-09-09 室内小门已落地
 
 Apartment 场景中 `ArtGenerated/Environment/door` 绑定 `ApartmentDoorInteraction`，下方 `OpenDoor/Stripe0..4` 为开门形态；`ApartmentViewportHost/IndoorDoorUI` 保存操作提示，旧 `Conversation` 已移除。视口图片下 `AngelDialogueBubble` / `DevilDialogueBubble` 分别保存两只宠物的气泡，子节点 `Content/Tail` 和 `Content/Body/Text` 可在 Scene / Inspector 调整；默认隐藏 Content，交流时按顺序显示。两只宠物下新增只用于点选的 `SelectionArea`，原 `ControlIndicator` 继续显示金色箭头。内容资产为 `IndoorDoorDialogues.asset`，门边接近点复用现有 `Approach_*_门边`。详细规则与验证见 `docs/indoor-door-interaction.md`。

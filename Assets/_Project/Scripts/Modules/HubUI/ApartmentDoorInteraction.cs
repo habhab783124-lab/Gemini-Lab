@@ -6,10 +6,11 @@ using GeminiLab.Modules.Pet;
 using GeminiLab.Modules.Pet.Social;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace GeminiLab.Modules.HubUI
 {
-    /// <summary>小门开关和交流入口。视觉、对话和接近点均在场景/资产中绑定。</summary>
+    /// <summary>小门开关和串门交流。房间范围、选项和气泡均由场景显式绑定。</summary>
     public sealed class ApartmentDoorInteraction : MonoBehaviour
     {
         [SerializeField] private Collider2D? _clickArea;
@@ -28,18 +29,30 @@ namespace GeminiLab.Modules.HubUI
         [SerializeField, Min(1f)] private float _readingDuration = 8f;
         [SerializeField] private TMP_Text? _hint;
         [SerializeField] private bool _isOpen;
-        private int _angelTopic;
-        private int _devilTopic;
-        private float _nextTalkTime;
+        [SerializeField] private Collider2D? _angelRoom;
+        [SerializeField] private Collider2D? _devilRoom;
+        [SerializeField] private GameObject? _angelChoices;
+        [SerializeField] private GameObject? _devilChoices;
+        [SerializeField] private Button? _angelChat;
+        [SerializeField] private Button? _angelDecline;
+        [SerializeField] private Button? _devilChat;
+        [SerializeField] private Button? _devilDecline;
+        private PetController? _visitInitiator;
+        private PetController? _speakerPet;
+        private bool _visitDismissed;
+        private bool _choiceVisible;
         private bool _closeBlocked;
         private PetDialogueBubble? _pendingReceiver;
-        private string _pendingReply = string.Empty;
+        private IndoorDoorDialogueCatalog.Topic? _topic;
+        private IndoorDoorDialogueCatalog.Topic? _lastAngelTopic;
+        private IndoorDoorDialogueCatalog.Topic? _lastDevilTopic;
         private float _replyAt;
         private float _hideAt;
         private bool _dialogueActive;
 
         public bool IsOpen => _isOpen;
         public bool IsDialogueVisible => _dialogueActive;
+        public bool IsChoiceVisible => _choiceVisible;
 
         private bool IsSpacePageActive => !ServiceLocator.TryResolve(out IUIRouter? router) || router == null || router.Top == PanelId.SpaceSys;
 
@@ -49,22 +62,77 @@ namespace GeminiLab.Modules.HubUI
         {
             PetPlayerFurnitureInteractionController.PriorityInteractRequested += TryInteract;
             ApplyDoorState();
+            if (_angelChat != null) _angelChat.onClick.AddListener(AcceptConversation);
+            if (_devilChat != null) _devilChat.onClick.AddListener(AcceptConversation);
+            if (_angelDecline != null) _angelDecline.onClick.AddListener(DeclineConversation);
+            if (_devilDecline != null) _devilDecline.onClick.AddListener(DeclineConversation);
+            HideChoices();
         }
 
         private void OnDisable()
         {
             PetPlayerFurnitureInteractionController.PriorityInteractRequested -= TryInteract;
-            CloseDialogue();
+            if (_angelChat != null) _angelChat.onClick.RemoveListener(AcceptConversation);
+            if (_devilChat != null) _devilChat.onClick.RemoveListener(AcceptConversation);
+            if (_angelDecline != null) _angelDecline.onClick.RemoveListener(DeclineConversation);
+            if (_devilDecline != null) _devilDecline.onClick.RemoveListener(DeclineConversation);
+            ResetVisit();
         }
 
         private void Update()
         {
-            if (!IsSpacePageActive) { CloseDialogue(); return; }
-            if (Input.GetKeyDown(KeyCode.Escape)) CloseDialogue();
+            RefreshVisit();
+            if (Input.GetKeyDown(KeyCode.Escape)) DeclineConversation();
             AdvanceDialogue(Time.unscaledTime);
             if (_hint == null) return;
-            bool near = TryGetNearbyInitiator(out _);
-            _hint.text = _dialogueActive ? "F / Esc 收起气泡" : _closeBlocked ? "门口有宠物，走开后再关门" : !_isOpen ? "点击小门开门" : near ? "WASD 穿过小门  ·  F 交流  ·  点击关门" : "小门已打开  ·  WASD 可串门，门边按 F 交流";
+            _hint.text = _dialogueActive ? "Esc 结束交流" : _choiceVisible ? "" : _closeBlocked ? "门口有宠物，走开后再关门" : !_isOpen ? "点击小门开门" : _visitInitiator != null ? "F 再次显示交流选项" : "WASD 进入对方房间，可选择交流";
+        }
+
+        private bool CanOfferConversation()
+        {
+            if (!isActiveAndEnabled || !IsSpacePageActive || !_isOpen) return false;
+            foreach (var build in FindObjectsByType<BuildModeController>(FindObjectsSortMode.None))
+                if (build.IsBuildModeEnabled) return false;
+            return true;
+        }
+
+        private void RefreshVisit()
+        {
+            if (!CanOfferConversation() || !TryGetVisitingInitiator(out var visitor))
+            { ResetVisit(); return; }
+            if (_visitInitiator != visitor)
+            {
+                ResetVisit();
+                _visitInitiator = visitor;
+            }
+            if (!_dialogueActive && !_visitDismissed) ShowChoices();
+        }
+
+        private void ResetVisit()
+        {
+            CloseDialogue();
+            _visitInitiator = null;
+            _visitDismissed = false;
+        }
+
+        private void ShowChoices()
+        {
+            _choiceVisible = true;
+            if (_angelChoices != null) _angelChoices.SetActive(_visitInitiator == _devil);
+            if (_devilChoices != null) _devilChoices.SetActive(_visitInitiator == _angel);
+        }
+
+        private void HideChoices()
+        {
+            _choiceVisible = false;
+            if (_angelChoices != null) _angelChoices.SetActive(false);
+            if (_devilChoices != null) _devilChoices.SetActive(false);
+        }
+
+        public void DeclineConversation()
+        {
+            _visitDismissed = true;
+            CloseDialogue();
         }
 
         public bool TryHandleWorldPoint(Vector2 point)
@@ -80,7 +148,7 @@ namespace GeminiLab.Modules.HubUI
             if (_closeBlocked) return;
             _isOpen = value;
             ApplyDoorState();
-            if (!value) CloseDialogue();
+            if (!value) ResetVisit();
         }
 
         private void ApplyDoorState()
@@ -90,8 +158,8 @@ namespace GeminiLab.Modules.HubUI
             if (_passageBlocker != null) _passageBlocker.enabled = !_isOpen;
             if (Application.isPlaying)
             {
-                _angel?.GetComponent<ApartmentPetMovement>()?.RefreshObstacles();
-                _devil?.GetComponent<ApartmentPetMovement>()?.RefreshObstacles();
+                if (_angel != null) _angel.GetComponent<ApartmentPetMovement>()?.RefreshObstacles();
+                if (_devil != null) _devil.GetComponent<ApartmentPetMovement>()?.RefreshObstacles();
             }
         }
 
@@ -114,31 +182,43 @@ namespace GeminiLab.Modules.HubUI
         {
             _dialogueActive = false;
             _pendingReceiver = null;
-            _pendingReply = string.Empty;
-            _angelBubble?.Hide();
-            _devilBubble?.Hide();
+            _topic = null;
+            _speakerPet = null;
+            HideChoices();
+            if (_angel != null) _angel.SetConversationPaused(false);
+            if (_devil != null) _devil.SetConversationPaused(false);
+            if (_angelBubble != null) _angelBubble.Hide();
+            if (_devilBubble != null) _devilBubble.Hide();
             SetClickBubblesSuppressed(false);
         }
 
         private void SetClickBubblesSuppressed(bool value)
         {
-            _angel?.GetComponent<PetClickReactionController>()?.SetDialogueBubbleActive(value);
-            _devil?.GetComponent<PetClickReactionController>()?.SetDialogueBubbleActive(value);
+            if (_angel != null) _angel.GetComponent<PetClickReactionController>()?.SetDialogueBubbleActive(value);
+            if (_devil != null) _devil.GetComponent<PetClickReactionController>()?.SetDialogueBubbleActive(value);
         }
 
         private void AdvanceDialogue(float now)
         {
             if (!_dialogueActive) return;
-            if (now >= _hideAt) { CloseDialogue(); return; }
-            if (_pendingReceiver != null && now >= _replyAt)
+            if (_pendingReceiver != null && _speakerPet != null && _topic != null && now >= _replyAt)
             {
-                _pendingReceiver.Show(_pendingReply);
+                // 开场播放后才读取接收者状态并结算；先取走待办，避免事件回调重复结算。
+                var receiver = _pendingReceiver;
                 _pendingReceiver = null;
-                _pendingReply = string.Empty;
+                if (ServiceLocator.TryResolve(out IPetSocialService? social) && social != null)
+                {
+                    PetId id = _speakerPet.PetId;
+                    var topic = _topic;
+                    var outcome = social.TrySocialize(id, id == PetId.Angel ? PetId.Devil : PetId.Angel);
+                    if (_dialogueActive)
+                        receiver.Show(outcome.Initiated ? topic.Reply(outcome.ResponseType) : "等休息好了再聊吧。");
+                }
             }
+            if (now >= _hideAt) CloseDialogue();
         }
 
-        private bool TryGetNearbyInitiator(out PetController? initiator)
+        private bool TryGetVisitingInitiator(out PetController? initiator)
         {
             initiator = null;
             Transform? active = PetPlayerInputController.ActiveTransform;
@@ -146,40 +226,50 @@ namespace GeminiLab.Modules.HubUI
             if (_angel != null && active == _angel.transform) initiator = _angel;
             else if (_devil != null && active == _devil.transform) initiator = _devil;
             if (initiator == null) return false;
-            // 串门后也可从另一侧发起，不把交互位置绑定到宠物的出生房间。
-            return (_angelApproach != null && Vector2.Distance(active.position, _angelApproach.position) <= _talkDistance) ||
-                   (_devilApproach != null && Vector2.Distance(active.position, _devilApproach.position) <= _talkDistance);
+            var room = initiator == _angel ? _devilRoom : _angelRoom;
+            var foot = initiator.GetComponent<CapsuleCollider2D>();
+            Vector2 position = foot != null && foot.enabled ? foot.bounds.center : active.position;
+            return room != null && room.OverlapPoint(position);
         }
 
+        // F 只重开选项，不能绕过玩家的交流确认。
         public bool TryInteract()
         {
             if (!isActiveAndEnabled || !IsSpacePageActive) return false;
-            foreach (var build in FindObjectsByType<BuildModeController>(FindObjectsSortMode.None))
-                if (build.IsBuildModeEnabled) return false;
-            if (IsDialogueVisible) { CloseDialogue(); return true; }
-            if (!TryGetNearbyInitiator(out PetController? initiator)) return false;
-            // 关闭的门也消费 F，避免落入旧的“门边家具”动画入口。
-            if (!_isOpen || Time.unscaledTime < _nextTalkTime) return true;
-            if (_dialogues == null || _angelBubble == null || _devilBubble == null ||
-                !ServiceLocator.TryResolve(out IPetSocialService? social) || social == null) return true;
-            PetId id = initiator!.PetId;
-            PetId target = id == PetId.Angel ? PetId.Devil : PetId.Angel;
-            var topic = _dialogues.GetTopic(id, id == PetId.Angel ? _angelTopic : _devilTopic);
-            if (topic == null) return true;
-            PetSocialOutcome outcome = social.TrySocialize(id, target);
-            var speaker = id == PetId.Angel ? _angelBubble : _devilBubble;
-            var receiver = id == PetId.Angel ? _devilBubble : _angelBubble;
-            CloseDialogue();
-            SetClickBubblesSuppressed(true);
-            speaker.Show(outcome.Initiated ? topic.Opening : "现在太累了，休息一会儿再聊吧。");
-            _dialogueActive = true;
-            _pendingReceiver = outcome.Initiated ? receiver : null;
-            _pendingReply = outcome.Initiated ? topic.Reply(outcome.ResponseType) : string.Empty;
-            _replyAt = Time.unscaledTime + Mathf.Max(.1f, _replyDelay);
-            _hideAt = (outcome.Initiated ? _replyAt : Time.unscaledTime) + Mathf.Max(1f, _readingDuration);
-            if (outcome.Initiated) { if (id == PetId.Angel) _angelTopic++; else _devilTopic++; }
-            _nextTalkTime = Time.unscaledTime + 2f;
+            if (_dialogueActive) return true;
+            if (!CanOfferConversation() || !TryGetVisitingInitiator(out var visitor)) return false;
+            _visitInitiator = visitor;
+            _visitDismissed = false;
+            ShowChoices();
             return true;
+        }
+
+        public void AcceptConversation()
+        {
+            if (!_choiceVisible || !CanOfferConversation() || !TryGetVisitingInitiator(out var initiator) || initiator != _visitInitiator) return;
+            if (_dialogues == null || _angelBubble == null || _devilBubble == null ||
+                !ServiceLocator.TryResolve(out IPetSocialService? social) || social == null) return;
+            PetId id = initiator!.PetId;
+            var topic = _dialogues.GetRandomTopic(id, id == PetId.Angel ? _lastAngelTopic : _lastDevilTopic);
+            if (topic == null) return;
+            CloseDialogue();
+            _visitDismissed = true;
+            _speakerPet = initiator;
+            _topic = topic;
+            SetClickBubblesSuppressed(true);
+            bool canInitiate = social.CanInitiate(id);
+            var speaker = id == PetId.Angel ? _angelBubble : _devilBubble;
+            speaker.Show(canInitiate ? topic.Opening : "现在太累了，休息一会儿再聊吧。");
+            _dialogueActive = true;
+            _pendingReceiver = canInitiate ? (id == PetId.Angel ? _devilBubble : _angelBubble) : null;
+            _replyAt = Time.unscaledTime + Mathf.Max(.1f, _replyDelay);
+            _hideAt = (canInitiate ? _replyAt : Time.unscaledTime) + Mathf.Max(1f, _readingDuration);
+            if (canInitiate)
+            {
+                _angel.SetConversationPaused(true);
+                _devil.SetConversationPaused(true);
+                if (id == PetId.Angel) _lastAngelTopic = topic; else _lastDevilTopic = topic;
+            }
         }
     }
 }

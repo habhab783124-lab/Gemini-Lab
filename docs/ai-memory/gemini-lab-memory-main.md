@@ -1,5 +1,20 @@
 # Gemini-Lab Memory Main
 
+## 2026-09-11 交流功能集成与宠物视觉绑定
+
+- 入室交流确认、随机话题、34 条纸条已合入最新 main 的功能结构，保留主线的外部动画控制接口。
+- `Pet_Angel.prefab` / `Pet_Devil.prefab` 已保存主 Animator 与 `InteractionVisual` 子节点；Apartment 通过 Prefab 实例继承，WorldMap 的两只宠物保存独立绑定。交互 Renderer 和 Animator 默认禁用，Sprite / Controller 引用在资源中可检查。
+- PetController 不再运行时创建交互视觉、复制 Sprite 或替换 AnimatorController。已有子节点根据家具请求维持世界坐标姿态，隐藏的身体移动或缩放不拖动交互画面；结束时停用交互动画并恢复主 Renderer。
+- 编辑器入口：`Tools/Gemini-Lab/Pet/Author Visual Bindings`；项目批量入口 `PetVisualBindingAuthoring.AuthorProject` 仅显式调用，不自动迁移。
+- 28 个程序集通过 Unity 所带 Roslyn 编译（使用本地缓存依赖），新增绑定静态检查通过。完整 Unity EditMode / Play 验证尚未完成：独立工作区 UPM 启动失败，不能把历史测试结果当成本次运行结果。
+
+## 2026-09-09 交流确认与纸条策划更新（当前行为）
+
+- 原门边 F 直接交流已改为：操控宠物进入对方房间即出现两个按钮；点击交流才暂停双方并播放气泡、回应时结算，拒绝不改数值。离开后重入/F 可重新显示选项。原先轮换话题改为随机且不连续重复。
+- 四张按钮 UI 来自用户提供的交流按钮压缩包，保存于 `Art/UI/Communication`；布局在 Scene 中作者化，当前视口底部已避免裁切。
+- 纸条更新为双方各 17 条，共 34 条；6 个候选槽共 102 个显式变体，兼容原 ID。详情和截图裁切文案说明见 `docs/indoor-door-interaction.md`。
+- 65 项 EditMode 通过；Play 六种交流组合、四按钮点击、双方暂停及页面退出恢复、34 条纸条显示/阅读/消耗通过。当前实现取代下方早期记录中的门边距离、F 直接发起和 8 条纸条描述。
+
 ## 2026-09-09 室内小门交流完成
 
 - 点击小门开关；选中宠物到任一侧门边按 F 交流，双向各 5 话题和三种回应已存 `IndoorDoorDialogues.asset`。

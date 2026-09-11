@@ -717,20 +717,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             return null;
         }
 
-        private static RoomNoteData[] CreatePlaceholderNotes()
-        {
-            return new[]
-            {
-                new RoomNoteData { id = "note_demon_01", senderCharacter = "Demon", receiverCharacter = "Angel", content = "窗边那架纸飞机是我的。你要是想试飞，记得叫上我。", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_demon_02", senderCharacter = "Demon", receiverCharacter = "Angel", content = "刚才那段吉他不是弹错了，是新编的。你笑什么。", visualType = RoomNoteVisualType.PaperBall, weight = 1f },
-                new RoomNoteData { id = "note_demon_03", senderCharacter = "Demon", receiverCharacter = "Angel", content = "糖果分你一颗。南瓜形状的那颗……也可以给你。", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_demon_04", senderCharacter = "Demon", receiverCharacter = "Angel", content = "今天的晚霞像打翻的颜料盘。下次一起看吧。", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_angel_01", senderCharacter = "Angel", receiverCharacter = "Demon", content = "借你的书放回去了，夹着羽毛的那页，我想再读一遍。", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_angel_02", senderCharacter = "Angel", receiverCharacter = "Demon", content = "这只纸鹤折歪了。你说像我打瞌睡的时候，所以留下了。", visualType = RoomNoteVisualType.PaperBall, weight = 1f },
-                new RoomNoteData { id = "note_angel_03", senderCharacter = "Angel", receiverCharacter = "Demon", content = "听见你练琴了。最后那一小段很好听，可以再弹一次吗？", visualType = RoomNoteVisualType.Note, weight = 1f },
-                new RoomNoteData { id = "note_angel_04", senderCharacter = "Angel", receiverCharacter = "Demon", content = "窗台留了一个位置。等星星出来的时候，你也来坐一会儿吧。", visualType = RoomNoteVisualType.Note, weight = 1f }
-            };
-        }
+        private static RoomNoteData[] CreatePlaceholderNotes() => ApartmentCommunicationContent.CreateNotes();
 
         private static RoomRelicData[] CreatePlaceholderRelics()
         {

@@ -90,6 +90,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             Ref(so, "_dialogues", CreateCatalog()); so.ApplyModifiedProperties();
             AuthorSpeechBubbles();
             UpgradePassage();
+            ApartmentCommunicationAuthoring.Author();
             AssetDatabase.SaveAssets(); EditorSceneManager.MarkSceneDirty(scene);
             Debug.Log("[IndoorDoor] 已绑定门、十组对话、选中箭头和低摩擦移动。请保存场景。");
         }
