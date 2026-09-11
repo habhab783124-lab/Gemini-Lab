@@ -4,7 +4,8 @@
     "references": [
         "GeminiLab.Core",
         "GeminiLab.Modules.Pet",
-        "spine-unity"
+        "spine-unity",
+        "Kirurobo.UniWindowController"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
