@@ -36,6 +36,7 @@ namespace GeminiLab.Modules.HubUI.Panels
         [SerializeField] private SceneAuthoredImageVariantView? _detailGrowthView;
         [SerializeField] private TMP_Text? _detailDateText;
         [SerializeField] private TMP_Text? _detailEmotionText;
+        // 场景字段名沿用既有序列化引用；该文本现在展示 AI 返回的花朵简介。
         [SerializeField] private TMP_Text? _detailFlowerLanguageText;
 
         // 这些引用保留给 Scene/Inspector 和 authoring 使用；运行时不写入 Image.sprite。
@@ -274,20 +275,20 @@ namespace GeminiLab.Modules.HubUI.Panels
             string keywordText = data.EmotionKeywords != null && data.EmotionKeywords.Length > 0
                 ? string.Join("、", data.EmotionKeywords)
                 : emotionName;
-            string languageText = string.IsNullOrWhiteSpace(data.FlowerLanguage)
-                ? $"{flowerName}的花语暂未生成"
-                : data.FlowerLanguage.Trim();
+            string descriptionText = string.IsNullOrWhiteSpace(data.FlowerDescription)
+                ? $"{flowerName}的简介暂未生成"
+                : data.FlowerDescription.Trim();
             SetDetailText(
                 FormatFlowerDate(data.DateIso),
                 $"{emotionName}\n关键词：{keywordText}",
-                $"{flowerName}\n{languageText}\n{stateText}");
+                $"{flowerName}\n简介：{descriptionText}\n{stateText}");
         }
 
-        private void SetDetailText(string date, string emotion, string flowerLanguage)
+        private void SetDetailText(string date, string emotion, string flowerDescription)
         {
             if (_detailDateText != null) _detailDateText.text = date;
             if (_detailEmotionText != null) _detailEmotionText.text = emotion;
-            if (_detailFlowerLanguageText != null) _detailFlowerLanguageText.text = flowerLanguage;
+            if (_detailFlowerLanguageText != null) _detailFlowerLanguageText.text = flowerDescription;
         }
 
         private int ResolveDisplayDayIndex()

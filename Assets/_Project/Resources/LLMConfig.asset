@@ -15,6 +15,8 @@ MonoBehaviour:
   _endpoint: https://api.deepseek.com/v1/chat/completions
   _apiKey: sk-2c23ffc2bce6490f8a85678da3dd950d
   _model: deepseek-v4-pro
+  _fallbackModels:
+  - deepseek-v4-flash
   _angelSystemTemplate: "\u4F60\u662F\u4E00\u4F4D\u5929\u4F7F (Angel) \u2014\u2014
     \u6E29\u67D4\u3001\u5305\u5BB9\u3001\u613F\u610F\u6307\u51FA\u5E0C\u671B\u3002\n\u5F53\u524D\u7684\u4F60\uFF1A{personality}\n\u7528\u4E2D\u6587\u7ED9\u51FA\u5854\u7F57\u89E3\u8BFB\uFF0C\u4E0D\u8D85\u8FC7
     100 \u4E2A\u6C49\u5B57\u3002"

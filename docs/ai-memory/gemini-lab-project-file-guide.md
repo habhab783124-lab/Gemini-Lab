@@ -655,7 +655,7 @@ Updated: 2026-08-22
 
 - 场景：`Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity`，节点位于 `Canvas/Panel_OutdoorTutorial`。
 - 作者化脚本：`Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorTutorialAuthoring.cs`，菜单为 `Tools/Gemini-Lab/WorldMap/Author Outdoor Tutorial`。脚本只增量维护新手指引子树。
-- 页面资源：`Assets/_Project/Art/新手引导/outdoor/intro.png`、`outdoor1.png`～`outdoor6.png`；按钮资源：`Assets/_Project/Art/新手引导/left.png`、`right.png`、`outdoor/close.png`。
+- 页面资源：当前挂载并展示 `Assets/_Project/Art/新手引导/outdoor/outdoor1.png`～`outdoor6.png`，首页为 `outdoor1.png`；原 `outdoor/intro.png` 及其 `.meta` 保留但不再挂载。按钮资源：`Assets/_Project/Art/新手引导/left.png`、`right.png`、`outdoor/close.png`。
 - 运行时分页组件：`Assets/_Project/Scripts/Modules/HubUI/Panels/SceneAuthoredImageVariantView.cs`，只操作 Scene 中的页面节点和按钮事件。
 ### WorldMap 室外点击路由（2026-09-07）
 

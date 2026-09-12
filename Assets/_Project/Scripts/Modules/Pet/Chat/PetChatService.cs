@@ -132,32 +132,54 @@ namespace GeminiLab.Modules.Pet
                 return (GetFallback(petId), true);
             }
 
-            try
+            string[] modelCandidates = _config.ModelCandidates;
+            if (modelCandidates.Length == 0)
             {
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                cts.CancelAfter(TimeSpan.FromSeconds(_timeoutSeconds));
+                LogFallback(petId, "NoModelCandidates");
+                return (GetFallback(petId), true);
+            }
 
-                Debug.Log($"[PetChat] Sending LLM request for {petId}...");
-                string response = await SendLLMRequestAsync(systemPrompt, userPrompt, cts.Token);
-                Debug.Log($"[PetChat] LLM response for {petId}: {(string.IsNullOrWhiteSpace(response) ? "<empty>" : response[..Math.Min(response.Length, 50)])}...");
-                string cleaned = CleanResponse(response);
-                if (string.IsNullOrWhiteSpace(cleaned))
+            Debug.Log($"[AI] request-entry role={petId} feature=PetChat service={GetType().Name} registered=true models={string.Join(",", modelCandidates)}");
+            string lastFailure = string.Empty;
+            for (int modelIndex = 0; modelIndex < modelCandidates.Length; modelIndex++)
+            {
+                string model = modelCandidates[modelIndex];
+                try
                 {
-                    Debug.LogWarning($"[PetChat] Empty/cleaned response for {petId}, using fallback");
-                    return (GetFallback(petId), true);
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    cts.CancelAfter(TimeSpan.FromSeconds(_timeoutSeconds));
+
+                    string response = await SendLLMRequestAsync(systemPrompt, userPrompt, model, cts.Token);
+                    string preview = string.IsNullOrWhiteSpace(response)
+                        ? "<empty>"
+                        : response[..Math.Min(response.Length, 50)];
+                    Debug.Log($"[AI] raw-response role={petId} feature=PetChat model={model} content={SanitizeForLog(preview)}");
+                    string cleaned = CleanResponse(response);
+                    if (string.IsNullOrWhiteSpace(cleaned))
+                    {
+                        lastFailure = "EmptyResponse";
+                        LogModelFailure(petId, model, modelIndex, modelCandidates.Length, lastFailure);
+                        continue;
+                    }
+
+                    Debug.Log($"[AI] result-accepted role={petId} feature=PetChat model={model}");
+                    return (cleaned, false);
                 }
-                return (cleaned, false);
+                catch (OperationCanceledException)
+                {
+                    if (cancellationToken.IsCancellationRequested) throw;
+                    lastFailure = "Timeout";
+                    LogModelFailure(petId, model, modelIndex, modelCandidates.Length, lastFailure);
+                }
+                catch (Exception ex)
+                {
+                    lastFailure = $"{ex.GetType().Name}:{SanitizeForLog(ex.Message, 240)}";
+                    LogModelFailure(petId, model, modelIndex, modelCandidates.Length, lastFailure);
+                }
             }
-            catch (OperationCanceledException)
-            {
-                if (cancellationToken.IsCancellationRequested) throw;
-                return (GetFallback(petId), true);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[PetChat] LLM request failed for {petId}: {ex.Message}");
-                return (GetFallback(petId), true);
-            }
+
+            LogFallback(petId, $"AllModelsFailed:{lastFailure}");
+            return (GetFallback(petId), true);
         }
 
         private string BuildSystemPrompt(PetId petId)
@@ -240,11 +262,11 @@ namespace GeminiLab.Modules.Pet
         }
 
         private async Task<string> SendLLMRequestAsync(
-            string systemPrompt, string userPrompt, CancellationToken cancellationToken)
+            string systemPrompt, string userPrompt, string model, CancellationToken cancellationToken)
         {
             var body = new LLMRequest
             {
-                model = _config.Model,
+                model = model,
                 messages = new[]
                 {
                     new LLMMessage { role = "system", content = systemPrompt },
@@ -262,6 +284,7 @@ namespace GeminiLab.Modules.Pet
             req.SetRequestHeader("Authorization", $"Bearer {_config.ApiKey}");
 
             var operation = req.SendWebRequest();
+            Debug.Log($"[AI] request-sent role=PetChat feature=PetChat method=POST endpoint={_config.Endpoint} model={model}");
             while (!operation.isDone)
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -285,6 +308,31 @@ namespace GeminiLab.Modules.Pet
             }
 
             return response.choices[0].message?.content ?? string.Empty;
+        }
+
+        private void LogModelFailure(PetId petId, string model, int modelIndex, int modelCount, string reason)
+        {
+            bool hasNextModel = modelIndex + 1 < modelCount;
+            Debug.LogWarning($"[AI] model-failed role={petId} feature=PetChat model={model} attempt={modelIndex + 1}/{modelCount} hasNext={hasNextModel} reason={SanitizeForLog(reason, 240)}");
+        }
+
+        private void LogFallback(PetId petId, string reason)
+        {
+            Debug.LogWarning($"[Fallback] role={petId} feature=PetChat reason={SanitizeForLog(reason, 240)}");
+        }
+
+        private string SanitizeForLog(string value, int maxLength = 240)
+        {
+            string sanitized = value ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(_config.ApiKey))
+            {
+                sanitized = sanitized.Replace(_config.ApiKey, "[REDACTED]");
+            }
+
+            sanitized = sanitized.Replace("\r", "\\r").Replace("\n", "\\n");
+            return sanitized.Length <= maxLength
+                ? sanitized
+                : sanitized.Substring(0, Math.Max(1, maxLength - 3)) + "...";
         }
 
         private static string GetFallback(PetId petId)

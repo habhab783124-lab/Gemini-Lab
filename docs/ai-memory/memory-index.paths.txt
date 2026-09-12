@@ -275,8 +275,8 @@ Assets/_Project/Scripts/Modules/HubUI/Panels/WeeklyGardenPanelStub.cs (关键词
 Assets/_Project/Tests/EditMode/EmotionGardenAiTests.cs
 Assets/_Project/Scripts/Editor/SceneBootstrap/WorldMapOutdoorTutorialAuthoring.cs (WorldMap 室外新手指引 Scene 作者化与占位入口)
 Assets/_Project/Scripts/Modules/HubUI/Panels/SceneAuthoredImageVariantView.cs (Scene 作者化页面显隐与翻页)
-Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (Panel_OutdoorTutorial 七页新手指引)
-Assets/_Project/Art/新手引导/outdoor/ (intro、outdoor1-6、close 页面资源)
+Assets/_Project/Scenes/WorldMap/WorldMap_Main.unity (Panel_OutdoorTutorial 六页新手指引，首页为 outdoor1)
+Assets/_Project/Art/新手引导/outdoor/ (outdoor1-6、close 页面资源；intro.png 保留但不再挂载)
 Assets/_Project/Art/新手引导/left.png (新手指引上一页按钮)
 Assets/_Project/Art/新手引导/right.png (新手指引下一页按钮)
 Assets/_Project/Art/WorldMap/weather/WorldMapClouds_Alpha.png (天气云层派生透明 Sprite)
