@@ -43,6 +43,7 @@ namespace GeminiLab.Modules.HubUI
 
         public void Show(string key)
         {
+            
             if (string.IsNullOrWhiteSpace(key))
             {
                 Hide();

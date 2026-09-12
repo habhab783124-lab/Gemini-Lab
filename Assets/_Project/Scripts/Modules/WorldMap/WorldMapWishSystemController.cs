@@ -356,8 +356,12 @@ namespace GeminiLab.Modules.WorldMap
             if (_fulfillButton != null) _fulfillButton.interactable = false;
         }
 
+        // private static string FormatMemoryEntry(WorldMapWishRecord record)
+        //     => $"{FormatDate(record.CreatedAtIso)} [{FormatState(record.State)}]\n{record.Content}";
+
         private static string FormatMemoryEntry(WorldMapWishRecord record)
-            => $"{FormatDate(record.CreatedAtIso)} [{FormatState(record.State)}]\n{record.Content}";
+            => $"{record.Content}\n\n{FormatDate(record.CreatedAtIso)} [{FormatState(record.State)}]";
+
 
         private void RefreshDetail(WorldMapWishRecord record)
         {
