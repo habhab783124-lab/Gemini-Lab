@@ -44,7 +44,12 @@ namespace GeminiLab.Modules.AI
                 return null;
             }
 
-            Debug.Log($"[AI] request-entry role={role} feature=Emotion inputEmpty={inputEmpty} service={GetType().Name} registered=true sent=false");
+            string[] modelCandidates = _config.ModelCandidates;
+            if (modelCandidates.Length == 0)
+            {
+                LogFallback(role, "NoModelCandidates");
+                return null;
+            }
 
             string systemPrompt = BuildSystemPrompt(normalizedOwner);
             string userPrompt = BuildUserPrompt(
@@ -55,46 +60,57 @@ namespace GeminiLab.Modules.AI
                 flowerName,
                 flowerDescription);
 
-            try
+            Debug.Log($"[AI] request-entry role={role} feature=Emotion inputEmpty={inputEmpty} service={GetType().Name} registered=true models={string.Join(",", modelCandidates)}");
+
+            string lastFailure = string.Empty;
+            for (int modelIndex = 0; modelIndex < modelCandidates.Length; modelIndex++)
             {
-                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                float timeoutSeconds = _config.TimeoutSeconds > 0f ? _config.TimeoutSeconds : 10f;
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
-
-                string responseContent = await SendRequestAsync(role, systemPrompt, userPrompt, timeoutCts.Token);
-                Debug.Log($"[AI] raw-response role={role} feature=Emotion content={SanitizeForLog(responseContent)}");
-
-                EmotionGardenAiResult result = ParseResponse(responseContent);
-                if (!EmotionGardenAiValidation.IsCompleteResult(result, out string validationReason))
+                string model = modelCandidates[modelIndex];
+                try
                 {
-                    LogFallback(role, $"InvalidResult:{validationReason}");
-                    return null;
+                    using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    float timeoutSeconds = _config.TimeoutSeconds > 0f ? _config.TimeoutSeconds : 10f;
+                    timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
+                    string responseContent = await SendRequestAsync(role, model, systemPrompt, userPrompt, timeoutCts.Token);
+                    Debug.Log($"[AI] raw-response role={role} feature=Emotion model={model} content={SanitizeForLog(responseContent)}");
+
+                    EmotionGardenAiResult result = ParseResponse(responseContent);
+                    if (!EmotionGardenAiValidation.IsCompleteResult(result, out string validationReason))
+                    {
+                        lastFailure = $"InvalidResult:{validationReason}";
+                        LogModelFailure(role, model, modelIndex, modelCandidates.Length, lastFailure);
+                        continue;
+                    }
+
+                    result.EmotionType = EmotionFlowerCatalog.NormalizeEmotionType(result.EmotionType);
+                    result.EmotionKeywords = EmotionGardenAiValidation.NormalizeKeywords(result.EmotionKeywords);
+                    result.FlowerDescription = EmotionGardenAiValidation.NormalizeText(result.FlowerDescription, 120);
+                    result.FlowerLanguage = EmotionGardenAiValidation.NormalizeText(result.FlowerLanguage, 160);
+                    result.Summary = EmotionGardenAiValidation.NormalizeText(result.Summary, 60);
+                    result.AngelNote = EmotionGardenAiValidation.NormalizeText(result.AngelNote, 80);
+                    result.DevilNote = EmotionGardenAiValidation.NormalizeText(result.DevilNote, 80);
+                    result.ResultSource = EmotionGardenResultSources.Ai;
+                    result.IsFallback = false;
+
+                    Debug.Log($"{EmotionGardenResultSources.Ai} role={role} feature=Emotion model={model} result=Accepted emotion={result.EmotionType}");
+                    return result;
                 }
+                catch (OperationCanceledException)
+                {
+                    if (cancellationToken.IsCancellationRequested) throw;
+                    lastFailure = "Timeout";
+                    LogModelFailure(role, model, modelIndex, modelCandidates.Length, lastFailure);
+                }
+                catch (Exception ex)
+                {
+                    lastFailure = $"{ex.GetType().Name}:{SanitizeForLog(ex.Message, 240)}";
+                    LogModelFailure(role, model, modelIndex, modelCandidates.Length, lastFailure);
+                }
+            }
 
-                result.EmotionType = EmotionFlowerCatalog.NormalizeEmotionType(result.EmotionType);
-                result.EmotionKeywords = EmotionGardenAiValidation.NormalizeKeywords(result.EmotionKeywords);
-                result.FlowerDescription = EmotionGardenAiValidation.NormalizeText(result.FlowerDescription, 120);
-                result.FlowerLanguage = EmotionGardenAiValidation.NormalizeText(result.FlowerLanguage, 160);
-                result.Summary = EmotionGardenAiValidation.NormalizeText(result.Summary, 60);
-                result.AngelNote = EmotionGardenAiValidation.NormalizeText(result.AngelNote, 80);
-                result.DevilNote = EmotionGardenAiValidation.NormalizeText(result.DevilNote, 80);
-                result.ResultSource = EmotionGardenResultSources.Ai;
-                result.IsFallback = false;
-
-                Debug.Log($"{EmotionGardenResultSources.Ai} role={role} feature=Emotion result=Accepted emotion={result.EmotionType}");
-                return result;
-            }
-            catch (OperationCanceledException)
-            {
-                if (cancellationToken.IsCancellationRequested) throw;
-                LogFallback(role, "Timeout");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                LogFallback(role, $"{ex.GetType().Name}:{SanitizeForLog(ex.Message, 240)}");
-                return null;
-            }
+            LogFallback(role, $"AllModelsFailed:{lastFailure}");
+            return null;
         }
 
         private static string BuildSystemPrompt(string owner)
@@ -111,7 +127,9 @@ namespace GeminiLab.Modules.AI
                    "必须优先根据玩家输入判断，不能无理由返回平静；例如生气/愤怒优先选愤怒，开心/快乐优先选喜悦，悲伤/难过优先选悲伤，明确平静才选平静。" +
                    "EmotionKeywords 返回 2 到 5 个简短中文关键词。" +
                    "Summary 必须是 30 到 60 个中文字符；AngelNote 和 DevilNote 必须分别是 40 到 80 个中文字符。" +
-                   "FlowerDescription 和 FlowerLanguage 使用具体、自然的中文。";
+                   "FlowerDescription 必须紧扣玩家输入，至少使用其中一个具体事件、细节、情绪、人物关系或愿望，并把它映射到花朵的形态、气质或象征上。" +
+                   "禁止只写花瓣、露珠、阳光等与输入无关的通用外观描写，禁止套用脱离玩家输入也成立的固定句式，也不要逐字复述整句输入。" +
+                   "若玩家输入为空，只能使用不编造经历的泛化表达。FlowerLanguage 也要使用具体、自然的中文，并可适度承接玩家输入。";
         }
 
         private static string BuildUserPrompt(
@@ -135,13 +153,14 @@ namespace GeminiLab.Modules.AI
 
         private async Task<string> SendRequestAsync(
             string role,
+            string model,
             string systemPrompt,
             string userPrompt,
             CancellationToken cancellationToken)
         {
             var body = new LlmRequest
             {
-                model = _config.Model,
+                model = model,
                 messages = new[]
                 {
                     new LlmMessage { role = "system", content = systemPrompt },
@@ -161,7 +180,7 @@ namespace GeminiLab.Modules.AI
             request.SetRequestHeader("Authorization", $"Bearer {_config.ApiKey}");
 
             var operation = request.SendWebRequest();
-            Debug.Log($"[AI] request-sent role={role} feature=Emotion method=POST endpoint={_config.Endpoint} model={_config.Model}");
+            Debug.Log($"[AI] request-sent role={role} feature=Emotion method=POST endpoint={_config.Endpoint} model={model}");
             while (!operation.isDone)
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -290,6 +309,12 @@ namespace GeminiLab.Modules.AI
         private void LogFallback(string role, string reason)
         {
             Debug.LogWarning($"{EmotionGardenResultSources.Fallback} role={role} feature=Emotion reason={SanitizeForLog(reason, 240)}");
+        }
+
+        private void LogModelFailure(string role, string model, int modelIndex, int modelCount, string reason)
+        {
+            bool hasNextModel = modelIndex + 1 < modelCount;
+            Debug.LogWarning($"[AI] model-failed role={role} feature=Emotion model={model} attempt={modelIndex + 1}/{modelCount} hasNext={hasNextModel} reason={SanitizeForLog(reason, 240)}");
         }
 
         private static string ResolveLogRole(string owner)

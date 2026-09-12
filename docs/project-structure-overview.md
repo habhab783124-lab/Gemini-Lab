@@ -496,7 +496,7 @@ SO 分类规划已写明，而且当前已经开始落地实际 `.asset` 文件�
 
 ## WorldMap 室外新手指引（2026-09-06）
 
-- `Canvas/Panel_OutdoorTutorial` 保存七张可替换的教程页面，以及上一页、下一页、关闭按钮；面板默认关闭。
+- `Canvas/Panel_OutdoorTutorial` 保存六张可替换的教程页面 `Page_Outdoor1`～`Page_Outdoor6`，首页为 `Page_Outdoor1`，以及上一页、下一页、关闭按钮；面板默认关闭。原 `intro.png` 资源保留但不再挂载。
 - `Canvas/Btn_OutdoorTutorial` 是当前的占位入口，后续可直接替换其 Sprite 或 UnityEvent，不需要改动分页代码。
 - 所有图片引用和 RectTransform 都保存在 Scene；`SceneAuthoredImageVariantView` 运行时只做页面显隐与首尾边界控制，符合 Scene/Play 视觉一致约束。
 ### 2026-09-07 WorldMap 室外点击交互

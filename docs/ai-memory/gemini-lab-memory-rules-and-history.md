@@ -368,6 +368,11 @@ Updated: 2026-08-21
 
 ### 2026-09-06 WorldMap 室外新手指引更新
 
-- 新手指引采用 Scene 作者化七页结构，页面顺序固定为 `intro`、`outdoor1`～`outdoor6`；翻页按钮为点击按钮，不使用拖拽。
+- 初始版本的新手指引采用 Scene 作者化七页结构，页面顺序为 `intro`、`outdoor1`～`outdoor6`；2026-09-13 调整后当前顺序为 `outdoor1`～`outdoor6`。翻页按钮为点击按钮，不使用拖拽。
 - 当前只提供可替换的占位入口按钮，未擅自接入邮箱、标牌、首次进入或其他业务触发。正式入口确定后只需替换该按钮的 UnityEvent 绑定。
 - 图片资源保留为非空序列化 Sprite 引用，运行时只切换页面显隐；Scene 与 Play 的视觉节点保持同一套来源。
+
+### 2026-09-13 WorldMap 室外新手指引首页调整
+
+- 删除室外新手指引首页 `Page_Intro` 的展示对象和分页引用，页面顺序调整为 `outdoor1`～`outdoor6`，`outdoor1` 现在是第一页。
+- `intro.png` 原始资源不删除，仅不再挂载到 `Panel_OutdoorTutorial`；其他页面、按钮和 Scene/Play 作者化规则不变。

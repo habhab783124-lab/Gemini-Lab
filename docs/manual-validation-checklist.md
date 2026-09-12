@@ -966,11 +966,11 @@ Updated: 2026-08-22
 
 | 检查项 | 结果 | 备注 |
 | :--- | :--- | :--- |
-| 点击 `Btn_OutdoorTutorial` 后显示 `intro` 页面 | 待 Play 验证 | 当前为可替换占位入口 |
-| 点击下一页按 `intro`→`outdoor1`～`outdoor6` 顺序切换 | 待 Play 验证 | 首页/末页保持边界，不循环 |
+| 点击 `Btn_OutdoorTutorial` 后显示 `outdoor1` 页面 | 待 Play 验证 | 当前为可替换占位入口 |
+| 点击下一页按 `outdoor1`→`outdoor2`～`outdoor6` 顺序切换 | 待 Play 验证 | 首页/末页保持边界，不循环 |
 | 点击上一页按相反顺序切换，首末页不越界 | 待 Play 验证 | 使用点击按钮事件 |
 | 点击 `close.png` 关闭面板 | 待 Play 验证 | 面板关闭后入口仍可用 |
-| Scene 中七页 Sprite 引用与 Play 显示一致 | 待人工验证 | 页面和布局均已保存到 `WorldMap_Main.unity` |
+| Scene 中六页 Sprite 引用与 Play 显示一致 | 待人工验证 | 页面和布局均已保存到 `WorldMap_Main.unity`，首页为 `outdoor1` |
 ## B37. WorldMap 第一阶段室外点击交互（2026-09-07）
 
 | 检查项 | 结果 | 备注 |

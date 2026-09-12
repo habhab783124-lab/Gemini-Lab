@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GeminiLab.Modules.Tarot
@@ -16,8 +17,11 @@ namespace GeminiLab.Modules.Tarot
         [Tooltip("API Key")]
         [SerializeField] private string _apiKey = string.Empty;
 
-        [Tooltip("模型名，如 gpt-4o / claude-sonnet-4-6")]
+        [Tooltip("首选模型名，如 deepseek-v4-pro")]
         [SerializeField] private string _model = "gpt-4o";
+
+        [Tooltip("首选模型无有效返回时按顺序尝试的备用模型列表")]
+        [SerializeField] private string[] _fallbackModels = { "deepseek-v4-flash" };
 
         [Tooltip("天使 System prompt。占位符: {personality}")]
         [TextArea(5, 20)]
@@ -63,6 +67,23 @@ namespace GeminiLab.Modules.Tarot
         public string Endpoint => _endpoint;
         public string ApiKey => _apiKey;
         public string Model => _model;
+        public string[] ModelCandidates
+        {
+            get
+            {
+                var candidates = new List<string>();
+                AddModelCandidate(candidates, _model);
+                if (_fallbackModels != null)
+                {
+                    foreach (string fallbackModel in _fallbackModels)
+                    {
+                        AddModelCandidate(candidates, fallbackModel);
+                    }
+                }
+
+                return candidates.ToArray();
+            }
+        }
         public string AngelSystemTemplate => _angelSystemTemplate;
         public string DevilSystemTemplate => _devilSystemTemplate;
         public string UserMessageTemplate => _userMessageTemplate;
@@ -70,5 +91,16 @@ namespace GeminiLab.Modules.Tarot
         public float TimeoutSeconds => _timeoutSeconds;
 
         public bool IsConfigured => !string.IsNullOrWhiteSpace(_endpoint) && !string.IsNullOrWhiteSpace(_apiKey);
+
+        private static void AddModelCandidate(List<string> candidates, string? model)
+        {
+            if (string.IsNullOrWhiteSpace(model)) return;
+
+            string normalized = model.Trim();
+            if (!candidates.Contains(normalized))
+            {
+                candidates.Add(normalized);
+            }
+        }
     }
 }

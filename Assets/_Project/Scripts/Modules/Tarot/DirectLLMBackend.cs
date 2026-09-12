@@ -33,35 +33,53 @@ namespace GeminiLab.Modules.Tarot
         {
             if (!_config.IsConfigured)
             {
+                LogFallback($"role={petId} feature=TarotReading", "ConfigMissing");
                 return LocalFallback.Build(draw, petId, orientation);
             }
 
             string systemPrompt = BuildSystemPrompt(petId);
             string userPrompt = BuildUserPrompt(draw, petId);
 
-            string responseText;
-            try
+            string[] modelCandidates = _config.ModelCandidates;
+            if (modelCandidates.Length == 0)
             {
-                responseText = await SendRequestAsync(systemPrompt, userPrompt, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[DirectLLM] Request failed: {ex.Message}");
+                LogFallback($"role={petId} feature=TarotReading", "NoModelCandidates");
                 return LocalFallback.Build(draw, petId, orientation);
             }
 
-            if (string.IsNullOrWhiteSpace(responseText))
+            string lastFailure = string.Empty;
+            for (int modelIndex = 0; modelIndex < modelCandidates.Length; modelIndex++)
             {
-                Debug.LogWarning("[DirectLLM] API returned empty content, falling back");
-                return LocalFallback.Build(draw, petId, orientation);
+                string model = modelCandidates[modelIndex];
+                try
+                {
+                    string responseText = await SendRequestAsync("Tarot", systemPrompt, userPrompt, model, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (string.IsNullOrWhiteSpace(responseText))
+                    {
+                        lastFailure = "EmptyResponse";
+                        LogModelFailure($"role={petId} feature=TarotReading", model, modelIndex, modelCandidates.Length, lastFailure);
+                        continue;
+                    }
+
+                    Debug.Log($"[AI] result-accepted role={petId} feature=TarotReading model={model}");
+                    return new TarotReading(petId, orientation, responseText, isFromGateway: true);
+                }
+                catch (OperationCanceledException)
+                {
+                    if (cancellationToken.IsCancellationRequested) throw;
+                    lastFailure = "Timeout";
+                    LogModelFailure($"role={petId} feature=TarotReading", model, modelIndex, modelCandidates.Length, lastFailure);
+                }
+                catch (Exception ex)
+                {
+                    lastFailure = $"{ex.GetType().Name}:{SanitizeForLog(ex.Message, 240)}";
+                    LogModelFailure($"role={petId} feature=TarotReading", model, modelIndex, modelCandidates.Length, lastFailure);
+                }
             }
 
-            return new TarotReading(petId, orientation, responseText, isFromGateway: true);
+            LogFallback($"role={petId} feature=TarotReading", $"AllModelsFailed:{lastFailure}");
+            return LocalFallback.Build(draw, petId, orientation);
         }
 
         public async Task<TarotSummaryResult> RequestSummaryAsync(
@@ -70,6 +88,7 @@ namespace GeminiLab.Modules.Tarot
         {
             if (!_config.IsConfigured)
             {
+                LogFallback("role=Tarot feature=TarotSummary", "ConfigMissing");
                 return TarotSummaryResult.Default();
             }
 
@@ -79,23 +98,47 @@ namespace GeminiLab.Modules.Tarot
                 .Replace("{futureCard}", $"{future.Card.DisplayNameZh} ({future.Card.DisplayNameEn})")
                 .Replace("{question}", question ?? "未指定");
 
-            string responseText;
-            try
+            string[] modelCandidates = _config.ModelCandidates;
+            if (modelCandidates.Length == 0)
             {
-                responseText = await SendRequestAsync(systemPrompt, "请返回 JSON。", cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[DirectLLM] Summary request failed: {ex.Message}");
+                LogFallback("role=Tarot feature=TarotSummary", "NoModelCandidates");
                 return TarotSummaryResult.Default();
             }
 
-            return TarotSummaryResult.FromJson(responseText);
+            string lastFailure = string.Empty;
+            for (int modelIndex = 0; modelIndex < modelCandidates.Length; modelIndex++)
+            {
+                string model = modelCandidates[modelIndex];
+                try
+                {
+                    string responseText = await SendRequestAsync("Tarot", systemPrompt, "请返回 JSON。", model, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (string.IsNullOrWhiteSpace(responseText))
+                    {
+                        lastFailure = "EmptyResponse";
+                        LogModelFailure("role=Tarot feature=TarotSummary", model, modelIndex, modelCandidates.Length, lastFailure);
+                        continue;
+                    }
+
+                    TarotSummaryResult result = TarotSummaryResult.FromJson(responseText);
+                    Debug.Log($"[AI] result-accepted role=Tarot feature=TarotSummary model={model}");
+                    return result;
+                }
+                catch (OperationCanceledException)
+                {
+                    if (cancellationToken.IsCancellationRequested) throw;
+                    lastFailure = "Timeout";
+                    LogModelFailure("role=Tarot feature=TarotSummary", model, modelIndex, modelCandidates.Length, lastFailure);
+                }
+                catch (Exception ex)
+                {
+                    lastFailure = $"{ex.GetType().Name}:{SanitizeForLog(ex.Message, 240)}";
+                    LogModelFailure("role=Tarot feature=TarotSummary", model, modelIndex, modelCandidates.Length, lastFailure);
+                }
+            }
+
+            LogFallback("role=Tarot feature=TarotSummary", $"AllModelsFailed:{lastFailure}");
+            return TarotSummaryResult.Default();
         }
 
         private string BuildSystemPrompt(PetId petId)
@@ -119,12 +162,12 @@ namespace GeminiLab.Modules.Tarot
                 .Replace("{keywords}", string.Join("、", draw.Card.GetKeywords(draw.Orientation)));
         }
 
-        private async Task<string> SendRequestAsync(string systemPrompt, string userPrompt,
-            CancellationToken cancellationToken)
+        private async Task<string> SendRequestAsync(string role, string systemPrompt, string userPrompt,
+            string model, CancellationToken cancellationToken)
         {
             var body = new LLMRequest
             {
-                model = _config.Model,
+                model = model,
                 messages = new[]
                 {
                     new LLMMessage { role = "system", content = systemPrompt },
@@ -142,6 +185,7 @@ namespace GeminiLab.Modules.Tarot
             req.SetRequestHeader("Authorization", $"Bearer {_config.ApiKey}");
 
             var operation = req.SendWebRequest();
+            Debug.Log($"[AI] request-sent role={role} feature=Tarot method=POST endpoint={_config.Endpoint} model={model}");
             while (!operation.isDone)
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -165,6 +209,31 @@ namespace GeminiLab.Modules.Tarot
             }
 
             return response.choices[0].message?.content ?? string.Empty;
+        }
+
+        private void LogModelFailure(string roleAndFeature, string model, int modelIndex, int modelCount, string reason)
+        {
+            bool hasNextModel = modelIndex + 1 < modelCount;
+            Debug.LogWarning($"[AI] model-failed {roleAndFeature} model={model} attempt={modelIndex + 1}/{modelCount} hasNext={hasNextModel} reason={SanitizeForLog(reason, 240)}");
+        }
+
+        private void LogFallback(string roleAndFeature, string reason)
+        {
+            Debug.LogWarning($"[Fallback] {roleAndFeature} reason={SanitizeForLog(reason, 240)}");
+        }
+
+        private string SanitizeForLog(string value, int maxLength = 240)
+        {
+            string sanitized = value ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(_config.ApiKey))
+            {
+                sanitized = sanitized.Replace(_config.ApiKey, "[REDACTED]");
+            }
+
+            sanitized = sanitized.Replace("\r", "\\r").Replace("\n", "\\n");
+            return sanitized.Length <= maxLength
+                ? sanitized
+                : sanitized.Substring(0, Math.Max(1, maxLength - 3)) + "...";
         }
 
         private string ResolvePersonality(PetId petId)

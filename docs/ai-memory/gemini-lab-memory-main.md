@@ -794,7 +794,7 @@ WorldMap 苹果树点击后由 `AppleTreeDropController` 播放快速晃动并�
 
 ### 2026-09-06 WorldMap 室外新手指引
 
-- `WorldMap_Main.unity` 的 `Canvas/Panel_OutdoorTutorial` 已保存七个页面节点：`Page_Intro` 与 `Page_Outdoor1`～`Page_Outdoor6`，图片来自 `Assets/_Project/Art/新手引导/outdoor/`。
+- 初始版本的 `WorldMap_Main.unity` 曾在 `Canvas/Panel_OutdoorTutorial` 保存七个页面节点；2026-09-13 调整后当前为 `Page_Outdoor1`～`Page_Outdoor6` 六个页面，图片来自 `Assets/_Project/Art/新手引导/outdoor/`。
 - 面板保存 `left.png`、`right.png`、`outdoor/close.png` 三个按钮资源，并提供 `Btn_OutdoorTutorial` 占位入口。入口当前只负责打开第一页，后续可在 Inspector 中替换按钮 Sprite 或绑定正式入口。
 - `SceneAuthoredImageVariantView` 负责运行时切换已作者化页面，上一页/下一页在首尾边界停止；运行时不创建 GameObject、不加载路径资源，也不写入最终 Sprite。
 - `WorldMapOutdoorTutorialAuthoring` 是定向作者化工具（菜单 `Tools/Gemini-Lab/WorldMap/Author Outdoor Tutorial`），只维护自己的节点，不重建或清空 WorldMap 场景。当前没有绑定邮箱、标牌或首次进入等正式业务触发条件。
@@ -838,3 +838,8 @@ WorldMap 苹果树点击后由 `AppleTreeDropController` 播放快速晃动并�
 
 - 在保留天空派生范围、正弦往返和端点折返方式不变的前提下，`WorldMapAmbientAnimationController` 的 `_cloudMoveSpeed` 从 `0.12` 降为 `0.06`，即当前移动速度减半。
 - 本次不改云层移动范围、折返方式、天空/云层视觉资源或其他 WorldMap 系统；Play 结果仍需人工确认。
+
+### 2026-09-13 WorldMap 室外新手指引首页调整
+
+- `Canvas/Panel_OutdoorTutorial` 当前保存六个页面节点：`Page_Outdoor1`～`Page_Outdoor6`；`Page_Outdoor1` 作为首页，原 `Page_Intro` 已从场景和分页引用中移除。
+- 原始 `Assets/_Project/Art/新手引导/outdoor/intro.png` 及其 `.meta` 保留在仓库中，但不再由室外新手指引展示或挂载。

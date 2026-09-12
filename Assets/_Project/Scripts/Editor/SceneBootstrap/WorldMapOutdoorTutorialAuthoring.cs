@@ -45,7 +45,7 @@ namespace GeminiLab.Editor.SceneBootstrap
             ConfigureFullscreen(panel);
 
             SceneAuthoredImageVariantView pageView = GetOrAdd<SceneAuthoredImageVariantView>(panel);
-            GameObject introPage = EnsurePage(panel.transform, "Page_Intro", OutdoorArtRoot + "/intro.png", uiLayer);
+            RemoveChild(panel.transform, "Page_Intro");
             GameObject[] pages = new GameObject[6];
             for (int i = 0; i < pages.Length; i++)
             {
@@ -56,7 +56,7 @@ namespace GeminiLab.Editor.SceneBootstrap
                     uiLayer);
             }
 
-            ConfigurePageView(pageView, introPage, pages);
+            ConfigurePageView(pageView, pages);
 
             Button previousButton = EnsureImageButton(
                 panel.transform,
@@ -97,12 +97,11 @@ namespace GeminiLab.Editor.SceneBootstrap
             EditorUtility.SetDirty(pageView);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            Debug.Log("[WorldMapOutdoorTutorialAuthoring] Outdoor tutorial authored with seven pages and placeholder entry.");
+            Debug.Log("[WorldMapOutdoorTutorialAuthoring] Outdoor tutorial authored with six pages and placeholder entry.");
         }
 
         private static void ConfigurePageView(
             SceneAuthoredImageVariantView pageView,
-            GameObject introPage,
             GameObject[] pages)
         {
             SerializedObject serialized = new SerializedObject(pageView);
@@ -111,22 +110,22 @@ namespace GeminiLab.Editor.SceneBootstrap
             SerializedProperty? previewTarget = serialized.FindProperty("_previewTarget");
             if (previewTarget != null)
             {
-                previewTarget.objectReferenceValue = introPage;
+                previewTarget.objectReferenceValue = pages.Length > 0 ? pages[0] : null;
             }
 
             SerializedProperty? previewKey = serialized.FindProperty("_previewKey");
             if (previewKey != null)
             {
-                previewKey.stringValue = "outdoor-intro";
+                previewKey.stringValue = pages.Length > 0 ? "outdoor-1" : string.Empty;
             }
 
             SerializedProperty? variants = serialized.FindProperty("_variants");
             if (variants != null)
             {
-                variants.arraySize = pages.Length;
-                for (int i = 0; i < pages.Length; i++)
+                variants.arraySize = Mathf.Max(0, pages.Length - 1);
+                for (int i = 1; i < pages.Length; i++)
                 {
-                    SerializedProperty element = variants.GetArrayElementAtIndex(i);
+                    SerializedProperty element = variants.GetArrayElementAtIndex(i - 1);
                     element.FindPropertyRelative("Key").stringValue = $"outdoor-{i + 1}";
                     element.FindPropertyRelative("Target").objectReferenceValue = pages[i];
                 }
@@ -230,6 +229,15 @@ namespace GeminiLab.Editor.SceneBootstrap
             created.transform.SetParent(parent, false);
             Undo.RegisterCreatedObjectUndo(created, $"Create {name}");
             return created;
+        }
+
+        private static void RemoveChild(Transform parent, string name)
+        {
+            Transform? existing = parent.Find(name);
+            if (existing != null)
+            {
+                Undo.DestroyObjectImmediate(existing.gameObject);
+            }
         }
 
         private static void ConfigureFullscreen(GameObject target)
